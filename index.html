@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SHIKOKU FAMMILY — KOMUNITAS ID-JP</title>
+  <meta name="description" content="Database Anggota komunitas orang Indonesia di Shikoku, Jepang." />
+  <meta name="theme-color" content="#dbeeff" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" href="assets/icons/icon-192.png" />
+  <!-- Font Ubuntu, sesuai desain yang disepakati -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="css/style.css" />
+  <link rel="stylesheet" href="css/form.css" />
+</head>
+<body>
+  <!-- Header utama, selalu terlihat di semua menu -->
+  <header class="header">
+    <button id="btn-menu" class="btn-icon" aria-label="Buka menu">☰</button>
+    <div class="brand">
+      <strong>SHIKOKU FAMMILY</strong>
+      <small>KOMUNITAS ID-JP &middot; Database Anggota</small>
+    </div>
+    <button id="btn-logout" class="btn-small hidden" type="button">Keluar</button>
+  </header>
+
+  <!-- Menu samping: 9 menu utama. Menu admin disembunyikan untuk anggota biasa. -->
+  <nav id="drawer" class="drawer" aria-label="Menu utama">
+    <button id="btn-close-menu" class="btn-icon" aria-label="Tutup menu">✕</button>
+    <a href="#" data-page="dashboard">🏠 Dashboard</a>
+    <a href="#" data-page="members">👥 Data Anggota</a>
+    <a href="#" data-page="attendance">✅ Absensi</a>
+    <a href="#" data-page="gallery">🖼️ Galeri</a>
+    <a href="#" data-page="forum">💬 Forum</a>
+    <a href="#" data-page="map">🗺️ Peta Anggota</a>
+    <a href="#" data-page="regions">📍 Wilayah</a>
+    <a href="#" data-page="operators" data-admin-only="true">🛠️ Operator</a>
+    <a href="#" data-page="import" data-admin-only="true">📥 Import Database</a>
+    <p class="drawer-note">Menu Operator dan Import hanya tampil untuk admin yang sudah disetujui.</p>
+  </nav>
+  <div id="drawer-backdrop" class="backdrop hidden"></div>
+
+  <!-- Isi halaman dimuat dari pages/*.html oleh js/app.js -->
+  <main id="app" class="container">
+    <p class="muted">Memuat aplikasi…</p>
+  </main>
+
+  <!-- Maskot: diam (tanpa animasi), bisa digeser, diketuk menampilkan "Tanya Admin" -->
+  <div id="mascot" class="mascot" title="Maskot SHIKOKU FAMMILY">
+    <!-- Ganti berkas ini dengan gambar chibi yang kamu unggah -->
+    <img src="assets/mascot.png" alt="Maskot chibi SHIKOKU FAMMILY" />
+  </div>
+  <div id="mascot-menu" class="mascot-menu hidden">
+    <button id="btn-ask-admin" type="button">💬 Tanya Admin</button>
+    <p id="ask-admin-note" class="muted hidden">
+      Membuka Forum… Tulis pertanyaanmu di sana, admin akan menjawab.
+    </p>
+  </div>
+
+  <!-- Urutan penting: config dulu, lalu Supabase, lalu logika aplikasi -->
+  <script src="js/config.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="js/supabase.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/dashboard.js"></script>
+  <script src="js/members.js"></script>
+  <script src="js/attendance.js"></script>
+  <script src="js/gallery.js"></script>
+  <script src="js/forum.js"></script>
+  <script src="js/map.js"></script>
+  <script src="js/regions.js"></script>
+  <script src="js/operators.js"></script>
+  <script src="js/import.js"></script>
+  <script src="js/admin.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    // Daftarkan service worker supaya bisa dipasang di layar utama HP (PWA).
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", function () {
+        navigator.serviceWorker.register("sw.js").catch(function () {});
+      });
+    }
+  </script>
+</body>
+</html>

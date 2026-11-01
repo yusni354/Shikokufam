@@ -1,0 +1,29 @@
+<!-- Login dan daftar. Pendaftar baru otomatis berstatus "menunggu". -->
+<div class="card">
+  <h1>SHIKOKU FAMMILY</h1>
+  <p class="muted">KOMUNITAS ID-JP &middot; Database Anggota, wilayah Shikoku.</p>
+  <p id="auth-msg" class="hidden"></p>
+
+  <form id="form-login">
+    <h2>Masuk</h2>
+    <label for="login-email">Email</label>
+    <input id="login-email" type="email" required />
+    <label for="login-password">Kata sandi</label>
+    <input id="login-password" type="password" required />
+    <p><button type="submit">Masuk</button></p>
+    <p class="muted">Belum punya akun? <button type="button" class="secondary" id="show-register">Daftar</button></p>
+  </form>
+
+  <form id="form-register" class="hidden">
+    <h2>Daftar Anggota Baru</h2>
+    <label for="reg-nama">Nama lengkap</label>
+    <input id="reg-nama" type="text" required />
+    <label for="reg-email">Email</label>
+    <input id="reg-email" type="email" required />
+    <label for="reg-password">Kata sandi</label>
+    <input id="reg-password" type="password" required minlength="6" />
+    <p class="muted">Setelah daftar, statusmu “menunggu persetujuan” sampai admin menyetujuinya.</p>
+    <p><button type="submit">Daftar</button>
+       <button type="button" class="secondary" id="show-login">Kembali ke Masuk</button></p>
+  </form>
+</div>

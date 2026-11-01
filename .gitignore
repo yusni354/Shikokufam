@@ -1,0 +1,7 @@
+# Jangan pernah commit berkas-berkas ini ke GitHub.
+# .env berisi kunci rahasia; node_modules dan .vercel hanya berkas lokal.
+.env
+.env.local
+node_modules/
+.vercel
+.DS_Store

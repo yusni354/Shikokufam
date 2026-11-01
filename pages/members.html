@@ -1,0 +1,106 @@
+<!-- Data Anggota: daftar, cari, saring, detail, dan formulir 3 langkah (admin saja untuk tulis).
+     Anggota biasa hanya melihat dan mencari; akun "menunggu" sudah dikunci di js/app.js. -->
+<h1>Data Anggota</h1>
+<p class="muted" id="members-count">Memuat data anggota…</p>
+<p id="members-msg" class="hidden"></p>
+
+<!-- Tombol tambah hanya untuk admin; disembunyikan js/members.js untuk anggota biasa -->
+<div id="members-admin-actions" class="hidden">
+  <button id="btn-add-member" type="button">＋ Tambah Anggota</button>
+</div>
+
+<div class="card">
+  <label for="members-search">Cari nama, kota, wilayah, atau email</label>
+  <input id="members-search" type="search" placeholder="Contoh: Yusni, Tokushima…" />
+  <div class="filter-row">
+    <div>
+      <label for="members-filter-prefektur">Prefektur</label>
+      <select id="members-filter-prefektur">
+        <option value="">Semua prefektur</option>
+        <option>Tokushima</option>
+        <option>Kagawa</option>
+        <option>Ehime</option>
+        <option>Kochi</option>
+      </select>
+    </div>
+    <div>
+      <label for="members-filter-wilayah">Wilayah</label>
+      <select id="members-filter-wilayah">
+        <option value="">Semua wilayah</option>
+      </select>
+    </div>
+  </div>
+</div>
+
+<!-- Detail satu anggota, muncul saat tombol "Lihat Detail" diketuk -->
+<div id="member-detail" class="card hidden"></div>
+
+<!-- Formulir Tambah/Ubah Anggota, 3 langkah. Tombol Isi Otomatis hanya untuk admin
+     dan memakai api/ai-autofill.js di Vercel; kunci AI tidak ada di browser. -->
+<form id="member-form" class="card hidden" novalidate>
+  <h2 id="member-form-title">Tambah Anggota</h2>
+  <p class="step-indicator" id="member-step-label">Langkah 1 dari 3: Identitas</p>
+
+  <div id="ai-row" class="hidden">
+    <button id="btn-ai-autofill" type="button" title="Lengkapi kolom kosong dari alamat Jepang yang sudah diisi.">✨ Isi Otomatis (AI)</button>
+    <p class="muted small">Isi Otomatis hanya mengisi kolom yang masih kosong, dan tidak menebak nama, tanggal lahir, atau nomor telepon. Fitur ini memakai <code>api/ai-autofill.js</code> di Vercel, jadi hanya berfungsi setelah deploy (atau dengan <code>vercel dev</code>).</p>
+  </div>
+
+  <!-- Langkah 1: Identitas -->
+  <div class="form-step" data-step="1">
+    <label for="f-nama">Nama lengkap *</label>
+    <input id="f-nama" type="text" required />
+    <label for="f-jenis-kelamin">Jenis kelamin</label>
+    <select id="f-jenis-kelamin">
+      <option value="">— Pilih —</option>
+      <option>Laki-laki</option>
+      <option>Perempuan</option>
+    </select>
+    <label for="f-tanggal-lahir">Tanggal lahir</label>
+    <input id="f-tanggal-lahir" type="date" />
+    <label for="f-no-telepon">No telepon</label>
+    <input id="f-no-telepon" type="tel" />
+    <label for="f-email">Email</label>
+    <input id="f-email" type="email" />
+  </div>
+
+  <!-- Langkah 2: Identitas + Wilayah digabung, sesuai permintaan awal -->
+  <div class="form-step hidden" data-step="2">
+    <label for="f-alamat-jepang">Alamat Jepang</label>
+    <textarea id="f-alamat-jepang" rows="2"></textarea>
+    <label for="f-kode-pos">Kode pos</label>
+    <input id="f-kode-pos" type="text" inputmode="numeric" />
+    <label for="f-prefektur">Prefektur</label>
+    <select id="f-prefektur">
+      <option value="">— Pilih —</option>
+      <option>Tokushima</option>
+      <option>Kagawa</option>
+      <option>Ehime</option>
+      <option>Kochi</option>
+    </select>
+    <label for="f-kota">Kota</label>
+    <input id="f-kota" type="text" />
+    <label for="f-wilayah">Wilayah</label>
+    <input id="f-wilayah" type="text" placeholder="Contoh: Tokushima-shi" />
+  </div>
+
+  <!-- Langkah 3: Pekerjaan dan keanggotaan -->
+  <div class="form-step hidden" data-step="3">
+    <label for="f-pekerjaan">Pekerjaan</label>
+    <input id="f-pekerjaan" type="text" />
+    <label for="f-status-tinggal">Status tinggal</label>
+    <input id="f-status-tinggal" type="text" placeholder="Contoh: Pelajar, Pekerja, Keluarga" />
+    <label for="f-tanggal-bergabung">Tanggal bergabung</label>
+    <input id="f-tanggal-bergabung" type="date" />
+  </div>
+
+  <p id="member-form-error" class="error hidden"></p>
+  <div class="form-nav">
+    <button id="btn-form-prev" type="button" class="secondary">← Sebelumnya</button>
+    <button id="btn-form-next" type="button">Lanjut →</button>
+    <button id="btn-form-save" type="submit" class="hidden">Simpan Anggota</button>
+    <button id="btn-form-cancel" type="button" class="secondary">Batal</button>
+  </div>
+</form>
+
+<div id="members-list"></div>

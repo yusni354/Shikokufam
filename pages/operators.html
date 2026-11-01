@@ -1,0 +1,53 @@
+<!-- Operator: menu khusus admin (sudah dikunci di js/app.js dan menu samping).
+     Halaman ini mengelola daftar pengurus/operator dari Data Anggota.
+     Ini BUKAN tempat menyetujui akun atau mengubah peran login — itu ada di langkah api/
+     (kelola akun admin). Menghapus operator di sini tidak menghapus data anggota maupun akunnya. -->
+<h1>Operator</h1>
+<p class="muted">Daftar pengurus/operator komunitas. Hanya admin yang sudah disetujui yang bisa membuka menu ini.</p>
+<p class="muted" id="operators-count">Memuat operator…</p>
+<p id="operators-msg" class="hidden"></p>
+
+<div class="card">
+  <label for="operators-search">Cari nama, jabatan, atau wilayah</label>
+  <input id="operators-search" type="search" placeholder="Contoh: Yusni, Ketua, Tokushima…" />
+  <label for="operators-filter-wilayah">Wilayah</label>
+  <select id="operators-filter-wilayah">
+    <option value="">Semua wilayah</option>
+  </select>
+</div>
+
+<!-- Formulir tambah/ubah operator -->
+<form id="operator-form" class="card hidden" novalidate>
+  <h2 id="operator-form-title">Tambah Operator</h2>
+  <label for="o-anggota">Anggota *</label>
+  <select id="o-anggota" required>
+    <option value="">— Pilih anggota —</option>
+  </select>
+  <label for="o-jabatan">Jabatan *</label>
+  <input id="o-jabatan" type="text" required list="jabatan-list" placeholder="Contoh: Ketua" />
+  <datalist id="jabatan-list">
+    <option>Ketua</option>
+    <option>Wakil Ketua</option>
+    <option>Sekretaris</option>
+    <option>Bendahara</option>
+    <option>Koordinator Wilayah</option>
+    <option>Humas</option>
+    <option>Acara</option>
+  </datalist>
+  <label for="o-wilayah">Wilayah</label>
+  <select id="o-wilayah">
+    <option value="">— Pilih wilayah (dari menu Wilayah) —</option>
+  </select>
+  <p class="muted small">Kalau wilayah yang dicari belum ada di daftar, tambahkan dulu di menu Wilayah.</p>
+  <label for="o-kontak">Kontak</label>
+  <input id="o-kontak" type="text" placeholder="Contoh: nomor HP atau akun media sosial" />
+  <p id="operator-form-error" class="error hidden"></p>
+  <p>
+    <button type="submit">Simpan Operator</button>
+    <button id="btn-operator-cancel" type="button" class="secondary">Batal</button>
+  </p>
+</form>
+
+<p><button id="btn-add-operator" type="button">＋ Tambah Operator</button></p>
+
+<div id="operators-list"></div>

@@ -1,0 +1,59 @@
+<!-- Peta Anggota memakai Google My Maps, bukan API Google Maps berbayar.
+     Alurnya: admin mengekspor CSV dari halaman ini, mengimpornya ke My Maps,
+     lalu menempel tautan embed My Maps ke js/config.js.
+     Peta bisa dilihat semua anggota yang disetujui; ekspor CSV hanya untuk admin,
+     karena berisi alamat anggota. -->
+<h1>Peta Anggota</h1>
+<p class="muted">Sebaran alamat anggota di wilayah Shikoku, lewat Google My Maps.</p>
+<p id="map-msg" class="hidden"></p>
+
+<!-- Peta embed, hanya tampil kalau tautannya sudah diisi di js/config.js -->
+<div id="map-embed-card" class="card hidden">
+  <h2>Peta Sebaran Anggota</h2>
+  <iframe id="map-iframe" title="Peta Anggota SHIKOKU FAMMILY" width="100%" height="480"
+    style="border:0; border-radius:10px;" loading="lazy" allowfullscreen></iframe>
+</div>
+
+<div id="map-empty-card" class="card">
+  <h2>Peta belum dipasang</h2>
+  <p class="muted">Tautan embed Google My Maps belum diisi. Ikuti langkah admin di bawah ini,
+    lalu isi <code>GOOGLE_MY_MAPS_EMBED_URL</code> di <code>js/config.js</code>.</p>
+</div>
+
+<div class="grid">
+  <div class="card stat"><b id="map-total">–</b><span>Total Anggota</span></div>
+  <div class="card stat"><b id="map-with-address">–</b><span>Dengan Alamat Jepang</span></div>
+  <div class="card stat"><b id="map-without-address">–</b><span>Belum Ada Alamat</span></div>
+</div>
+
+<div class="card" id="map-admin-card">
+  <h2>Untuk Admin: Buat / Perbarui Pin di My Maps</h2>
+  <ol>
+    <li>Saring anggota di bawah ini, lalu tekan “Ekspor CSV untuk My Maps”.</li>
+    <li>Buka Google My Maps, buat peta baru, lalu pilih Impor dan unggah berkas CSV itu.</li>
+    <li>Saat My Maps bertanya, pilih kolom <b>Alamat Lengkap</b> sebagai lokasi pin dan kolom <b>Nama</b> sebagai judul pin.</li>
+    <li>Bagikan peta, salin tautan embed-nya (Share &gt; Embed on my site), lalu tempel ke <code>GOOGLE_MY_MAPS_EMBED_URL</code> di <code>js/config.js</code>.</li>
+  </ol>
+  <p>
+    <button id="btn-export-csv" type="button">⬇ Ekspor CSV untuk My Maps</button>
+    <a class="btn secondary" href="https://www.google.com/maps/d/" target="_blank" rel="noopener">Buka Google My Maps</a>
+  </p>
+  <p class="muted small">Ekspor hanya berisi anggota yang sudah punya alamat Jepang. Anggota tanpa alamat tidak ikut diekspor — lengkapi dulu alamatnya di Data Anggota.</p>
+</div>
+
+<div class="card">
+  <h2>Pratinjau Alamat untuk Ekspor</h2>
+  <label for="map-search">Cari nama atau kota</label>
+  <input id="map-search" type="search" placeholder="Contoh: Yusni, Tokushima…" />
+  <label for="map-filter-prefektur">Prefektur</label>
+  <select id="map-filter-prefektur">
+    <option value="">Semua prefektur</option>
+    <option>Tokushima</option>
+    <option>Kagawa</option>
+    <option>Ehime</option>
+    <option>Kochi</option>
+  </select>
+  <p class="muted" id="map-preview-count"></p>
+</div>
+
+<div id="map-list"></div>
