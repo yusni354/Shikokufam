@@ -22,8 +22,19 @@ create table if not exists public.messages (
   replied_at timestamptz
 );
 
+create table if not exists public.message_replies (
+  id uuid primary key default gen_random_uuid(),
+  message_id uuid not null references public.messages(id) on delete cascade,
+  sender_id uuid not null references auth.users(id) on delete cascade,
+  message text not null check (char_length(trim(message)) between 1 and 5000),
+  created_at timestamptz not null default now()
+);
+
 create index if not exists messages_status_created_at_idx
   on public.messages (status, created_at desc);
+
+create index if not exists message_replies_message_created_at_idx
+  on public.message_replies (message_id, created_at);
 
 create or replace function public.is_admin()
 returns boolean
@@ -67,6 +78,12 @@ create policy "Admins can read messages"
   to authenticated
   using (public.is_admin());
 
+drop policy if exists "Users can read their own messages" on public.messages;
+create policy "Users can read their own messages"
+  on public.messages for select
+  to authenticated
+  using (sender_id = (select auth.uid()));
+
 drop policy if exists "Admins can update messages" on public.messages;
 create policy "Admins can update messages"
   on public.messages for update
@@ -84,6 +101,41 @@ grant usage on schema public to anon, authenticated;
 grant insert on public.messages to anon, authenticated;
 grant select on public.profiles to authenticated;
 grant select, update, delete on public.messages to authenticated;
+grant select, insert on public.message_replies to authenticated;
+
+alter table public.message_replies enable row level security;
+
+drop policy if exists "Message participants can read replies" on public.message_replies;
+create policy "Message participants can read replies"
+  on public.message_replies for select
+  to authenticated
+  using (
+    public.is_admin()
+    or sender_id = (select auth.uid())
+    or exists (
+      select 1
+      from public.messages
+      where messages.id = message_replies.message_id
+        and messages.sender_id = (select auth.uid())
+    )
+  );
+
+drop policy if exists "Message participants can send replies" on public.message_replies;
+create policy "Message participants can send replies"
+  on public.message_replies for insert
+  to authenticated
+  with check (
+    sender_id = (select auth.uid())
+    and (
+      public.is_admin()
+      or exists (
+        select 1
+        from public.messages
+        where messages.id = message_replies.message_id
+          and messages.sender_id = (select auth.uid())
+      )
+    )
+  );
 
 -- Jalankan setelah membuat akun admin di Authentication > Users:
 -- insert into public.profiles (id, name, role)

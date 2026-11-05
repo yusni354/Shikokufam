@@ -24,24 +24,58 @@ function createLocalDb(){
   });
   return {collection};
 }
-function messageFromRow(row){return {id:row.id,nama:row.name,teks:row.message,at:new Date(row.created_at).getTime(),status:row.status}}
+function messageFromRow(row){return {id:row.id,nama:row.name,teks:row.message,at:new Date(row.created_at).getTime(),status:row.status,sender_id:row.sender_id}}
+function replyFromRow(row){return {id:row.id,message_id:row.message_id,by:row.sender_id,teks:row.message,at:new Date(row.created_at).getTime()}}
 async function loadMessages(){
-  if(!S.supabase||!S.admin)return;
-  const {data,error}=await S.supabase.from('messages').select('*').order('created_at',{ascending:true});
+  if(!S.supabase||!S.uid)return;
+  let query=S.supabase.from('messages').select('*').order('created_at',{ascending:true});
+  if(!S.admin)query=query.eq('sender_id',S.uid);
+  const {data,error}=await query;
   if(error){console.error(error);return}
   S.tanya=(data||[]).map(messageFromRow);
-  const unread=(data||[]).filter(x=>x.status==='unread');
-  if(unread.length)await S.supabase.from('messages').update({status:'read',read_at:new Date().toISOString()}).eq('status','unread');
+  const ids=(data||[]).map(x=>x.id);
+  if(ids.length){
+    const {data:replies}=await S.supabase.from('message_replies').select('*').in('message_id',ids).order('created_at',{ascending:true});
+    S.replies=(replies||[]).map(replyFromRow);
+  }else S.replies=[];
+  if(S.admin){
+    const unread=(data||[]).filter(x=>x.status==='unread');
+    if(unread.length)await S.supabase.from('messages').update({status:'read',read_at:new Date().toISOString()}).eq('status','unread');
+  }
   render();
 }
 async function submitMessage(data){
   if(!S.supabase)throw new Error('Supabase belum tersedia');
+  if(!S.uid)throw new Error('Silakan login terlebih dahulu');
   const {error}=await S.supabase.from('messages').insert({
     name:data.nama,
     message:data.teks,
-    sender_id:S.supabase.auth.getUser?((await S.supabase.auth.getUser()).data.user?.id||null):null
+    sender_id:S.uid
   });
   if(error)throw error;
+}
+async function submitReply(messageId,text){
+  if(!S.supabase||!S.uid)throw new Error('Silakan login terlebih dahulu');
+  const {error}=await S.supabase.from('message_replies').insert({message_id:messageId,sender_id:S.uid,message:text});
+  if(error)throw error;
+}
+function accountForm(){
+  const email=h('input',{type:'email',placeholder:'Email',autocomplete:'email'});
+  const password=h('input',{type:'password',placeholder:'Password minimal 6 karakter',autocomplete:'current-password'});
+  const name=h('input',{placeholder:'Nama lengkap',autocomplete:'name'});
+  const notice=h('p',{class:'warn'});
+  let signup=false;
+  const title=h('b',{},'🔐 Masuk ke Shikoku Family');
+  const toggle=h('button',{class:'btn s',onclick:()=>{signup=!signup;name.style.display=signup?'':'none';title.textContent=signup?'📝 Buat akun':'🔐 Masuk ke Shikoku Family';toggle.textContent=signup?'Sudah punya akun? Masuk':'Belum punya akun? Daftar'}},'Belum punya akun? Daftar');
+  name.style.display='none';
+  return box(title,h('p',{class:'sub'},'Login diperlukan agar Anda dapat menerima balasan admin.'),h('label',{class:'lb'},'Email',email),h('label',{class:'lb'},'Password',password),h('label',{class:'lb'},'Nama lengkap',name),notice,h('button',{class:'btn',onclick:async()=>{
+    notice.textContent='Memproses...';
+    const result=signup
+      ?await S.supabase.auth.signUp({email:email.value.trim(),password:password.value,options:{data:{name:name.value.trim()}}})
+      :await S.supabase.auth.signInWithPassword({email:email.value.trim(),password:password.value});
+    notice.textContent=result.error?result.error.message:(signup?'Akun berhasil dibuat. Silakan masuk.':'Login berhasil.');
+    if(!result.error&&!signup)await loadMessages();
+  }},signup?'Daftar':'Masuk'),toggle);
 }
 function loginForm(){
   const email=h('input',{type:'email',placeholder:'Email admin',autocomplete:'email'});
@@ -53,6 +87,14 @@ function loginForm(){
     notice.textContent=error?error.message:'Login berhasil.';
     if(!error)await loadMessages();
   }},'Masuk'));
+}
+function replyBox(messageId){
+  const input=h('textarea',{rows:2,placeholder:'Tulis balasan...'});
+  return h('div',{style:'margin-top:10px'},input,h('button',{class:'btn s',onclick:async()=>{
+    if(!input.value.trim())return;
+    try{await submitReply(messageId,input.value.trim());input.value='';await loadMessages()}
+    catch(e){alert('Gagal mengirim balasan: '+e.message)}
+  }},'Kirim balasan'));
 }
 function guard(){return S.db?null:h('p',{class:'warn'},'Penyimpanan belum tersedia.')}
 
@@ -302,7 +344,7 @@ render();
       if(session?.user){
         const {data:profile}=await S.supabase.from('profiles').select('name,role').eq('id',session.user.id).maybeSingle();
         S.admin=profile?.role==='admin';S.name=profile?.name||session.user.email||'';
-        if(S.admin)await loadMessages();
+        await loadMessages();
       }
       S.authLoading=false;render();
     };
@@ -315,13 +357,15 @@ render();
 })();
 
 function vPesan(){
-  if(!S.admin)return [h('h1',{},'Pesan Masuk'),h('p',{class:'sub'},'Area ini khusus admin.'),loginForm()];
+  if(!S.uid)return [h('h1',{},'Pesan Masuk'),accountForm()];
   const L=[...(S.tanya||[])].reverse();
   const cards=L.length?L.map(x=>h('div',{class:'card',style:'display:block'},
     h('div',{class:'row'},h('b',{},x.nama||'Anggota'),h('small',{class:'warn'},new Date(x.at||0).toLocaleString('id-ID'))),
     h('div',{style:'background:#e3f1f8;border-radius:16px;padding:12px;margin:10px 0 12px;white-space:pre-wrap'},x.teks||'Tidak ada pesan tambahan.'),
-    h('button',{class:'btn s',onclick:async()=>{if(!confirm('Hapus pesan ini?'))return;const {error}=await S.supabase.from('messages').delete().eq('id',x.id);if(error)alert('Gagal menghapus pesan: '+error.message);else loadMessages()}},'Hapus'))):[h('p',{class:'warn'},'Belum ada pertanyaan.')];
-  return [h('h1',{},'Pesan Masuk'),h('p',{class:'sub'},L.length+' pertanyaan untuk admin'),...cards];
+    ...(S.replies||[]).filter(r=>r.message_id===x.id).map(r=>h('div',{style:'background:#f4ead7;border-radius:16px;padding:12px;margin:8px 0;white-space:pre-wrap'},h('b',{},r.by===S.uid?'Anda':'Admin'),h('br'),r.teks)),
+    S.admin&&h('button',{class:'btn s',onclick:async()=>{if(!confirm('Hapus pesan ini?'))return;const {error}=await S.supabase.from('messages').delete().eq('id',x.id);if(error)alert('Gagal menghapus pesan: '+error.message);else loadMessages()}},'Hapus'),
+    replyBox(x.id))):[h('p',{class:'warn'},S.admin?'Belum ada pertanyaan.':'Belum ada pesan Anda.')];
+  return [h('h1',{},S.admin?'Pesan Masuk':'Pesan Saya'),h('p',{class:'sub'},L.length+' pesan'),h('button',{class:'btn s',onclick:async()=>{await S.supabase.auth.signOut()}},'Keluar'),...cards];
 }
 /* ===== maskot: gambar diam, bisa digeser, ketuk untuk tanya admin ===== */
 const ADMIN_WA=''; /* isi nomor WhatsApp admin, contoh: 6281234567890 */
@@ -330,7 +374,9 @@ const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 function closeMenu(){const m=$('#pm');if(m)m.remove()}
 function askForm(){
   closeMenu();
+  if(!S.uid){alert('Silakan daftar atau login terlebih dahulu agar dapat menerima balasan admin.');go('pesan');return}
   const nama=h('input',{placeholder:'Nama lengkap',autocomplete:'name'});
+  nama.value=S.name||'';
   const ta=h('textarea',{rows:5,placeholder:'Tulis pertanyaan untuk admin...',autocomplete:'off'});
   const m=h('div',{id:'qm'},h('div',{class:'card',style:'display:block;max-width:420px'},
     h('b',{},'💬 Tanya Admin'),
