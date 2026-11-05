@@ -314,8 +314,15 @@ render();
   render();
 })();
 
-function vPesan(){if(!S.admin)return [h('h1',{},'Pesan Masuk'),h('p',{class:'sub'},'Area ini khusus admin.'),loginForm()];const L=[...(S.tanya||[])].reverse();return [h('h1',{},'Pesan Masuk'),h('p',{class:'sub'},L.length+' pertanyaan untuk admin'),
-  L.length?L.map(x=>h('div',{class:'card',style:'display:block'},h('div',{class:'row'},h('b',{},x.nama||'Anggota'),h('small',{class:'warn'},new Date(x.at||0).toLocaleString('id-ID'))),h('div',{style:'background:#e3f1f8;border-radius:16px;padding:12px;margin:10px 0 12px;white-space:pre-wrap'},x.teks||'Tidak ada pesan tambahan.'),h('button',{class:'btn s',onclick:async()=>{if(!confirm('Hapus pesan ini?'))return;const {error}=await S.supabase.from('messages').delete().eq('id',x.id);if(error)alert('Gagal menghapus pesan: '+error.message);else loadMessages()}},'Hapus'))):h('p',{class:'warn'},'Belum ada pertanyaan.')]}
+function vPesan(){
+  if(!S.admin)return [h('h1',{},'Pesan Masuk'),h('p',{class:'sub'},'Area ini khusus admin.'),loginForm()];
+  const L=[...(S.tanya||[])].reverse();
+  const cards=L.length?L.map(x=>h('div',{class:'card',style:'display:block'},
+    h('div',{class:'row'},h('b',{},x.nama||'Anggota'),h('small',{class:'warn'},new Date(x.at||0).toLocaleString('id-ID'))),
+    h('div',{style:'background:#e3f1f8;border-radius:16px;padding:12px;margin:10px 0 12px;white-space:pre-wrap'},x.teks||'Tidak ada pesan tambahan.'),
+    h('button',{class:'btn s',onclick:async()=>{if(!confirm('Hapus pesan ini?'))return;const {error}=await S.supabase.from('messages').delete().eq('id',x.id);if(error)alert('Gagal menghapus pesan: '+error.message);else loadMessages()}},'Hapus'))):[h('p',{class:'warn'},'Belum ada pertanyaan.')];
+  return [h('h1',{},'Pesan Masuk'),h('p',{class:'sub'},L.length+' pertanyaan untuk admin'),...cards];
+}
 /* ===== maskot: gambar diam, bisa digeser, ketuk untuk tanya admin ===== */
 const ADMIN_WA=''; /* isi nomor WhatsApp admin, contoh: 6281234567890 */
 const pet=$('#pet');let drag=null;
@@ -338,6 +345,7 @@ function askForm(){
           const namaValue=nama.value.trim();
           await submitMessage({nama:namaValue,teks:ta.value.trim()});
           S.name=namaValue;m.remove();
+          if(S.admin)await loadMessages();
           alert('Pertanyaan terkirim dan sudah masuk ke Pesan Masuk.');
         }catch(e){
           console.error(e);
