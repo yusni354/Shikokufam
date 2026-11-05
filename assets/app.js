@@ -270,7 +270,7 @@ render();
 })();
 
 function vPesan(){const L=[...(S.tanya||[])].reverse();return [h('h1',{},'Pesan Masuk'),h('p',{class:'sub'},L.length+' pertanyaan untuk admin'),
-  L.length?L.map(x=>h('div',{class:'card',style:'display:block'},h('b',{},x.nama||'Anggota'),h('small',{class:'warn'},' \u00b7 '+new Date(x.at||0).toLocaleString('id-ID')),x.wilayah&&h('p',{class:'warn',style:'margin:6px 0'},'📍 '+x.wilayah+(x.wa?' · 📱 '+x.wa:'')),h('p',{style:'white-space:pre-wrap;margin:8px 0'},x.teks||'Tidak ada pesan tambahan.'),h('button',{class:'btn s',onclick:()=>{if(confirm('Hapus pesan ini?'))S.db.collection('tanya').doc(x.id).delete()}},'Hapus'))):h('p',{class:'warn'},'Belum ada pertanyaan.')]}
+  L.length?L.map(x=>h('div',{class:'card',style:'display:block'},h('div',{class:'row'},h('b',{},x.nama||'Anggota'),h('small',{class:'warn'},new Date(x.at||0).toLocaleString('id-ID'))),h('div',{style:'background:#e3f1f8;border-radius:16px;padding:12px;margin:10px 0 12px;white-space:pre-wrap'},x.teks||'Tidak ada pesan tambahan.'),h('button',{class:'btn s',onclick:()=>{if(confirm('Hapus pesan ini?'))S.db.collection('tanya').doc(x.id).delete()}},'Hapus'))):h('p',{class:'warn'},'Belum ada pertanyaan.')]}
 /* ===== maskot: gambar diam, bisa digeser, ketuk untuk tanya admin ===== */
 const ADMIN_WA=''; /* isi nomor WhatsApp admin, contoh: 6281234567890 */
 const pet=$('#pet');let drag=null;
@@ -279,19 +279,15 @@ function closeMenu(){const m=$('#pm');if(m)m.remove()}
 function askForm(){
   closeMenu();
   const nama=h('input',{placeholder:'Nama lengkap',autocomplete:'name'});
-  const wilayah=h('input',{placeholder:'Kota atau prefektur di Jepang',autocomplete:'address-level1'});
-  const wa=h('input',{placeholder:'Nomor WhatsApp',type:'tel',autocomplete:'tel'});
-  const ta=h('textarea',{rows:4,placeholder:'Tulis pertanyaan untuk admin...'});
+  const ta=h('textarea',{rows:5,placeholder:'Tulis pertanyaan untuk admin...',autocomplete:'off'});
   const m=h('div',{id:'qm'},h('div',{class:'card',style:'display:block;max-width:420px'},
-    h('b',{},'🤝 Gabung Shikoku Family'),
-    h('p',{class:'warn',style:'margin:4px 0 2px'},'Isi data singkat berikut agar admin dapat menghubungi Anda.'),
+    h('b',{},'💬 Tanya Admin'),
+    h('p',{class:'warn',style:'margin:4px 0 2px'},'Sampaikan pertanyaan Anda. Admin akan membalasnya.'),
     h('label',{class:'lb'},'Nama lengkap *',nama),
-    h('label',{class:'lb'},'Kota / prefektur di Jepang *',wilayah),
-    h('label',{class:'lb'},'Nomor WhatsApp *',wa),
-    h('label',{class:'lb'},'Pesan',ta),
+    h('label',{class:'lb'},'Pertanyaan *',ta),
     h('div',{class:'row',style:'justify-content:flex-start;margin-top:8px'},
-      h('button',{class:'btn',onclick:async()=>{if(!nama.value.trim()||!wilayah.value.trim()||!wa.value.trim()){alert('Nama, wilayah, dan WhatsApp wajib diisi');return}if(!S.db){alert('Database belum aktif');return}
-        try{const namaValue=nama.value.trim();await S.db.collection('tanya').add({nama:namaValue,wilayah:wilayah.value.trim(),wa:wa.value.trim(),teks:ta.value.trim(),by:S.uid,jenis:'pendaftaran',at:Date.now()});S.name=namaValue;m.remove();alert('Terkirim. Admin akan menghubungi Anda.')}catch(e){alert('Gagal mengirim')}}},'Kirim pendaftaran'),
+      h('button',{class:'btn',onclick:async()=>{if(!nama.value.trim()||!ta.value.trim()){alert('Nama dan pertanyaan wajib diisi');return}if(!S.db){alert('Database belum aktif');return}
+        try{const namaValue=nama.value.trim();await S.db.collection('tanya').add({nama:namaValue,teks:ta.value.trim(),by:S.uid,jenis:'pertanyaan',at:Date.now()});S.name=namaValue;m.remove();go('pesan');alert('Pertanyaan terkirim dan sudah masuk ke Pesan Masuk.')}catch(e){alert('Gagal mengirim')}}},'Kirim pertanyaan'),
       h('button',{class:'btn s',onclick:()=>m.remove()},'Batal'))));
   document.body.append(m);ta.focus()}
 function openMenu(){
