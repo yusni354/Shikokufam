@@ -1,4 +1,4 @@
-const S={members:[],events:[],topics:[],view:'landing',admin:false,uid:null,name:'',db:null,supabase:null,authLoading:true};
+const S={members:[],events:[],topics:[],view:'landing',admin:false,uid:null,email:'',name:'',db:null,supabase:null,authLoading:true};
 const $=s=>document.querySelector(s);
 function h(t,p,...k){const e=document.createElement(t);for(const a in p||{}){if(a==='onclick')e.onclick=p[a];else if(a==='class')e.className=p[a];else e.setAttribute(a,p[a])}k.flat().forEach(c=>{if(c!=null&&c!==false)e.append(c)});return e}
 const ALL=[['landing','🏡 Beranda'],['peta','🗺️ Peta Wilayah'],['dash','🏠 Dashboard'],['members','👥 Data Anggota'],['absen','📝 Absensi'],['forum','💬 Forum'],['import','📥 Import Database',1],['pesan','📨 Pesan Masuk']];
@@ -68,7 +68,7 @@ function accountForm(){
   const title=h('b',{},'🔐 Masuk ke Shikoku Family');
   const toggle=h('button',{class:'btn s',onclick:()=>{signup=!signup;name.style.display=signup?'':'none';title.textContent=signup?'📝 Buat akun':'🔐 Masuk ke Shikoku Family';toggle.textContent=signup?'Sudah punya akun? Masuk':'Belum punya akun? Daftar'}},'Belum punya akun? Daftar');
   name.style.display='none';
-  return box(title,h('p',{class:'sub'},'Login diperlukan agar Anda dapat menerima balasan admin.'),h('label',{class:'lb'},'Email',email),h('label',{class:'lb'},'Password',password),h('label',{class:'lb'},'Nama lengkap',name),notice,h('button',{class:'btn',onclick:async()=>{
+  return box(title,h('p',{class:'sub'},'Login diperlukan agar Anda dapat menerima balasan admin.'),h('label',{class:'lb'},'User ID (Email)',email),h('label',{class:'lb'},'Password',password),h('label',{class:'lb'},'Nama lengkap',name),notice,h('button',{class:'btn',onclick:async()=>{
     notice.textContent='Memproses...';
     const result=signup
       ?await S.supabase.auth.signUp({email:email.value.trim(),password:password.value,options:{data:{name:name.value.trim()}}})
@@ -140,6 +140,7 @@ function vDash(){
   const c=(e,t,d,n,v)=>h('button',{class:'card',onclick:()=>go(v)},h('span',{class:'e'},e),h('span',{style:'flex:1'},h('b',{},t),h('small',{},d),h('br'),h('b',{style:'font-size:15px'},n)),'›');
   return [h('h1',{},'Selamat datang'+(S.name?', '+S.name.split(' ')[0]:'')+' 👋'),
     h('p',{class:'sub'},new Date().toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'})),
+    h('div',{class:'card',style:'display:block'},h('small',{class:'warn'},'User ID'),h('br'),h('b',{},S.email||S.uid||'-'),h('br'),h('button',{class:'btn s',style:'margin-top:10px',onclick:async()=>{await S.supabase.auth.signOut()}},'Keluar')),
     h('div',{class:'stats'},...[['Anggota',S.members.length],['Kegiatan',S.events.length],['Wilayah',Object.keys(wilayah()).length]].map(x=>h('div',{},h('small',{},x[0]),h('b',{},String(x[1]))))),
     c('🗄️','Database','Kelola data anggota komunitas',S.members.length+' anggota','members'),
     c('📋','Absensi','Kegiatan & kehadiran anggota',S.events.length+' kegiatan','absen'),
@@ -360,7 +361,7 @@ render();
   if(window.supabase&&window.SUPABASE_CONFIG?.url&&window.SUPABASE_CONFIG?.anonKey){
     S.supabase=window.supabase.createClient(window.SUPABASE_CONFIG.url,window.SUPABASE_CONFIG.anonKey);
     const applySession=async session=>{
-      S.uid=session?.user?.id||null;S.admin=false;
+      S.uid=session?.user?.id||null;S.email=session?.user?.email||'';S.admin=false;
       if(session?.user){
         const {data:profile}=await S.supabase.from('profiles').select('name,role').eq('id',session.user.id).maybeSingle();
         S.admin=profile?.role==='admin';S.name=profile?.name||session.user.email||'';
