@@ -1,7 +1,7 @@
-const S={members:[],events:[],topics:[],view:'landing',admin:true,uid:null,name:'',db:null};
+const S={members:[],events:[],topics:[],view:'landing',admin:false,uid:null,name:'',db:null,supabase:null,authLoading:true};
 const $=s=>document.querySelector(s);
 function h(t,p,...k){const e=document.createElement(t);for(const a in p||{}){if(a==='onclick')e.onclick=p[a];else if(a==='class')e.className=p[a];else e.setAttribute(a,p[a])}k.flat().forEach(c=>{if(c!=null&&c!==false)e.append(c)});return e}
-const ALL=[['landing','🏡 Beranda'],['peta','🗺️ Peta Wilayah'],['dash','🏠 Dashboard'],['members','👥 Data Anggota'],['absen','📝 Absensi'],['forum','💬 Forum'],['import','📥 Import Database',1],['pesan','📨 Pesan Masuk',1]];
+const ALL=[['landing','🏡 Beranda'],['peta','🗺️ Peta Wilayah'],['dash','🏠 Dashboard'],['members','👥 Data Anggota'],['absen','📝 Absensi'],['forum','💬 Forum'],['import','📥 Import Database',1],['pesan','📨 Pesan Masuk']];
 function go(v){S.view=v;S.form=S.detail=null;document.body.classList.remove('open');render()}
 $('#mn').onclick=()=>document.body.classList.add('open');
 $('#ov').onclick=()=>document.body.classList.remove('open');
@@ -23,6 +23,36 @@ function createLocalDb(){
     })
   });
   return {collection};
+}
+function messageFromRow(row){return {id:row.id,nama:row.name,teks:row.message,at:new Date(row.created_at).getTime(),status:row.status}}
+async function loadMessages(){
+  if(!S.supabase||!S.admin)return;
+  const {data,error}=await S.supabase.from('messages').select('*').order('created_at',{ascending:true});
+  if(error){console.error(error);return}
+  S.tanya=(data||[]).map(messageFromRow);
+  const unread=(data||[]).filter(x=>x.status==='unread');
+  if(unread.length)await S.supabase.from('messages').update({status:'read',read_at:new Date().toISOString()}).eq('status','unread');
+  render();
+}
+async function submitMessage(data){
+  if(!S.supabase)throw new Error('Supabase belum tersedia');
+  const {error}=await S.supabase.from('messages').insert({
+    name:data.nama,
+    message:data.teks,
+    sender_id:S.supabase.auth.getUser?((await S.supabase.auth.getUser()).data.user?.id||null):null
+  });
+  if(error)throw error;
+}
+function loginForm(){
+  const email=h('input',{type:'email',placeholder:'Email admin',autocomplete:'email'});
+  const password=h('input',{type:'password',placeholder:'Password',autocomplete:'current-password'});
+  const notice=h('p',{class:'warn'});
+  return box(h('b',{},'🔐 Login Admin'),h('p',{class:'sub'},'Masuk untuk membaca pesan yang diterima.'),h('label',{class:'lb'},'Email',email),h('label',{class:'lb'},'Password',password),notice,h('button',{class:'btn',onclick:async()=>{
+    notice.textContent='Memproses...';
+    const {error}=await S.supabase.auth.signInWithPassword({email:email.value.trim(),password:password.value});
+    notice.textContent=error?error.message:'Login berhasil.';
+    if(!error)await loadMessages();
+  }},'Masuk'));
 }
 function guard(){return S.db?null:h('p',{class:'warn'},'Penyimpanan belum tersedia.')}
 
@@ -265,12 +295,27 @@ render();
   try{S.assets=await claude.use('assets')}catch(e){}
   try{S.db=await claude.use('db')}catch(e){}
   if(!S.db)S.db=createLocalDb();
-  sub('members','members');sub('events','events');sub('topics','topics');sub('tanya','tanya');sub('pengaturan','pengaturan');sub('pin','pins');
+  if(window.supabase&&window.SUPABASE_CONFIG?.url&&window.SUPABASE_CONFIG?.anonKey){
+    S.supabase=window.supabase.createClient(window.SUPABASE_CONFIG.url,window.SUPABASE_CONFIG.anonKey);
+    const applySession=async session=>{
+      S.uid=session?.user?.id||null;S.admin=false;
+      if(session?.user){
+        const {data:profile}=await S.supabase.from('profiles').select('name,role').eq('id',session.user.id).maybeSingle();
+        S.admin=profile?.role==='admin';S.name=profile?.name||session.user.email||'';
+        if(S.admin)await loadMessages();
+      }
+      S.authLoading=false;render();
+    };
+    const {data:{session}}=await S.supabase.auth.getSession();
+    await applySession(session);
+    S.supabase.auth.onAuthStateChange((_event,next)=>{applySession(next)});
+  }else S.authLoading=false;
+  sub('members','members');sub('events','events');sub('topics','topics');sub('pengaturan','pengaturan');sub('pin','pins');
   render();
 })();
 
-function vPesan(){const L=[...(S.tanya||[])].reverse();return [h('h1',{},'Pesan Masuk'),h('p',{class:'sub'},L.length+' pertanyaan untuk admin'),
-  L.length?L.map(x=>h('div',{class:'card',style:'display:block'},h('div',{class:'row'},h('b',{},x.nama||'Anggota'),h('small',{class:'warn'},new Date(x.at||0).toLocaleString('id-ID'))),h('div',{style:'background:#e3f1f8;border-radius:16px;padding:12px;margin:10px 0 12px;white-space:pre-wrap'},x.teks||'Tidak ada pesan tambahan.'),h('button',{class:'btn s',onclick:()=>{if(confirm('Hapus pesan ini?'))S.db.collection('tanya').doc(x.id).delete()}},'Hapus'))):h('p',{class:'warn'},'Belum ada pertanyaan.')]}
+function vPesan(){if(!S.admin)return [h('h1',{},'Pesan Masuk'),h('p',{class:'sub'},'Area ini khusus admin.'),loginForm()];const L=[...(S.tanya||[])].reverse();return [h('h1',{},'Pesan Masuk'),h('p',{class:'sub'},L.length+' pertanyaan untuk admin'),
+  L.length?L.map(x=>h('div',{class:'card',style:'display:block'},h('div',{class:'row'},h('b',{},x.nama||'Anggota'),h('small',{class:'warn'},new Date(x.at||0).toLocaleString('id-ID'))),h('div',{style:'background:#e3f1f8;border-radius:16px;padding:12px;margin:10px 0 12px;white-space:pre-wrap'},x.teks||'Tidak ada pesan tambahan.'),h('button',{class:'btn s',onclick:async()=>{if(!confirm('Hapus pesan ini?'))return;const {error}=await S.supabase.from('messages').delete().eq('id',x.id);if(error)alert('Gagal menghapus pesan: '+error.message);else loadMessages()}},'Hapus'))):h('p',{class:'warn'},'Belum ada pertanyaan.')]}
 /* ===== maskot: gambar diam, bisa digeser, ketuk untuk tanya admin ===== */
 const ADMIN_WA=''; /* isi nomor WhatsApp admin, contoh: 6281234567890 */
 const pet=$('#pet');let drag=null;
@@ -286,8 +331,19 @@ function askForm(){
     h('label',{class:'lb'},'Nama lengkap *',nama),
     h('label',{class:'lb'},'Pertanyaan *',ta),
     h('div',{class:'row',style:'justify-content:flex-start;margin-top:8px'},
-      h('button',{class:'btn',onclick:async()=>{if(!nama.value.trim()||!ta.value.trim()){alert('Nama dan pertanyaan wajib diisi');return}if(!S.db){alert('Database belum aktif');return}
-        try{const namaValue=nama.value.trim();await S.db.collection('tanya').add({nama:namaValue,teks:ta.value.trim(),by:S.uid,jenis:'pertanyaan',at:Date.now()});S.name=namaValue;m.remove();go('pesan');alert('Pertanyaan terkirim dan sudah masuk ke Pesan Masuk.')}catch(e){alert('Gagal mengirim')}}},'Kirim pertanyaan'),
+      h('button',{class:'btn',onclick:async()=>{
+        if(!nama.value.trim()||!ta.value.trim()){alert('Nama dan pertanyaan wajib diisi');return}
+        if(!S.supabase){alert('Supabase belum tersedia');return}
+        try{
+          const namaValue=nama.value.trim();
+          await submitMessage({nama:namaValue,teks:ta.value.trim()});
+          S.name=namaValue;m.remove();
+          alert('Pertanyaan terkirim dan sudah masuk ke Pesan Masuk.');
+        }catch(e){
+          console.error(e);
+          alert('Gagal mengirim: '+(e.message||'periksa koneksi Supabase'));
+        }
+      }},'Kirim pertanyaan'),
       h('button',{class:'btn s',onclick:()=>m.remove()},'Batal'))));
   document.body.append(m);ta.focus()}
 function openMenu(){
