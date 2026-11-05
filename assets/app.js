@@ -140,12 +140,15 @@ function vDash(){
   const c=(e,t,d,n,v)=>h('button',{class:'card',onclick:()=>go(v)},h('span',{class:'e'},e),h('span',{style:'flex:1'},h('b',{},t),h('small',{},d),h('br'),h('b',{style:'font-size:15px'},n)),'›');
   return [h('h1',{},'Selamat datang'+(S.name?', '+S.name.split(' ')[0]:'')+' 👋'),
     h('p',{class:'sub'},new Date().toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'})),
-    h('div',{class:'card',style:'display:block'},h('small',{class:'warn'},'User ID'),h('br'),h('b',{},S.email||S.uid||'-'),h('br'),h('button',{class:'btn s',style:'margin-top:10px',onclick:async()=>{await S.supabase.auth.signOut()}},'Keluar')),
+    h('div',{class:'card',style:'display:block'},h('small',{class:'warn'},'User ID'),h('br'),h('b',{},S.email||S.uid||'-')),
     h('div',{class:'stats'},...[['Anggota',S.members.length],['Kegiatan',S.events.length],['Wilayah',Object.keys(wilayah()).length]].map(x=>h('div',{},h('small',{},x[0]),h('b',{},String(x[1]))))),
     c('🗄️','Database','Kelola data anggota komunitas',S.members.length+' anggota','members'),
     c('📋','Absensi','Kegiatan & kehadiran anggota',S.events.length+' kegiatan','absen'),
     c('💬','Forum','Diskusi & komentar anggota',S.topics.length+' topik','forum'),
-    c('🗺️','Peta & Wilayah','Sebaran anggota di Jepang',Object.keys(wilayah()).length+' wilayah','peta')];
+    S.admin&&c('📥','Import Database','Tambahkan data anggota','Impor CSV','import'),
+    c('📨','Pesan Masuk','Pesan dan balasan admin',S.admin?((S.tanya?.length||0)+' pesan'):'Pesan saya','pesan'),
+    c('🗺️','Peta & Wilayah','Sebaran anggota di Jepang',Object.keys(wilayah()).length+' wilayah','peta'),
+    h('button',{class:'card',onclick:async()=>{await S.supabase.auth.signOut()}},h('span',{class:'e'},'🚪'),h('span',{style:'flex:1'},h('b',{},'Keluar'),h('small',{},'Akhiri sesi akun')),'›')];
 }
 const PERAN=['Anggota','Pengurus'],STATUS=['aktif','nonaktif'];
 function vMembers(){
