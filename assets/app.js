@@ -323,6 +323,26 @@ function vImport(){
 
 const V={landing:vLanding,dash:vDash,members:vMembers,absen:vAbsen,forum:vForum,peta:vPeta,import:vImport,pesan:vPesan};
 function render(){
+  if(S.authLoading){
+    $('#dr').replaceChildren();
+    $('#app').replaceChildren(h('p',{class:'warn',style:'text-align:center;padding:40px 16px'},'Memeriksa sesi login...'));
+    $('#tb').style.display='none';
+    $('#pet').style.display='none';
+    return;
+  }
+  if(S.supabase&&!S.uid){
+    $('#dr').replaceChildren();
+    $('#app').replaceChildren(h('div',{class:'landing'},h('section',{class:'hero'},
+      h('p',{style:'font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-bottom:10px'},'SHIKOKU FAMILY'),
+      h('h1',{},'Selamat datang 👋'),
+      h('p',{},'Silakan masuk atau buat akun untuk bergabung dan menerima balasan dari admin.'),
+      accountForm()
+    )));
+    $('#tb').style.display='none';
+    $('#pet').style.display='none';
+    document.body.classList.remove('open');
+    return;
+  }
   const d=$('#dr');d.replaceChildren(h('p',{class:'sub',style:'padding:0 14px'},h('b',{style:'color:var(--ink)'},'KOMUNITAS ID-JP'),h('br'),'Database Anggota'),
     ...ALL.filter(x=>!x[2]||S.admin).map(x=>h('a',{class:S.view===x[0]?'on':'',onclick:()=>go(x[0])},x[1])));
   if(!V[S.view]||(ALL.find(x=>x[0]===S.view)||[])[2]&&!S.admin)S.view='landing';
