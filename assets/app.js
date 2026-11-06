@@ -66,17 +66,31 @@ async function submitReply(messageId,text){
 function accountForm(){
   const email=h('input',{type:'email',placeholder:'Email',autocomplete:'email'});
   const password=h('input',{type:'password',placeholder:'Password minimal 6 karakter',autocomplete:'current-password'});
+  const confirmPassword=h('input',{type:'password',placeholder:'Ulangi password',autocomplete:'new-password'});
   const name=h('input',{placeholder:'Nama lengkap',autocomplete:'name'});
   const notice=h('p',{class:'warn'});
   let signup=false;
   const title=h('b',{},'🔐 Masuk ke Shikoku Family');
-  const toggle=h('button',{class:'btn s',onclick:()=>{signup=!signup;name.style.display=signup?'':'none';title.textContent=signup?'📝 Buat akun':'🔐 Masuk ke Shikoku Family';toggle.textContent=signup?'Sudah punya akun? Masuk':'Belum punya akun? Daftar'}},'Belum punya akun? Daftar');
+  const toggle=h('button',{class:'btn s',onclick:()=>{signup=!signup;name.style.display=signup?'':'none';confirmPassword.style.display=signup?'':'none';confirmPassword.value='';title.textContent=signup?'📝 Daftar sebagai anggota':'🔐 Masuk ke Shikoku Family';toggle.textContent=signup?'Sudah punya akun? Masuk':'Belum punya akun? Daftar'}},'Belum punya akun? Daftar');
   name.style.display='none';
-  return box(title,h('p',{class:'sub'},'Login diperlukan agar Anda dapat menerima balasan admin.'),h('label',{class:'lb'},'User ID (Email)',email),h('label',{class:'lb'},'Password',password),h('label',{class:'lb'},'Nama lengkap',name),notice,h('button',{class:'btn',onclick:async()=>{
+  confirmPassword.style.display='none';
+  return box(title,h('p',{class:'sub'},'Masuk untuk bergabung atau daftar akun baru sebagai anggota komunitas.'),h('label',{class:'lb'},'Email',email),h('label',{class:'lb'},'Password',password),h('label',{class:'lb'},'Ulangi password',confirmPassword),h('label',{class:'lb'},'Nama lengkap',name),notice,h('button',{class:'btn',onclick:async()=>{
+    const emailValue=email.value.trim();
     notice.textContent='Memproses...';
-    const result=signup
-      ?await S.supabase.auth.signUp({email:email.value.trim(),password:password.value,options:{data:{name:name.value.trim()}}})
-      :await S.supabase.auth.signInWithPassword({email:email.value.trim(),password:password.value});
+    if(!emailValue||!password.value){notice.textContent='Email dan password wajib diisi.';return}
+    if(signup&&(!name.value.trim()||password.value.length<6||password.value!==confirmPassword.value)){
+      notice.textContent=!name.value.trim()?'Nama lengkap wajib diisi.':password.value.length<6?'Password minimal 6 karakter.':'Konfirmasi password tidak cocok.';
+      return;
+    }
+    let result;
+    try{
+      result=signup
+        ?await S.supabase.auth.signUp({email:emailValue,password:password.value,options:{data:{name:name.value.trim()}}})
+        :await S.supabase.auth.signInWithPassword({email:emailValue,password:password.value});
+    }catch(e){
+      notice.textContent=e.message||'Terjadi kesalahan. Silakan coba lagi.';
+      return;
+    }
     notice.textContent=result.error?result.error.message:(signup?'Akun berhasil dibuat. Silakan masuk.':'Login berhasil.');
     if(!result.error&&!signup)await loadMessages();
   }},signup?'Daftar':'Masuk'),toggle);
