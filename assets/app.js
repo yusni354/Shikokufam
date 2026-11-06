@@ -1,8 +1,8 @@
-const S={members:[],events:[],topics:[],view:'landing',admin:false,uid:null,email:'',name:'',db:null,supabase:null,authLoading:true};
+const S={members:[],events:[],topics:[],view:'landing',admin:false,uid:null,email:'',name:'',db:null,supabase:null,authLoading:true,unreadMessages:0};
 const $=s=>document.querySelector(s);
 function h(t,p,...k){const e=document.createElement(t);for(const a in p||{}){if(a==='onclick')e.onclick=p[a];else if(a==='class')e.className=p[a];else e.setAttribute(a,p[a])}k.flat().forEach(c=>{if(c!=null&&c!==false)e.append(c)});return e}
 const ALL=[['landing','🏡 Beranda'],['peta','🗺️ Peta Wilayah'],['dash','🏠 Dashboard'],['members','👥 Data Anggota'],['absen','📝 Absensi'],['forum','💬 Forum'],['import','📥 Import Database',1],['pesan','📨 Pesan Masuk']];
-function go(v){S.view=v;S.form=S.detail=null;document.body.classList.remove('open');render()}
+function go(v){S.view=v;S.form=S.detail=null;document.body.classList.remove('open');render();if(v==='pesan'&&S.admin)markMessagesRead()}
 $('#mn').onclick=()=>document.body.classList.add('open');
 $('#ov').onclick=()=>document.body.classList.remove('open');
 
@@ -38,10 +38,14 @@ async function loadMessages(){
     const {data:replies}=await S.supabase.from('message_replies').select('*').in('message_id',ids).order('created_at',{ascending:true});
     S.replies=(replies||[]).map(replyFromRow);
   }else S.replies=[];
-  if(S.admin){
-    const unread=(data||[]).filter(x=>x.status==='unread');
-    if(unread.length)await S.supabase.from('messages').update({status:'read',read_at:new Date().toISOString()}).eq('status','unread');
-  }
+  S.unreadMessages=S.admin?(data||[]).filter(x=>x.status==='unread').length:0;
+  render();
+}
+async function markMessagesRead(){
+  if(!S.supabase||!S.admin||!S.unreadMessages)return;
+  const {error}=await S.supabase.from('messages').update({status:'read',read_at:new Date().toISOString()}).eq('status','unread');
+  if(error){console.error(error);return}
+  S.unreadMessages=0;
   render();
 }
 async function submitMessage(data){
@@ -137,7 +141,9 @@ function vLanding(){
   )];
 }
 function vDash(){
-  const c=(e,t,d,n,v)=>h('button',{class:'card',onclick:()=>go(v)},h('span',{class:'e'},e),h('span',{style:'flex:1'},h('b',{},t),h('small',{},d),h('br'),h('b',{style:'font-size:15px'},n)),'›');
+  const c=(e,t,d,n,v)=>h('button',{class:'card',onclick:()=>go(v)},
+    h('span',{class:'e',style:'position:relative'},e,v==='pesan'&&S.unreadMessages>0&&h('span',{class:'icon-badge'},String(S.unreadMessages))),
+    h('span',{style:'flex:1'},h('b',{},t),h('small',{},d),h('br'),h('b',{style:'font-size:15px'},n)),'›');
   return [h('h1',{},'Selamat datang'+(S.name?', '+S.name.split(' ')[0]:'')+' 👋'),
     h('p',{class:'sub'},new Date().toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'})),
     h('div',{class:'card',style:'display:block'},h('small',{class:'warn'},'User ID'),h('br'),h('b',{},S.email||S.uid||'-')),
@@ -348,7 +354,8 @@ function render(){
     return;
   }
   const d=$('#dr');d.replaceChildren(h('p',{class:'sub',style:'padding:0 14px'},h('b',{style:'color:var(--ink)'},'KOMUNITAS ID-JP'),h('br'),'Database Anggota'),
-    ...ALL.filter(x=>!x[2]||S.admin).map(x=>h('a',{class:S.view===x[0]?'on':'',onclick:()=>go(x[0])},x[1])));
+    ...ALL.filter(x=>!x[2]||S.admin).map(x=>h('a',{class:S.view===x[0]?'on':'',onclick:()=>go(x[0])},
+      x[1],x[0]==='pesan'&&S.unreadMessages>0&&h('span',{class:'nav-badge'},String(S.unreadMessages)))));
   if(!V[S.view]||(ALL.find(x=>x[0]===S.view)||[])[2]&&!S.admin)S.view='landing';
   $('#app').replaceChildren(...[].concat(V[S.view]()).filter(Boolean));
   const tb=$('#tb');tb.style.display=S.form||S.view==='landing'?'none':'flex';$('#pet').style.display=S.form?'none':'block';
@@ -375,6 +382,7 @@ render();
     const {data:{session}}=await S.supabase.auth.getSession();
     await applySession(session);
     S.supabase.auth.onAuthStateChange((_event,next)=>{applySession(next)});
+    setInterval(()=>{if(S.admin)loadMessages()},30000);
   }else S.authLoading=false;
   sub('members','members');sub('events','events');sub('topics','topics');sub('pengaturan','pengaturan');sub('pin','pins');
   render();
