@@ -1,11 +1,12 @@
 const S={members:[],events:[],topics:[],view:'landing',admin:false,mainAdmin:false,uid:null,email:'',name:'',db:null,supabase:null,authLoading:true,unreadMessages:0,mapError:''};
 const $=s=>document.querySelector(s);
 function h(t,p,...k){const e=document.createElement(t);for(const a in p||{}){if(a==='onclick')e.onclick=p[a];else if(a==='class')e.className=p[a];else e.setAttribute(a,p[a])}k.flat().forEach(c=>{if(c!=null&&c!==false)e.append(c)});return e}
-const ALL=[['landing','🗺️ Beranda'],['dash','🏠 Dashboard'],['members','👥 Data Anggota'],['absen','📝 Absensi'],['forum','💬 Forum'],['import','📥 Import Database',1],['map-settings','⚙️ Pengaturan Peta',1,1],['pesan','📨 Pesan Masuk']];
+const ALL=[['landing','🗺️ Beranda'],['dash','🏠 Dashboard'],['members','👥 Data Anggota'],['absen','📝 Absensi'],['forum','💬 Forum'],['import','📥 Import Database',1],['pesan','📨 Pesan Masuk']];
 function go(v){S.view=v;S.form=S.detail=null;document.body.classList.remove('open');render();if(v==='pesan'&&S.admin)markMessagesRead()}
 $('#mn').onclick=()=>document.body.classList.add('open');
 $('#ov').onclick=()=>document.body.classList.remove('open');
-$('#mp').onclick=()=>go('map-settings');
+$('#st').onclick=()=>$('#sp').classList.toggle('open');
+$('#mp').onclick=()=>{$('#sp').classList.remove('open');go('map-settings')};
 
 function wilayah(){const m={};S.members.forEach(x=>{const w=x.wilayah||'Belum diisi';(m[w]=m[w]||[]).push(x)});return m}
 function createLocalDb(){
@@ -380,7 +381,7 @@ function render(){
     $('#app').replaceChildren(h('p',{class:'warn',style:'text-align:center;padding:40px 16px'},'Memeriksa sesi login...'));
     $('#tb').style.display='none';
     $('#pet').style.display='none';
-    $('#mp').style.display='none';
+    $('#sw').style.display='none';
     return;
   }
   if(S.supabase&&!S.uid){
@@ -393,7 +394,7 @@ function render(){
     )));
     $('#tb').style.display='none';
     $('#pet').style.display='none';
-    $('#mp').style.display='none';
+    $('#sw').style.display='none';
     document.body.classList.remove('open');
     return;
   }
@@ -401,9 +402,9 @@ function render(){
     ...ALL.filter(x=>!x[2]||(x[3]?S.mainAdmin:S.admin)).map(x=>h('a',{class:S.view===x[0]?'on':'',onclick:()=>go(x[0])},
       x[1],x[0]==='pesan'&&S.unreadMessages>0&&h('span',{class:'nav-badge'},String(S.unreadMessages)))),
     h('button',{class:'menu-logout',onclick:async()=>{await S.supabase.auth.signOut()}},'🚪 Keluar'));
-  $('#mp').style.display=S.mainAdmin?'inline-flex':'none';
+  $('#sw').style.display=S.mainAdmin?'flex':'none';
   const current=ALL.find(x=>x[0]===S.view);
-  if(!V[S.view]||current?.[2]&& (current[3]? !S.mainAdmin:!S.admin))S.view='landing';
+  if(!V[S.view]||S.view==='map-settings'&&!S.mainAdmin||current?.[2]&&!S.admin)S.view='landing';
   $('#app').replaceChildren(...[].concat(V[S.view]()).filter(Boolean));
   const tb=$('#tb');tb.style.display=S.form?'none':'flex';$('#pet').style.display=S.form?'none':'block';
   tb.replaceChildren(...[['landing','🗺️','Beranda'],['dash','🏠','Ringkasan'],['members','👥','Anggota'],['absen','📝','Absensi'],['forum','💬','Forum']].map(x=>h('a',{class:S.view===x[0]?'on':'',onclick:()=>go(x[0])},h('span',{},x[1]),x[2])));

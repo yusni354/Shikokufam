@@ -7,7 +7,12 @@ header{display:flex;align-items:center;gap:12px;padding:12px 16px;background:var
 header b{letter-spacing:.3px}
 .logo{width:34px;height:34px;border-radius:10px;background:#fff;color:var(--acc);display:grid;place-items:center;font-weight:700}
 .ic{background:none;border:0;font-size:24px;color:inherit}
-.header-action{display:none;margin-left:auto;border:1px solid rgba(255,255,255,.55);border-radius:999px;padding:8px 12px;background:rgba(255,255,255,.14);color:#fff;font-size:13px;font-weight:700;white-space:nowrap}
+.settings-wrap{display:none;position:relative;margin-left:auto}
+.header-action{border:1px solid rgba(255,255,255,.55);border-radius:999px;padding:8px 12px;background:rgba(255,255,255,.14);color:#fff;font-size:18px;font-weight:700;white-space:nowrap}
+.settings-pop{display:none;position:absolute;right:0;top:calc(100% + 10px);min-width:190px;padding:6px;background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:0 10px 24px rgba(0,0,0,.2);z-index:8}
+.settings-pop.open{display:block}
+.settings-pop button{width:100%;padding:10px;border:0;border-radius:11px;background:none;color:var(--ink);text-align:left;font-weight:600}
+.settings-pop button:hover{background:var(--line)}
 main{padding:16px 16px 110px;max-width:720px;margin:auto}
 h1{font-size:26px;margin:8px 0 2px}
 .sub{color:var(--mut);margin:0 0 16px}
