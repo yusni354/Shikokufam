@@ -18,6 +18,8 @@ create table if not exists public.profiles (
 alter table public.profiles
   add column if not exists is_main_admin boolean not null default false;
 alter table public.profiles
+  add column if not exists name text;
+alter table public.profiles
   add column if not exists email text;
 alter table public.profiles
   add column if not exists approval_status text not null default 'pending';
