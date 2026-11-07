@@ -78,7 +78,8 @@ function accountForm(){
     forgot.disabled=true;notice.textContent='Mengirim tautan reset password...';
     const {error}=await S.supabase.auth.resetPasswordForEmail(emailValue);
     forgot.disabled=false;
-    notice.textContent=error?error.message:'Tautan reset password sudah dikirim ke email Anda.';
+    notice.className=error?'warn auth-error':'warn auth-success';
+    notice.textContent=error?'Gagal mengirim tautan reset password: '+error.message:'Tautan reset password sudah dikirim ke email Anda.';
   }},'Lupa password?');
   const nameLabel=h('label',{class:'lb'},'Nama lengkap',name);
   const loginTab=h('button',{class:'auth-tab on',onclick:()=>setMode(false)},'Masuk');
@@ -91,6 +92,7 @@ function accountForm(){
   nameLabel.style.display='none';
   return h('div',{class:'card auth-card'},title,h('p',{class:'sub'},'Masuk untuk bergabung atau daftar akun baru sebagai anggota komunitas.'),h('div',{class:'auth-tabs'},loginTab,signupTab),nameLabel,h('label',{class:'lb'},'Email',email),h('label',{class:'lb'},'Password',password),notice,h('button',{class:'btn',onclick:async()=>{
     const emailValue=email.value.trim();
+    notice.className='warn';
     notice.textContent='Memproses...';
     if(!emailValue||!password.value){notice.textContent='Email dan password wajib diisi.';return}
     if(signup&&(!name.value.trim()||password.value.length<6)){
@@ -103,10 +105,19 @@ function accountForm(){
         ?await S.supabase.auth.signUp({email:emailValue,password:password.value,options:{data:{name:name.value.trim()}}})
         :await S.supabase.auth.signInWithPassword({email:emailValue,password:password.value});
     }catch(e){
+      notice.className='warn auth-error';
       notice.textContent=e.message||'Terjadi kesalahan. Silakan coba lagi.';
       return;
     }
-    notice.textContent=result.error?result.error.message:(signup?'Akun berhasil dibuat. Silakan masuk.':'Login berhasil.');
+    if(result.error){
+      notice.className='warn auth-error';
+      notice.textContent=!signup&&['invalid_credentials','invalid_grant'].includes(result.error.code)
+        ?'Email atau password salah. Silakan coba lagi.'
+        :result.error.message;
+    }else{
+      notice.className='warn auth-success';
+      notice.textContent=signup?'Akun berhasil dibuat. Silakan masuk.':'Login berhasil.';
+    }
     if(!result.error&&!signup)await loadMessages();
   }},signup?'Daftar':'Masuk'),forgot);
 }
