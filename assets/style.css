@@ -26,6 +26,8 @@ h1{font-size:26px;margin:8px 0 2px}
 .auth-tab.on{background:var(--card);color:var(--acc);box-shadow:0 2px 8px rgba(23,50,77,.1)}
 .auth-error{color:#111827;font-weight:600}
 .auth-success{color:#047857}
+.auth-card .warn{display:block;min-height:20px;margin:12px 0;padding:8px 10px;border-radius:8px;background:var(--line);color:#111827}
+.auth-card .auth-success{color:#047857}
 .auth-forgot{display:block;text-align:right;margin-top:4px}
 .auth-forgot .btn.s{width:auto;padding:5px 10px;border:1px solid var(--line);border-radius:8px;background:var(--line);color:#111827!important;font-weight:700;text-decoration:none}
 .auth-card .btn:not(.s){width:100%;margin-top:8px}
