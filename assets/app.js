@@ -268,6 +268,12 @@ function vForum(){
 }
 function alamatJp(m,det){return [det?m.alamat_jp:'',m.kec_jp,m.kota,m.pref||m.wilayah,m.kodepos,'Japan'].filter(Boolean).join(', ')}
 function mapMid(){const d=(S.pengaturan||[]).find(x=>x.id==='peta');return d&&d.mid}
+async function loadMapSettings(){
+  if(!S.supabase)return;
+  const {data,error}=await S.supabase.from('map_settings').select('map_mid').eq('id','main').maybeSingle();
+  if(error){console.error(error);S.pengaturan=[];return}
+  S.pengaturan=data?[{id:'peta',mid:data.map_mid}]:[];
+}
 function csvEsc(v){v=String(v==null?'':v);return(v.includes(',')||v.includes('"')||v.includes(String.fromCharCode(10)))?'"'+v.split('"').join('""')+'"':v}
 async function exportMyMaps(det){
   const dl=await claude.use('downloads');if(!dl){alert('Fitur unduh belum tersedia');return}
@@ -276,7 +282,15 @@ async function exportMyMaps(det){
 async function saveMid(inp){
   const u=inp.value.trim(),mm=(u.match(/[?&;]mid=([^&#"'\s<>]+)/)||[])[1]||(/^[A-Za-z0-9_-]{20,}$/.test(u)?u:'');
   if(!mm){alert('Kode tidak dikenali. Tempel kode embed (iframe) dari Google My Maps yang memuat "mid="');return}
-  try{await S.db.collection('pengaturan').doc('peta').set({mid:mm,at:Date.now()});alert('Peta disimpan')}catch(e){alert('Gagal menyimpan')}}
+  if(!S.admin){alert('Hanya admin utama yang dapat mengubah peta');return}
+  try{
+    if(S.supabase){
+      const {error}=await S.supabase.from('map_settings').upsert({id:'main',map_mid:mm,updated_at:new Date().toISOString()},{onConflict:'id'});
+      if(error)throw error;
+      S.pengaturan=[{id:'peta',mid:mm}];
+    }else await S.db.collection('pengaturan').doc('peta').set({mid:mm,at:Date.now()});
+    alert('Peta disimpan');render();
+  }catch(e){alert('Gagal menyimpan peta: '+(e.message||'periksa izin admin'))}}
 function vPetaLama(){
   const mid=mapMid(),det=h('input',{type:'checkbox'}),inp=h('textarea',{rows:4,placeholder:'Tempel kode embed (iframe) dari Google My Maps'});
   const ready=S.members.filter(m=>{const a=alamatJp(m,false);return a&&a!=='Japan'}).length;
@@ -391,6 +405,7 @@ render();
         S.admin=profile?.role==='admin';S.name=profile?.name||session.user.email||'';
         await loadMessages();
       }
+      await loadMapSettings();
       S.authLoading=false;render();
     };
     const {data:{session}}=await S.supabase.auth.getSession();
@@ -398,7 +413,7 @@ render();
     S.supabase.auth.onAuthStateChange((_event,next)=>{applySession(next)});
     setInterval(()=>{if(S.admin)loadMessages()},30000);
   }else S.authLoading=false;
-  sub('members','members');sub('events','events');sub('topics','topics');sub('pengaturan','pengaturan');sub('pin','pins');
+  sub('members','members');sub('events','events');sub('topics','topics');if(!S.supabase)sub('pengaturan','pengaturan');sub('pin','pins');
   render();
 })();
 

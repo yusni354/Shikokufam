@@ -54,6 +54,33 @@ $$;
 revoke all on function public.is_admin() from public;
 grant execute on function public.is_admin() to anon, authenticated;
 
+create table if not exists public.map_settings (
+  id text primary key check (id = 'main'),
+  map_mid text not null check (char_length(trim(map_mid)) > 0),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.map_settings enable row level security;
+
+drop policy if exists "Anyone can read map settings" on public.map_settings;
+create policy "Anyone can read map settings"
+  on public.map_settings for select
+  to anon, authenticated
+  using (true);
+
+drop policy if exists "Admins can create map settings" on public.map_settings;
+create policy "Admins can create map settings"
+  on public.map_settings for insert
+  to authenticated
+  with check (public.is_admin());
+
+drop policy if exists "Admins can update map settings" on public.map_settings;
+create policy "Admins can update map settings"
+  on public.map_settings for update
+  to authenticated
+  using (public.is_admin())
+  with check (public.is_admin());
+
 alter table public.profiles enable row level security;
 alter table public.messages enable row level security;
 
@@ -98,6 +125,8 @@ create policy "Admins can delete messages"
   using (public.is_admin());
 
 grant usage on schema public to anon, authenticated;
+grant select on public.map_settings to anon, authenticated;
+grant insert, update on public.map_settings to authenticated;
 grant insert on public.messages to anon, authenticated;
 grant select on public.profiles to authenticated;
 grant select, update, delete on public.messages to authenticated;
