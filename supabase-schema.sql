@@ -128,6 +128,9 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
 
+grant usage on schema public to supabase_auth_admin;
+grant insert on public.profiles to supabase_auth_admin;
+
 create table if not exists public.map_settings (
   id text primary key check (id = 'main'),
   map_mid text not null check (char_length(trim(map_mid)) > 0),

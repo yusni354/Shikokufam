@@ -113,9 +113,11 @@ function accountForm(){
     }
     if(result.error){
       notice.className='warn auth-error';
+      const errorText=[result.error.message,result.error.details,result.error.hint,result.error.code]
+        .filter(Boolean).join(' | ');
       notice.textContent=!signup&&['invalid_credentials','invalid_grant'].includes(result.error.code)
         ?'Email atau password salah. Silakan coba lagi.'
-        :result.error.message;
+        :errorText||'Pendaftaran gagal. Periksa konfigurasi database Supabase.';
     }else{
       notice.className='warn auth-success';
       if(signup){
