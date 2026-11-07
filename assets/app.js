@@ -344,7 +344,7 @@ function vImport(){
       ta.value='';alert(rows.length+' anggota diimpor');go('members')}},'Import'))];
 }
 
-const V={landing:vPeta,peta:vPeta,dash:vDash,members:vMembers,absen:vAbsen,forum:vForum,import:vImport,pesan:vPesan};
+const V={landing:vPetaLama,peta:vPetaLama,dash:vDash,members:vMembers,absen:vAbsen,forum:vForum,import:vImport,pesan:vPesan};
 function render(){
   if(S.authLoading){
     $('#dr').replaceChildren();
