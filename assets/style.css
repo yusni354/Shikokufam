@@ -12,6 +12,11 @@ h1{font-size:26px;margin:8px 0 2px}
 .sub{color:var(--mut);margin:0 0 16px}
 .warn{color:var(--mut);font-size:14px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:16px;margin-bottom:12px;display:flex;align-items:center;gap:14px;width:100%;text-align:left;color:var(--ink);box-shadow:0 4px 16px rgba(47,134,184,.1)}
+.auth-card{max-width:480px;margin:20px auto 0;padding:24px;display:block;text-align:left;box-shadow:0 12px 30px rgba(47,134,184,.14)}
+.auth-card> b{display:block;font-size:21px;margin-bottom:8px}
+.auth-card .sub{line-height:1.5}
+.auth-card .btn:not(.s){width:100%;margin-top:8px}
+.auth-card .btn.s{margin-top:14px;width:100%}
 .card .e{width:54px;height:54px;border-radius:16px;background:#e3f1f8;display:grid;place-items:center;font-size:26px;flex:none}
 .card b{display:block;font-size:17px}
 .card small{color:var(--mut)}

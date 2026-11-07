@@ -72,9 +72,8 @@ function accountForm(){
   let signup=false;
   const title=h('b',{},'🔐 Masuk ke Shikoku Family');
   const toggle=h('button',{class:'btn s',onclick:()=>{signup=!signup;name.style.display=signup?'':'none';confirmPassword.style.display=signup?'':'none';confirmPassword.value='';title.textContent=signup?'📝 Daftar sebagai anggota':'🔐 Masuk ke Shikoku Family';toggle.textContent=signup?'Sudah punya akun? Masuk':'Belum punya akun? Daftar'}},'Belum punya akun? Daftar');
-  name.style.display='none';
   confirmPassword.style.display='none';
-  return box(title,h('p',{class:'sub'},'Masuk untuk bergabung atau daftar akun baru sebagai anggota komunitas.'),h('label',{class:'lb'},'Email',email),h('label',{class:'lb'},'Password',password),h('label',{class:'lb'},'Ulangi password',confirmPassword),h('label',{class:'lb'},'Nama lengkap',name),notice,h('button',{class:'btn',onclick:async()=>{
+  return h('div',{class:'card auth-card'},title,h('p',{class:'sub'},'Masuk untuk bergabung atau daftar akun baru sebagai anggota komunitas.'),h('label',{class:'lb'},'Nama lengkap',name),h('label',{class:'lb'},'Email',email),h('label',{class:'lb'},'Password',password),h('label',{class:'lb'},'Ulangi password',confirmPassword),notice,h('button',{class:'btn',onclick:async()=>{
     const emailValue=email.value.trim();
     notice.textContent='Memproses...';
     if(!emailValue||!password.value){notice.textContent='Email dan password wajib diisi.';return}
