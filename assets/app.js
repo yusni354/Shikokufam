@@ -5,6 +5,7 @@ const ALL=[['landing','🗺️ Beranda'],['dash','🏠 Dashboard'],['members','�
 function go(v){S.view=v;S.form=S.detail=null;document.body.classList.remove('open');render();if(v==='pesan'&&S.admin)markMessagesRead()}
 $('#mn').onclick=()=>document.body.classList.add('open');
 $('#ov').onclick=()=>document.body.classList.remove('open');
+$('#mp').onclick=()=>go('map-settings');
 
 function wilayah(){const m={};S.members.forEach(x=>{const w=x.wilayah||'Belum diisi';(m[w]=m[w]||[]).push(x)});return m}
 function createLocalDb(){
@@ -368,6 +369,7 @@ function render(){
     $('#app').replaceChildren(h('p',{class:'warn',style:'text-align:center;padding:40px 16px'},'Memeriksa sesi login...'));
     $('#tb').style.display='none';
     $('#pet').style.display='none';
+    $('#mp').style.display='none';
     return;
   }
   if(S.supabase&&!S.uid){
@@ -380,6 +382,7 @@ function render(){
     )));
     $('#tb').style.display='none';
     $('#pet').style.display='none';
+    $('#mp').style.display='none';
     document.body.classList.remove('open');
     return;
   }
@@ -387,6 +390,7 @@ function render(){
     ...ALL.filter(x=>!x[2]||(x[3]?S.mainAdmin:S.admin)).map(x=>h('a',{class:S.view===x[0]?'on':'',onclick:()=>go(x[0])},
       x[1],x[0]==='pesan'&&S.unreadMessages>0&&h('span',{class:'nav-badge'},String(S.unreadMessages)))),
     h('button',{class:'menu-logout',onclick:async()=>{await S.supabase.auth.signOut()}},'🚪 Keluar'));
+  $('#mp').style.display=S.mainAdmin?'inline-flex':'none';
   const current=ALL.find(x=>x[0]===S.view);
   if(!V[S.view]||current?.[2]&& (current[3]? !S.mainAdmin:!S.admin))S.view='landing';
   $('#app').replaceChildren(...[].concat(V[S.view]()).filter(Boolean));
