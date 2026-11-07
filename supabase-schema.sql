@@ -194,6 +194,3 @@ create policy "Message participants can send replies"
 -- values ('UUID_USER_ADMIN', 'Nama Admin', 'admin');
 -- Tandai akun admin utama:
 -- update public.profiles set is_main_admin = true where id = 'UUID_USER_ADMIN';
-update public.profiles
-set is_main_admin = true
-where id = 'UUID_USER_ADMIN';
