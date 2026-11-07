@@ -57,12 +57,8 @@ grant execute on function public.is_admin() to anon, authenticated;
 create table if not exists public.map_settings (
   id text primary key check (id = 'main'),
   map_mid text not null check (char_length(trim(map_mid)) > 0),
-  legend text not null default '📍 | Lokasi anggota' || chr(10) || '⭐ | Lokasi penting',
   updated_at timestamptz not null default now()
 );
-
-alter table public.map_settings
-  add column if not exists legend text not null default '📍 | Lokasi anggota' || chr(10) || '⭐ | Lokasi penting';
 
 alter table public.map_settings enable row level security;
 
