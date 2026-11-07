@@ -86,8 +86,7 @@ function accountForm(){
   const loginTab=h('button',{class:'auth-tab on',onclick:()=>setMode(false)},'Masuk');
   const signupTab=h('button',{class:'auth-tab',onclick:()=>setMode(true)},'Daftar');
   const setMode=next=>{
-    signup=next;nameLabel.style.display=signup?'':'none';forgot.style.display=signup?'none':'block';
-    forgotWrap.style.display=signup?'none':'block';
+    signup=next;nameLabel.style.display=signup?'':'none';
     title.textContent=signup?'📝 Daftar sebagai anggota':'🔐 Masuk ke Shikoku Family';
     loginTab.className=signup?'auth-tab':'auth-tab on';signupTab.className=signup?'auth-tab on':'auth-tab';
   };
