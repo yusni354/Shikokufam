@@ -72,8 +72,18 @@ function accountForm(){
   const notice=h('p',{class:'warn'});
   let signup=false;
   const title=h('b',{},'🔐 Masuk ke Shikoku Family');
-  const toggle=h('button',{class:'btn s',onclick:()=>{signup=!signup;name.style.display=signup?'':'none';title.textContent=signup?'📝 Daftar sebagai anggota':'🔐 Masuk ke Shikoku Family';toggle.textContent=signup?'Sudah punya akun? Masuk':'Belum punya akun? Daftar'}},'Belum punya akun? Daftar');
-  return h('div',{class:'card auth-card'},title,h('p',{class:'sub'},'Masuk untuk bergabung atau daftar akun baru sebagai anggota komunitas.'),h('label',{class:'lb'},'Nama lengkap',name),h('label',{class:'lb'},'Email',email),h('label',{class:'lb'},'Password',password),notice,h('button',{class:'btn',onclick:async()=>{
+  const forgot=h('button',{class:'btn s',onclick:async()=>{
+    const emailValue=email.value.trim();
+    if(!emailValue){notice.textContent='Masukkan email terlebih dahulu untuk menerima tautan reset password.';email.focus();return}
+    forgot.disabled=true;notice.textContent='Mengirim tautan reset password...';
+    const {error}=await S.supabase.auth.resetPasswordForEmail(emailValue);
+    forgot.disabled=false;
+    notice.textContent=error?error.message:'Tautan reset password sudah dikirim ke email Anda.';
+  }},'Lupa password?');
+  const nameLabel=h('label',{class:'lb'},'Nama lengkap',name);
+  const toggle=h('button',{class:'btn s',onclick:()=>{signup=!signup;nameLabel.style.display=signup?'':'none';forgot.style.display=signup?'none':'block';title.textContent=signup?'📝 Daftar sebagai anggota':'🔐 Masuk ke Shikoku Family';toggle.textContent=signup?'Sudah punya akun? Masuk':'Belum punya akun? Daftar'}},'Belum punya akun? Daftar');
+  nameLabel.style.display='none';
+  return h('div',{class:'card auth-card'},title,h('p',{class:'sub'},'Masuk untuk bergabung atau daftar akun baru sebagai anggota komunitas.'),nameLabel,h('label',{class:'lb'},'Email',email),h('label',{class:'lb'},'Password',password),notice,h('button',{class:'btn',onclick:async()=>{
     const emailValue=email.value.trim();
     notice.textContent='Memproses...';
     if(!emailValue||!password.value){notice.textContent='Email dan password wajib diisi.';return}
@@ -92,7 +102,7 @@ function accountForm(){
     }
     notice.textContent=result.error?result.error.message:(signup?'Akun berhasil dibuat. Silakan masuk.':'Login berhasil.');
     if(!result.error&&!signup)await loadMessages();
-  }},signup?'Daftar':'Masuk'),toggle);
+  }},signup?'Daftar':'Masuk'),forgot,toggle);
 }
 function loginForm(){
   const email=h('input',{type:'email',placeholder:'Email admin',autocomplete:'email'});
