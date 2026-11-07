@@ -67,19 +67,17 @@ async function submitReply(messageId,text){
 function accountForm(){
   const email=h('input',{type:'email',placeholder:'Email',autocomplete:'email'});
   const password=h('input',{type:'password',placeholder:'Password minimal 6 karakter',autocomplete:'current-password'});
-  const confirmPassword=h('input',{type:'password',placeholder:'Ulangi password',autocomplete:'new-password'});
   const name=h('input',{placeholder:'Nama lengkap',autocomplete:'name'});
   const notice=h('p',{class:'warn'});
   let signup=false;
   const title=h('b',{},'🔐 Masuk ke Shikoku Family');
-  const toggle=h('button',{class:'btn s',onclick:()=>{signup=!signup;name.style.display=signup?'':'none';confirmPassword.style.display=signup?'':'none';confirmPassword.value='';title.textContent=signup?'📝 Daftar sebagai anggota':'🔐 Masuk ke Shikoku Family';toggle.textContent=signup?'Sudah punya akun? Masuk':'Belum punya akun? Daftar'}},'Belum punya akun? Daftar');
-  confirmPassword.style.display='none';
-  return h('div',{class:'card auth-card'},title,h('p',{class:'sub'},'Masuk untuk bergabung atau daftar akun baru sebagai anggota komunitas.'),h('label',{class:'lb'},'Nama lengkap',name),h('label',{class:'lb'},'Email',email),h('label',{class:'lb'},'Password',password),h('label',{class:'lb'},'Ulangi password',confirmPassword),notice,h('button',{class:'btn',onclick:async()=>{
+  const toggle=h('button',{class:'btn s',onclick:()=>{signup=!signup;name.style.display=signup?'':'none';title.textContent=signup?'📝 Daftar sebagai anggota':'🔐 Masuk ke Shikoku Family';toggle.textContent=signup?'Sudah punya akun? Masuk':'Belum punya akun? Daftar'}},'Belum punya akun? Daftar');
+  return h('div',{class:'card auth-card'},title,h('p',{class:'sub'},'Masuk untuk bergabung atau daftar akun baru sebagai anggota komunitas.'),h('label',{class:'lb'},'Nama lengkap',name),h('label',{class:'lb'},'Email',email),h('label',{class:'lb'},'Password',password),notice,h('button',{class:'btn',onclick:async()=>{
     const emailValue=email.value.trim();
     notice.textContent='Memproses...';
     if(!emailValue||!password.value){notice.textContent='Email dan password wajib diisi.';return}
-    if(signup&&(!name.value.trim()||password.value.length<6||password.value!==confirmPassword.value)){
-      notice.textContent=!name.value.trim()?'Nama lengkap wajib diisi.':password.value.length<6?'Password minimal 6 karakter.':'Konfirmasi password tidak cocok.';
+    if(signup&&(!name.value.trim()||password.value.length<6)){
+      notice.textContent=!name.value.trim()?'Nama lengkap wajib diisi.':'Password minimal 6 karakter.';
       return;
     }
     let result;
