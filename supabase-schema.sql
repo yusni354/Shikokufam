@@ -167,6 +167,12 @@ create policy "Admins can delete map settings"
 alter table public.profiles enable row level security;
 alter table public.messages enable row level security;
 
+drop policy if exists "Auth service can create profiles" on public.profiles;
+create policy "Auth service can create profiles"
+  on public.profiles for insert
+  to supabase_auth_admin
+  with check (true);
+
 drop policy if exists "Users can read their own profile" on public.profiles;
 create policy "Users can read their own profile"
   on public.profiles for select
