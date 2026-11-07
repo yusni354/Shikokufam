@@ -81,7 +81,7 @@ function accountForm(){
     notice.textContent=error?error.message:'Tautan reset password sudah dikirim ke email Anda.';
   }},'Lupa password?');
   const nameLabel=h('label',{class:'lb'},'Nama lengkap',name);
-  const toggle=h('button',{class:'btn s',onclick:()=>{signup=!signup;nameLabel.style.display=signup?'':'none';forgot.style.display=signup?'none':'block';title.textContent=signup?'📝 Daftar sebagai anggota':'🔐 Masuk ke Shikoku Family';toggle.textContent=signup?'Sudah punya akun? Masuk':'Belum punya akun? Daftar'}},'Belum punya akun? Daftar');
+  const toggle=h('button',{class:'btn s',onclick:()=>{signup=!signup;nameLabel.style.display=signup?'':'none';forgot.style.display=signup?'none':'block';title.textContent=signup?'📝 Daftar sebagai anggota':'🔐 Masuk ke Shikoku Family';toggle.textContent=signup?'Kembali ke login':'Daftar akun baru'}},'Daftar akun baru');
   nameLabel.style.display='none';
   return h('div',{class:'card auth-card'},title,h('p',{class:'sub'},'Masuk untuk bergabung atau daftar akun baru sebagai anggota komunitas.'),nameLabel,h('label',{class:'lb'},'Email',email),h('label',{class:'lb'},'Password',password),notice,h('button',{class:'btn',onclick:async()=>{
     const emailValue=email.value.trim();
