@@ -1,7 +1,7 @@
 const S={members:[],events:[],topics:[],view:'landing',admin:false,uid:null,email:'',name:'',db:null,supabase:null,authLoading:true,unreadMessages:0};
 const $=s=>document.querySelector(s);
 function h(t,p,...k){const e=document.createElement(t);for(const a in p||{}){if(a==='onclick')e.onclick=p[a];else if(a==='class')e.className=p[a];else e.setAttribute(a,p[a])}k.flat().forEach(c=>{if(c!=null&&c!==false)e.append(c)});return e}
-const ALL=[['landing','🗺️ Beranda'],['dash','🏠 Dashboard'],['members','👥 Data Anggota'],['absen','📝 Absensi'],['forum','💬 Forum'],['import','📥 Import Database',1],['pesan','📨 Pesan Masuk']];
+const ALL=[['landing','🗺️ Beranda'],['dash','🏠 Dashboard'],['members','👥 Data Anggota'],['absen','📝 Absensi'],['forum','💬 Forum'],['import','📥 Import Database',1],['map-settings','⚙️ Pengaturan Peta',1],['pesan','📨 Pesan Masuk']];
 function go(v){S.view=v;S.form=S.detail=null;document.body.classList.remove('open');render();if(v==='pesan'&&S.admin)markMessagesRead()}
 $('#mn').onclick=()=>document.body.classList.add('open');
 $('#ov').onclick=()=>document.body.classList.remove('open');
@@ -291,12 +291,15 @@ async function saveMid(inp){
     }else await S.db.collection('pengaturan').doc('peta').set({mid:mm,at:Date.now()});
     alert('Peta disimpan');render();
   }catch(e){alert('Gagal menyimpan peta: '+(e.message||'periksa izin admin'))}}
-function vPetaLama(){
+function mapEmbed(){
+  const mid=mapMid();
+  return mid?h('div',{},h('iframe',{src:'https://www.google.com/maps/d/embed?mid='+mid,style:'width:100%;height:calc(100vh - 120px);min-height:520px;border:0;border-radius:18px;background:var(--line)',loading:'lazy',allow:'fullscreen',title:'Google My Maps'}),h('a',{class:'btn s',style:'display:inline-block;margin-top:10px;text-decoration:none',href:'https://www.google.com/maps/d/viewer?mid='+mid,target:'_blank'},'🗺️ Buka di Google My Maps')):h('p',{class:'warn'},'Belum ada peta. Admin dapat mengatur Google My Maps melalui menu Pengaturan Peta.');
+}
+function vPeta(){return [mapEmbed()]}
+function vPetaSettings(){
   const mid=mapMid(),det=h('input',{type:'checkbox'}),inp=h('textarea',{rows:4,placeholder:'Tempel kode embed (iframe) dari Google My Maps'});
   const ready=S.members.filter(m=>{const a=alamatJp(m,false);return a&&a!=='Japan'}).length;
-  const map=mid?h('div',{},h('iframe',{src:'https://www.google.com/maps/d/embed?mid='+mid,style:'width:100%;height:min(70vh,560px);border:0;border-radius:18px;background:var(--line)',loading:'lazy',allow:'fullscreen',title:'Google My Maps'}),h('a',{class:'btn s',style:'display:inline-block;margin-top:10px;text-decoration:none',href:'https://www.google.com/maps/d/viewer?mid='+mid,target:'_blank'},'🗺️ Buka di Google My Maps')):h('p',{class:'warn'},'Belum ada peta. Admin bisa menempel kode embed Google My Maps di bagian bawah halaman ini.');
   return [h('h1',{},'Peta Wilayah'),h('p',{class:'sub'},ready+' dari '+S.members.length+' anggota punya alamat Jepang untuk dijadikan pin'),
-    box(h('b',{},'🗺️ Peta Anggota'),map),
     S.admin&&box(h('b',{},'Pasang & perbarui peta'),
       h('p',{class:'warn'},'1) Unduh CSV. 2) Buka mymaps.google.com, buat peta baru, pilih Impor, lalu unggah CSV. 3) Pilih kolom Alamat untuk posisi pin dan kolom Nama untuk judul. 4) Atur peta agar bisa dilihat publik. 5) Di My Maps klik menu titik tiga di samping judul peta, pilih "Sematkan di situs saya", salin kode HTML-nya, lalu tempel di kotak di bawah.'),
       h('label',{class:'warn',style:'display:block;margin:8px 0'},det,' Sertakan alamat jalan/gedung (lebih tepat, tetapi lebih sensitif)'),
@@ -315,7 +318,7 @@ async function geo(txt,b,full){
     if(isFinite(r.lat)&&isFinite(r.lng)&&r.lat!==null){d.lat=String(r.lat);d.lng=String(r.lng)}else alert('Posisi tidak ditemukan. Ketuk peta untuk menaruh pin.')}
   catch(e){alert('Gagal memproses')}
   render()}
-function vPeta(){
+function vPetaLegacy(){
   const d=S.dp=S.dp||{nama:'',alamat:'',lat:'',lng:''},vb=S.vb=S.vb||[0,0,572,640],pins=S.pins||[];
   const svg=sv('svg',{viewBox:vb.join(' '),style:'width:100%;height:min(70vh,560px);background:#dcecf5;border-radius:18px;touch-action:none;display:block'});
   ISL.forEach(s=>svg.append(sv('path',{d:'M'+s.split(' ').map(q=>px(...q.split(',').map(Number)).join(',')).join('L')+'Z',fill:'#f5f1e6',stroke:'#8fb4c9','stroke-width':1.5,'pointer-events':'none'})));
@@ -358,7 +361,7 @@ function vImport(){
       ta.value='';alert(rows.length+' anggota diimpor');go('members')}},'Import'))];
 }
 
-const V={landing:vPetaLama,peta:vPetaLama,dash:vDash,members:vMembers,absen:vAbsen,forum:vForum,import:vImport,pesan:vPesan};
+const V={landing:vPeta,dash:vDash,members:vMembers,absen:vAbsen,forum:vForum,import:vImport,'map-settings':vPetaSettings,pesan:vPesan};
 function render(){
   if(S.authLoading){
     $('#dr').replaceChildren();
