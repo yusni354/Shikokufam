@@ -104,6 +104,12 @@ create policy "Admins can update map settings"
   using (public.is_main_admin())
   with check (public.is_main_admin());
 
+drop policy if exists "Admins can delete map settings" on public.map_settings;
+create policy "Admins can delete map settings"
+  on public.map_settings for delete
+  to authenticated
+  using (public.is_main_admin());
+
 alter table public.profiles enable row level security;
 alter table public.messages enable row level security;
 
@@ -149,7 +155,7 @@ create policy "Admins can delete messages"
 
 grant usage on schema public to anon, authenticated;
 grant select on public.map_settings to anon, authenticated;
-grant insert, update on public.map_settings to authenticated;
+grant insert, update, delete on public.map_settings to authenticated;
 grant insert on public.messages to anon, authenticated;
 grant select on public.profiles to authenticated;
 grant select, update, delete on public.messages to authenticated;
