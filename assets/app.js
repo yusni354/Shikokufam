@@ -1,7 +1,7 @@
-const S={members:[],events:[],topics:[],view:'landing',admin:false,uid:null,email:'',name:'',db:null,supabase:null,authLoading:true,unreadMessages:0};
+const S={members:[],events:[],topics:[],view:'landing',admin:false,mainAdmin:false,uid:null,email:'',name:'',db:null,supabase:null,authLoading:true,unreadMessages:0};
 const $=s=>document.querySelector(s);
 function h(t,p,...k){const e=document.createElement(t);for(const a in p||{}){if(a==='onclick')e.onclick=p[a];else if(a==='class')e.className=p[a];else e.setAttribute(a,p[a])}k.flat().forEach(c=>{if(c!=null&&c!==false)e.append(c)});return e}
-const ALL=[['landing','🗺️ Beranda'],['dash','🏠 Dashboard'],['members','👥 Data Anggota'],['absen','📝 Absensi'],['forum','💬 Forum'],['import','📥 Import Database',1],['map-settings','⚙️ Pengaturan Peta',1],['pesan','📨 Pesan Masuk']];
+const ALL=[['landing','🗺️ Beranda'],['dash','🏠 Dashboard'],['members','👥 Data Anggota'],['absen','📝 Absensi'],['forum','💬 Forum'],['import','📥 Import Database',1],['map-settings','⚙️ Pengaturan Peta',1,1],['pesan','📨 Pesan Masuk']];
 function go(v){S.view=v;S.form=S.detail=null;document.body.classList.remove('open');render();if(v==='pesan'&&S.admin)markMessagesRead()}
 $('#mn').onclick=()=>document.body.classList.add('open');
 $('#ov').onclick=()=>document.body.classList.remove('open');
@@ -282,7 +282,7 @@ async function exportMyMaps(det){
 async function saveMid(inp){
   const u=inp.value.trim(),mm=(u.match(/[?&;]mid=([^&#"'\s<>]+)/)||[])[1]||(/^[A-Za-z0-9_-]{20,}$/.test(u)?u:'');
   if(!mm){alert('Kode tidak dikenali. Tempel kode embed (iframe) dari Google My Maps yang memuat "mid="');return}
-  if(!S.admin){alert('Hanya admin utama yang dapat mengubah peta');return}
+  if(!S.mainAdmin){alert('Hanya admin utama yang dapat mengubah peta');return}
   try{
     if(S.supabase){
       const {error}=await S.supabase.from('map_settings').upsert({id:'main',map_mid:mm,updated_at:new Date().toISOString()},{onConflict:'id'});
@@ -300,7 +300,7 @@ function vPetaSettings(){
   const mid=mapMid(),det=h('input',{type:'checkbox'}),inp=h('textarea',{rows:4,placeholder:'Tempel kode embed (iframe) dari Google My Maps'});
   const ready=S.members.filter(m=>{const a=alamatJp(m,false);return a&&a!=='Japan'}).length;
   return [h('h1',{},'Peta Wilayah'),h('p',{class:'sub'},ready+' dari '+S.members.length+' anggota punya alamat Jepang untuk dijadikan pin'),
-    S.admin&&box(h('b',{},'Pasang & perbarui peta'),
+    S.mainAdmin&&box(h('b',{},'Pasang & perbarui peta'),
       h('p',{class:'warn'},'1) Unduh CSV. 2) Buka mymaps.google.com, buat peta baru, pilih Impor, lalu unggah CSV. 3) Pilih kolom Alamat untuk posisi pin dan kolom Nama untuk judul. 4) Atur peta agar bisa dilihat publik. 5) Di My Maps klik menu titik tiga di samping judul peta, pilih "Sematkan di situs saya", salin kode HTML-nya, lalu tempel di kotak di bawah.'),
       h('label',{class:'warn',style:'display:block;margin:8px 0'},det,' Sertakan alamat jalan/gedung (lebih tepat, tetapi lebih sensitif)'),
       h('button',{class:'btn',style:'margin-bottom:10px',onclick:()=>exportMyMaps(det.checked)},'⬇️ Unduh CSV untuk My Maps ('+ready+' pin)'),
@@ -384,10 +384,11 @@ function render(){
     return;
   }
   const d=$('#dr');d.replaceChildren(h('p',{class:'sub',style:'padding:0 14px'},h('b',{style:'color:var(--ink)'},'KOMUNITAS ID-JP'),h('br'),'Database Anggota'),
-    ...ALL.filter(x=>!x[2]||S.admin).map(x=>h('a',{class:S.view===x[0]?'on':'',onclick:()=>go(x[0])},
+    ...ALL.filter(x=>!x[2]||(x[3]?S.mainAdmin:S.admin)).map(x=>h('a',{class:S.view===x[0]?'on':'',onclick:()=>go(x[0])},
       x[1],x[0]==='pesan'&&S.unreadMessages>0&&h('span',{class:'nav-badge'},String(S.unreadMessages)))),
     h('button',{class:'menu-logout',onclick:async()=>{await S.supabase.auth.signOut()}},'🚪 Keluar'));
-  if(!V[S.view]||(ALL.find(x=>x[0]===S.view)||[])[2]&&!S.admin)S.view='landing';
+  const current=ALL.find(x=>x[0]===S.view);
+  if(!V[S.view]||current?.[2]&& (current[3]? !S.mainAdmin:!S.admin))S.view='landing';
   $('#app').replaceChildren(...[].concat(V[S.view]()).filter(Boolean));
   const tb=$('#tb');tb.style.display=S.form?'none':'flex';$('#pet').style.display=S.form?'none':'block';
   tb.replaceChildren(...[['landing','🗺️','Beranda'],['dash','🏠','Ringkasan'],['members','👥','Anggota'],['absen','📝','Absensi'],['forum','💬','Forum']].map(x=>h('a',{class:S.view===x[0]?'on':'',onclick:()=>go(x[0])},h('span',{},x[1]),x[2])));
@@ -402,10 +403,11 @@ render();
   if(window.supabase&&window.SUPABASE_CONFIG?.url&&window.SUPABASE_CONFIG?.anonKey){
     S.supabase=window.supabase.createClient(window.SUPABASE_CONFIG.url,window.SUPABASE_CONFIG.anonKey);
     const applySession=async session=>{
-      S.uid=session?.user?.id||null;S.email=session?.user?.email||'';S.admin=false;
+      S.uid=session?.user?.id||null;S.email=session?.user?.email||'';S.admin=false;S.mainAdmin=false;
       if(session?.user){
-        const {data:profile}=await S.supabase.from('profiles').select('name,role').eq('id',session.user.id).maybeSingle();
+        const {data:profile}=await S.supabase.from('profiles').select('name,role,is_main_admin').eq('id',session.user.id).maybeSingle();
         S.admin=profile?.role==='admin';S.name=profile?.name||session.user.email||'';
+        S.mainAdmin=S.admin&&profile?.is_main_admin===true;
         await loadMessages();
       }
       await loadMapSettings();

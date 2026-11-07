@@ -7,8 +7,12 @@ create table if not exists public.profiles (
   name text,
   role text not null default 'member'
     check (role in ('admin', 'member')),
+  is_main_admin boolean not null default false,
   created_at timestamptz not null default now()
 );
+
+alter table public.profiles
+  add column if not exists is_main_admin boolean not null default false;
 
 create table if not exists public.messages (
   id uuid primary key default gen_random_uuid(),
@@ -54,6 +58,25 @@ $$;
 revoke all on function public.is_admin() from public;
 grant execute on function public.is_admin() to anon, authenticated;
 
+create or replace function public.is_main_admin()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.profiles
+    where id = (select auth.uid())
+      and role = 'admin'
+      and is_main_admin = true
+  );
+$$;
+
+revoke all on function public.is_main_admin() from public;
+grant execute on function public.is_main_admin() to anon, authenticated;
+
 create table if not exists public.map_settings (
   id text primary key check (id = 'main'),
   map_mid text not null check (char_length(trim(map_mid)) > 0),
@@ -72,14 +95,14 @@ drop policy if exists "Admins can create map settings" on public.map_settings;
 create policy "Admins can create map settings"
   on public.map_settings for insert
   to authenticated
-  with check (public.is_admin());
+  with check (public.is_main_admin());
 
 drop policy if exists "Admins can update map settings" on public.map_settings;
 create policy "Admins can update map settings"
   on public.map_settings for update
   to authenticated
-  using (public.is_admin())
-  with check (public.is_admin());
+  using (public.is_main_admin())
+  with check (public.is_main_admin());
 
 alter table public.profiles enable row level security;
 alter table public.messages enable row level security;
@@ -169,3 +192,5 @@ create policy "Message participants can send replies"
 -- Jalankan setelah membuat akun admin di Authentication > Users:
 -- insert into public.profiles (id, name, role)
 -- values ('UUID_USER_ADMIN', 'Nama Admin', 'admin');
+-- Tandai akun admin utama:
+-- update public.profiles set is_main_admin = true where id = 'UUID_USER_ADMIN';
