@@ -5,14 +5,37 @@ create extension if not exists pgcrypto;
 create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
   name text,
+  email text,
   role text not null default 'member'
     check (role in ('admin', 'member')),
   is_main_admin boolean not null default false,
+  approval_status text not null default 'pending'
+    check (approval_status in ('pending', 'approved', 'rejected')),
+  approved_at timestamptz,
   created_at timestamptz not null default now()
 );
 
 alter table public.profiles
   add column if not exists is_main_admin boolean not null default false;
+alter table public.profiles
+  add column if not exists email text;
+alter table public.profiles
+  add column if not exists approval_status text not null default 'pending';
+alter table public.profiles
+  add column if not exists approved_at timestamptz;
+
+do $$
+begin
+  alter table public.profiles
+    add constraint profiles_approval_status_check
+    check (approval_status in ('pending', 'approved', 'rejected'));
+exception
+  when duplicate_object then null;
+end $$;
+
+update public.profiles
+set approval_status = 'approved'
+where role = 'admin' or approval_status is null;
 
 create table if not exists public.messages (
   id uuid primary key default gen_random_uuid(),
@@ -77,6 +100,30 @@ $$;
 revoke all on function public.is_main_admin() from public;
 grant execute on function public.is_main_admin() to anon, authenticated;
 
+create or replace function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  insert into public.profiles (id, name, email, approval_status)
+  values (
+    new.id,
+    nullif(trim(new.raw_user_meta_data->>'name'), ''),
+    new.email,
+    'pending'
+  )
+  on conflict (id) do nothing;
+  return new;
+end;
+$$;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute procedure public.handle_new_user();
+
 create table if not exists public.map_settings (
   id text primary key check (id = 'main'),
   map_mid text not null check (char_length(trim(map_mid)) > 0),
@@ -119,6 +166,13 @@ create policy "Users can read their own profile"
   to authenticated
   using (id = (select auth.uid()) or public.is_admin());
 
+drop policy if exists "Main admins can approve profiles" on public.profiles;
+create policy "Main admins can approve profiles"
+  on public.profiles for update
+  to authenticated
+  using (public.is_main_admin())
+  with check (public.is_main_admin());
+
 drop policy if exists "Anyone can submit a message" on public.messages;
 create policy "Anyone can submit a message"
   on public.messages for insert
@@ -158,6 +212,7 @@ grant select on public.map_settings to anon, authenticated;
 grant insert, update, delete on public.map_settings to authenticated;
 grant insert on public.messages to anon, authenticated;
 grant select on public.profiles to authenticated;
+grant update on public.profiles to authenticated;
 grant select, update, delete on public.messages to authenticated;
 grant select, insert on public.message_replies to authenticated;
 

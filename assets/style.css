@@ -13,6 +13,9 @@ header b{letter-spacing:.45px;font-size:14px}
 .settings-pop.open{display:block}
 .settings-pop button{width:100%;padding:10px;border:0;border-radius:11px;background:none;color:var(--ink);text-align:left;font-weight:600}
 .settings-pop button:hover{background:var(--line)}
+.settings-pop span{display:inline-grid;place-items:center;min-width:20px;height:20px;margin-left:4px;padding:0 5px;border-radius:999px;background:#d9455f;color:#fff;font-size:11px}
+.approval-row{align-items:flex-start}
+.approval-row small{display:block;color:var(--mut);margin-top:4px}
 main{padding:16px 16px 110px;max-width:720px;margin:auto}
 h1{font-size:26px;margin:8px 0 2px}
 .sub{color:var(--mut);margin:0 0 16px}

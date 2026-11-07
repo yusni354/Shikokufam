@@ -1,4 +1,4 @@
-const S={members:[],events:[],topics:[],view:'landing',admin:false,mainAdmin:false,uid:null,email:'',name:'',db:null,supabase:null,authLoading:true,unreadMessages:0,mapError:''};
+const S={members:[],events:[],topics:[],view:'landing',admin:false,mainAdmin:false,uid:null,email:'',name:'',approvalStatus:'approved',pendingUsers:[],mapError:'',db:null,supabase:null,authLoading:true,unreadMessages:0};
 const $=s=>document.querySelector(s);
 function h(t,p,...k){const e=document.createElement(t);for(const a in p||{}){if(a==='onclick')e.onclick=p[a];else if(a==='class')e.className=p[a];else e.setAttribute(a,p[a])}k.flat().forEach(c=>{if(c!=null&&c!==false)e.append(c)});return e}
 const ALL=[['landing','🗺️ Beranda'],['dash','🏠 Dashboard'],['members','👥 Data Anggota'],['absen','📝 Absensi'],['forum','💬 Forum'],['import','📥 Import Database',1],['pesan','📨 Pesan Masuk']];
@@ -7,6 +7,7 @@ $('#mn').onclick=()=>document.body.classList.add('open');
 $('#ov').onclick=()=>document.body.classList.remove('open');
 $('#st').onclick=()=>$('#sp').classList.toggle('open');
 $('#mp').onclick=()=>{$('#sp').classList.remove('open');go('map-settings')};
+$('#ap').onclick=()=>{$('#sp').classList.remove('open');go('approvals')};
 
 function wilayah(){const m={};S.members.forEach(x=>{const w=x.wilayah||'Belum diisi';(m[w]=m[w]||[]).push(x)});return m}
 function createLocalDb(){
@@ -117,7 +118,21 @@ function accountForm(){
         :result.error.message;
     }else{
       notice.className='warn auth-success';
-      notice.textContent=signup?'Akun berhasil dibuat. Silakan masuk.':'Login berhasil.';
+      if(signup){
+        notice.textContent='Akun berhasil dibuat dan menunggu persetujuan admin.';
+        if(result.data.session)await S.supabase.auth.signOut();
+      }else{
+        const {data:profile}=await S.supabase.from('profiles').select('approval_status').eq('id',result.data.user.id).maybeSingle();
+        if(profile?.approval_status==='pending'||profile?.approval_status==null){
+          await S.supabase.auth.signOut();
+          notice.className='warn auth-error';
+          notice.textContent='Akun Anda masih menunggu persetujuan admin.';
+        }else if(profile.approval_status==='rejected'){
+          await S.supabase.auth.signOut();
+          notice.className='warn auth-error';
+          notice.textContent='Pendaftaran akun Anda ditolak oleh admin.';
+        }else notice.textContent='Akun Anda telah disetujui. Login berhasil.';
+      }
     }
     if(!result.error&&!signup)await loadMessages();
   }},signup?'Daftar':'Masuk'));
@@ -304,6 +319,12 @@ async function loadMapSettings(){
   S.mapError='';
   S.pengaturan=data?[{id:'peta',mid:data.map_mid}]:[];
 }
+async function loadPendingUsers(){
+  if(!S.supabase||!S.mainAdmin){S.pendingUsers=[];return}
+  const {data,error}=await S.supabase.from('profiles').select('id,name,email,created_at,approval_status').eq('approval_status','pending').order('created_at',{ascending:true});
+  if(error){console.error(error);S.pendingUsers=[];return}
+  S.pendingUsers=data||[];
+}
 function csvEsc(v){v=String(v==null?'':v);return(v.includes(',')||v.includes('"')||v.includes(String.fromCharCode(10)))?'"'+v.split('"').join('""')+'"':v}
 async function exportMyMaps(det){
   const dl=await claude.use('downloads');if(!dl){alert('Fitur unduh belum tersedia');return}
@@ -336,6 +357,22 @@ function mapEmbed(){
   return mid?h('div',{},h('iframe',{src:mapEmbedUrl(mid),style:'width:100%;height:calc(100vh - 120px);min-height:520px;border:0;border-radius:18px;background:var(--line)',loading:'lazy',allow:'fullscreen',title:'Google My Maps'}),h('a',{class:'btn s',style:'display:inline-block;margin-top:10px;text-decoration:none',href:'https://www.google.com/maps/d/viewer?mid='+encodeURIComponent(mid),target:'_blank'},'🗺️ Buka di Google My Maps')):h('p',{class:'warn'},S.mapError||'Belum ada peta. Admin dapat mengatur Google My Maps melalui menu Pengaturan Peta.');
 }
 function vPeta(){return [mapEmbed()]}
+async function setApproval(id,status){
+  if(!S.supabase||!S.mainAdmin)return;
+  const {error}=await S.supabase.from('profiles').update({
+    approval_status:status,
+    approved_at:status==='approved'?new Date().toISOString():null
+  }).eq('id',id);
+  if(error){alert('Gagal memperbarui persetujuan: '+error.message);return}
+  await loadPendingUsers();render();
+}
+function vApprovals(){
+  if(!S.mainAdmin)return [h('p',{class:'warn'},'Halaman ini hanya dapat diakses admin utama.')];
+  const rows=S.pendingUsers.map(user=>h('div',{class:'card approval-row'},
+    h('div',{style:'flex:1;min-width:0'},h('b',{},user.name||'Nama belum diisi'),h('small',{},user.email||'-'),h('small',{},new Date(user.created_at).toLocaleString('id-ID'))),
+    h('div',{class:'fl'},h('button',{class:'btn',onclick:()=>setApproval(user.id,'approved')},'Setujui'),h('button',{class:'btn s',onclick:()=>setApproval(user.id,'rejected')},'Tolak'))));
+  return [h('h1',{},'Persetujuan Akun'),h('p',{class:'sub'},'Pendaftar baru menunggu persetujuan admin.'),...(rows.length?rows:[h('p',{class:'warn'},'Tidak ada pendaftar yang menunggu persetujuan.')])];
+}
 function vPetaSettings(){
   const mid=mapMid(),det=h('input',{type:'checkbox'}),inp=h('textarea',{rows:4,placeholder:'Tempel kode embed (iframe) dari Google My Maps'});
   inp.value=mid?mapEmbedUrl(mid):'';
@@ -402,7 +439,7 @@ function vImport(){
       ta.value='';alert(rows.length+' anggota diimpor');go('members')}},'Import'))];
 }
 
-const V={landing:vPeta,dash:vDash,members:vMembers,absen:vAbsen,forum:vForum,import:vImport,'map-settings':vPetaSettings,pesan:vPesan};
+const V={landing:vPeta,dash:vDash,members:vMembers,absen:vAbsen,forum:vForum,import:vImport,'map-settings':vPetaSettings,approvals:vApprovals,pesan:vPesan};
 function render(){
   if(S.authLoading){
     $('#dr').replaceChildren();
@@ -431,8 +468,11 @@ function render(){
       x[1],x[0]==='pesan'&&S.unreadMessages>0&&h('span',{class:'nav-badge'},String(S.unreadMessages)))),
     h('button',{class:'menu-logout',onclick:async()=>{await S.supabase.auth.signOut()}},'🚪 Keluar'));
   $('#sw').style.display=S.mainAdmin?'flex':'none';
+  const approvalBadge=$('#ab');
+  approvalBadge.textContent=S.pendingUsers.length?String(S.pendingUsers.length):'';
+  approvalBadge.style.display=S.pendingUsers.length?'inline-grid':'none';
   const current=ALL.find(x=>x[0]===S.view);
-  if(!V[S.view]||S.view==='map-settings'&&!S.mainAdmin||current?.[2]&&!S.admin)S.view='landing';
+  if(!V[S.view]||['map-settings','approvals'].includes(S.view)&&!S.mainAdmin||current?.[2]&&!S.admin)S.view='landing';
   $('#app').replaceChildren(...[].concat(V[S.view]()).filter(Boolean));
   const tb=$('#tb');tb.style.display=S.form?'none':'flex';$('#pet').style.display=S.form?'none':'block';
   tb.replaceChildren(...[['landing','🗺️','Beranda'],['dash','🏠','Ringkasan'],['members','👥','Anggota'],['absen','📝','Absensi'],['forum','💬','Forum']].map(x=>h('a',{class:S.view===x[0]?'on':'',onclick:()=>go(x[0])},h('span',{},x[1]),x[2])));
@@ -447,20 +487,22 @@ render();
   if(window.supabase&&window.SUPABASE_CONFIG?.url&&window.SUPABASE_CONFIG?.anonKey){
     S.supabase=window.supabase.createClient(window.SUPABASE_CONFIG.url,window.SUPABASE_CONFIG.anonKey);
     const applySession=async session=>{
-      S.uid=session?.user?.id||null;S.email=session?.user?.email||'';S.admin=false;S.mainAdmin=false;
+      S.uid=session?.user?.id||null;S.email=session?.user?.email||'';S.admin=false;S.mainAdmin=false;S.approvalStatus='approved';
       if(session?.user){
-        const {data:profile}=await S.supabase.from('profiles').select('name,role,is_main_admin').eq('id',session.user.id).maybeSingle();
+        const {data:profile}=await S.supabase.from('profiles').select('name,role,is_main_admin,approval_status').eq('id',session.user.id).maybeSingle();
         S.admin=profile?.role==='admin';S.name=profile?.name||session.user.email||'';
         S.mainAdmin=S.admin&&profile?.is_main_admin===true;
+        S.approvalStatus=profile?.approval_status||'pending';
         await loadMessages();
       }
       await loadMapSettings();
+      await loadPendingUsers();
       S.authLoading=false;render();
     };
     const {data:{session}}=await S.supabase.auth.getSession();
     await applySession(session);
     S.supabase.auth.onAuthStateChange((_event,next)=>{applySession(next)});
-    setInterval(()=>{if(S.admin)loadMessages()},30000);
+    setInterval(()=>{if(S.admin)loadMessages();if(S.mainAdmin)loadPendingUsers()},30000);
   }else S.authLoading=false;
   sub('members','members');sub('events','events');sub('topics','topics');if(!S.supabase)sub('pengaturan','pengaturan');sub('pin','pins');
   render();
