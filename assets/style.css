@@ -27,7 +27,7 @@ h1{font-size:26px;margin:8px 0 2px}
 .auth-error{color:#111827;font-weight:600}
 .auth-success{color:#047857}
 .auth-forgot{display:block;text-align:right;margin-top:4px}
-.auth-forgot .btn.s{width:auto;padding:4px 0;border:0;color:#111827;font-weight:700;text-decoration:underline}
+.auth-forgot .btn.s{width:auto;padding:5px 10px;border:1px solid var(--line);border-radius:8px;background:var(--line);color:#111827!important;font-weight:700;text-decoration:none}
 .auth-card .btn:not(.s){width:100%;margin-top:8px}
 .auth-card .btn.s{margin-top:14px;width:100%}
 .card .e{width:54px;height:54px;border-radius:16px;background:#e3f1f8;display:grid;place-items:center;font-size:26px;flex:none}
