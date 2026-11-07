@@ -268,40 +268,52 @@ function vForum(){
 }
 function alamatJp(m,det){return [det?m.alamat_jp:'',m.kec_jp,m.kota,m.pref||m.wilayah,m.kodepos,'Japan'].filter(Boolean).join(', ')}
 function mapMid(){const d=(S.pengaturan||[]).find(x=>x.id==='peta');return d&&d.mid}
+const DEFAULT_MAP_LEGEND='📍 | Lokasi anggota\n⭐ | Lokasi penting';
+function mapLegend(){
+  const d=(S.pengaturan||[]).find(x=>x.id==='peta'),raw=d&&d.legend||DEFAULT_MAP_LEGEND;
+  return raw.split('\n').map(x=>x.trim()).filter(Boolean).map(x=>{
+    const [mark,...label]=x.split('|');
+    return {mark:mark.trim(),label:label.join('|').trim()||mark.trim()};
+  });
+}
 async function loadMapSettings(){
   if(!S.supabase)return;
-  const {data,error}=await S.supabase.from('map_settings').select('map_mid').eq('id','main').maybeSingle();
+  const {data,error}=await S.supabase.from('map_settings').select('map_mid,legend').eq('id','main').maybeSingle();
   if(error){console.error(error);S.pengaturan=[];return}
-  S.pengaturan=data?[{id:'peta',mid:data.map_mid}]:[];
+  S.pengaturan=data?[{id:'peta',mid:data.map_mid,legend:data.legend}]:[];
 }
 function csvEsc(v){v=String(v==null?'':v);return(v.includes(',')||v.includes('"')||v.includes(String.fromCharCode(10)))?'"'+v.split('"').join('""')+'"':v}
 async function exportMyMaps(det){
   const dl=await claude.use('downloads');if(!dl){alert('Fitur unduh belum tersedia');return}
   const rows=[['Nama','Wilayah','Alamat','Status','Kode']].concat(S.members.map((m,i)=>[m.panggilan||m.nama,m.wilayah||m.pref||'',alamatJp(m,det),m.status||'aktif',m.kode||'MEM-'+String(i+1).padStart(5,'0')]).filter(r=>r[2]&&r[2]!=='Japan'));
   try{await dl.save({filename:'anggota-untuk-my-maps.csv',data:String.fromCharCode(65279)+rows.map(r=>r.map(csvEsc).join(',')).join(String.fromCharCode(10))})}catch(e){alert('Gagal mengunduh: '+(e.message||e.code||''))}}
-async function saveMid(inp){
+async function saveMid(inp,legendInput){
   const u=inp.value.trim(),mm=(u.match(/[?&;]mid=([^&#"'\s<>]+)/)||[])[1]||(/^[A-Za-z0-9_-]{20,}$/.test(u)?u:'');
   if(!mm){alert('Kode tidak dikenali. Tempel kode embed (iframe) dari Google My Maps yang memuat "mid="');return}
   if(!S.admin){alert('Hanya admin utama yang dapat mengubah peta');return}
   try{
+    const legend=legendInput.value.trim()||DEFAULT_MAP_LEGEND;
     if(S.supabase){
-      const {error}=await S.supabase.from('map_settings').upsert({id:'main',map_mid:mm,updated_at:new Date().toISOString()},{onConflict:'id'});
+      const {error}=await S.supabase.from('map_settings').upsert({id:'main',map_mid:mm,legend,updated_at:new Date().toISOString()},{onConflict:'id'});
       if(error)throw error;
-      S.pengaturan=[{id:'peta',mid:mm}];
-    }else await S.db.collection('pengaturan').doc('peta').set({mid:mm,at:Date.now()});
+      S.pengaturan=[{id:'peta',mid:mm,legend}];
+    }else await S.db.collection('pengaturan').doc('peta').set({mid:mm,legend,at:Date.now()});
     alert('Peta disimpan');render();
   }catch(e){alert('Gagal menyimpan peta: '+(e.message||'periksa izin admin'))}}
 function vPetaLama(){
-  const mid=mapMid(),det=h('input',{type:'checkbox'}),inp=h('textarea',{rows:4,placeholder:'Tempel kode embed (iframe) dari Google My Maps'});
+  const mid=mapMid(),det=h('input',{type:'checkbox'}),inp=h('textarea',{rows:4,placeholder:'Tempel kode embed (iframe) dari Google My Maps'}),legendInput=h('textarea',{rows:4,placeholder:'Satu baris: simbol | keterangan'});
   const ready=S.members.filter(m=>{const a=alamatJp(m,false);return a&&a!=='Japan'}).length;
   const map=mid?h('div',{},h('iframe',{src:'https://www.google.com/maps/d/embed?mid='+mid,style:'width:100%;height:min(70vh,560px);border:0;border-radius:18px;background:var(--line)',loading:'lazy',allow:'fullscreen'}),h('a',{class:'btn s',style:'display:inline-block;margin-top:10px;text-decoration:none',href:'https://www.google.com/maps/d/viewer?mid='+mid,target:'_blank'},'🗺️ Buka di Google My Maps')):h('p',{class:'warn'},'Belum ada peta. Admin bisa menempel kode embed Google My Maps di bagian bawah halaman ini.');
+  legendInput.value=(S.pengaturan||[]).find(x=>x.id==='peta')?.legend||DEFAULT_MAP_LEGEND;
+  const legend=h('div',{class:'map-legend'},h('b',{},'Legenda peta'),...mapLegend().map(x=>h('div',{class:'legend-item'},h('span',{class:'legend-mark'},x.mark),h('span',{},x.label))));
   return [h('h1',{},'Peta Wilayah'),h('p',{class:'sub'},ready+' dari '+S.members.length+' anggota punya alamat Jepang untuk dijadikan pin'),
-    box(h('b',{},'🗺️ Peta Anggota'),map),
+    box(h('b',{},'🗺️ Peta Anggota'),map,legend),
     S.admin&&box(h('b',{},'Pasang & perbarui peta'),
       h('p',{class:'warn'},'1) Unduh CSV. 2) Buka mymaps.google.com, buat peta baru, pilih Impor, lalu unggah CSV. 3) Pilih kolom Alamat untuk posisi pin dan kolom Nama untuk judul. 4) Atur peta agar bisa dilihat publik. 5) Di My Maps klik menu titik tiga di samping judul peta, pilih "Sematkan di situs saya", salin kode HTML-nya, lalu tempel di kotak di bawah.'),
       h('label',{class:'warn',style:'display:block;margin:8px 0'},det,' Sertakan alamat jalan/gedung (lebih tepat, tetapi lebih sensitif)'),
       h('button',{class:'btn',style:'margin-bottom:10px',onclick:()=>exportMyMaps(det.checked)},'⬇️ Unduh CSV untuk My Maps ('+ready+' pin)'),
-      inp,h('button',{class:'btn s',style:'margin-top:8px',onclick:()=>saveMid(inp)},'Simpan peta')),
+      inp,h('label',{class:'lb'},'Legenda (satu baris per item, format: simbol | keterangan)',legendInput),
+      h('button',{class:'btn s',style:'margin-top:8px',onclick:()=>saveMid(inp,legendInput)},'Simpan peta')),
     h('b',{style:'display:block;margin:6px 4px 10px'},'Sebaran per wilayah'),...sebaran()];
 }
 const ISL=['141.9,45.5 142.9,44.7 144.7,44 145.3,44.35 144.9,43.6 145.8,43.35 144.4,42.95 143.25,41.93 141.7,42.6 140.97,42.3 140.6,42.55 140.4,42.1 140.1,41.4 140.3,42.9 140.35,43.35 141,43.2 141.6,43.9 141.7,45.4','140.9,41.5 141.4,41.4 141.5,40.5 142,39.6 141.6,38.9 141.5,38.3 141,38.2 141,37 140.6,36.4 140.87,35.7 140.1,35.5 139.8,35.6 139.65,35.4 139.6,35.15 139.15,35.25 138.85,34.6 138.85,35.1 138.2,34.6 137.7,34.65 137,34.6 136.9,35 136.8,34.5 136.9,34.3 136.2,33.45 135.77,33.43 135.15,33.85 135.4,34.6 134.7,34.75 133.95,34.55 132.4,34.3 131.4,33.95 130.9,33.95 131.4,34.4 132.1,34.9 133,35.5 134.2,35.55 135.3,35.5 136.1,35.65 136.1,36.1 136.6,36.6 137.35,37.5 137.2,36.8 138.2,37.2 139.05,37.95 139.8,38.95 140,39.7 139.7,39.95 140,40.2 139.9,40.8 140.35,41.25','134.65,34.2 134,34.35 133,34.1 132.7,33.85 132.4,33.45 132,33.35 132.5,33.2 132.7,32.95 133,32.72 133.3,33.4 133.55,33.5 134.18,33.25 134.35,33.6 134.6,34.05','130.95,33.95 131.65,33.25 131.9,32.95 131.45,31.9 130.65,31 130.2,31.15 130.2,32 130,32.3 130.5,32.75 129.85,32.75 129.7,33.15 129.9,33.5 130.4,33.6'];
