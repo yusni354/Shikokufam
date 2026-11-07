@@ -368,7 +368,8 @@ function render(){
   }
   const d=$('#dr');d.replaceChildren(h('p',{class:'sub',style:'padding:0 14px'},h('b',{style:'color:var(--ink)'},'KOMUNITAS ID-JP'),h('br'),'Database Anggota'),
     ...ALL.filter(x=>!x[2]||S.admin).map(x=>h('a',{class:S.view===x[0]?'on':'',onclick:()=>go(x[0])},
-      x[1],x[0]==='pesan'&&S.unreadMessages>0&&h('span',{class:'nav-badge'},String(S.unreadMessages)))));
+      x[1],x[0]==='pesan'&&S.unreadMessages>0&&h('span',{class:'nav-badge'},String(S.unreadMessages)))),
+    h('button',{class:'menu-logout',onclick:async()=>{await S.supabase.auth.signOut()}},'🚪 Keluar'));
   if(!V[S.view]||(ALL.find(x=>x[0]===S.view)||[])[2]&&!S.admin)S.view='landing';
   $('#app').replaceChildren(...[].concat(V[S.view]()).filter(Boolean));
   const tb=$('#tb');tb.style.display=S.form||S.view==='landing'?'none':'flex';$('#pet').style.display=S.form?'none':'block';
@@ -410,7 +411,7 @@ function vPesan(){
     ...(S.replies||[]).filter(r=>r.message_id===x.id).map(r=>h('div',{style:'background:#f4ead7;border-radius:16px;padding:12px;margin:8px 0;white-space:pre-wrap'},h('b',{},r.by===S.uid?'Anda':'Admin'),h('br'),r.teks)),
     S.admin&&h('button',{class:'btn s',onclick:async()=>{if(!confirm('Hapus pesan ini?'))return;const {error}=await S.supabase.from('messages').delete().eq('id',x.id);if(error)alert('Gagal menghapus pesan: '+error.message);else loadMessages()}},'Hapus'),
     replyBox(x.id))):[h('p',{class:'warn'},S.admin?'Belum ada pertanyaan.':'Belum ada pesan Anda.')];
-  return [h('h1',{},S.admin?'Pesan Masuk':'Pesan Saya'),h('p',{class:'sub'},L.length+' pesan'),h('button',{class:'btn s',onclick:async()=>{await S.supabase.auth.signOut()}},'Keluar'),...cards];
+  return [h('h1',{},S.admin?'Pesan Masuk':'Pesan Saya'),h('p',{class:'sub'},L.length+' pesan'),...cards];
 }
 /* ===== maskot: gambar diam, bisa digeser, ketuk untuk tanya admin ===== */
 const ADMIN_WA=''; /* isi nomor WhatsApp admin, contoh: 6281234567890 */
