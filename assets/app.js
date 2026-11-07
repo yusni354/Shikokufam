@@ -1,4 +1,4 @@
-const S={members:[],events:[],topics:[],view:'landing',admin:false,mainAdmin:false,uid:null,email:'',name:'',db:null,supabase:null,authLoading:true,unreadMessages:0};
+const S={members:[],events:[],topics:[],view:'landing',admin:false,mainAdmin:false,uid:null,email:'',name:'',db:null,supabase:null,authLoading:true,unreadMessages:0,mapError:''};
 const $=s=>document.querySelector(s);
 function h(t,p,...k){const e=document.createElement(t);for(const a in p||{}){if(a==='onclick')e.onclick=p[a];else if(a==='class')e.className=p[a];else e.setAttribute(a,p[a])}k.flat().forEach(c=>{if(c!=null&&c!==false)e.append(c)});return e}
 const ALL=[['landing','🗺️ Beranda'],['dash','🏠 Dashboard'],['members','👥 Data Anggota'],['absen','📝 Absensi'],['forum','💬 Forum'],['import','📥 Import Database',1],['map-settings','⚙️ Pengaturan Peta',1,1],['pesan','📨 Pesan Masuk']];
@@ -269,10 +269,12 @@ function vForum(){
 }
 function alamatJp(m,det){return [det?m.alamat_jp:'',m.kec_jp,m.kota,m.pref||m.wilayah,m.kodepos,'Japan'].filter(Boolean).join(', ')}
 function mapMid(){const d=(S.pengaturan||[]).find(x=>x.id==='peta');return d&&d.mid}
+function mapEmbedUrl(mid){return 'https://www.google.com/maps/d/embed?mid='+encodeURIComponent(mid)}
 async function loadMapSettings(){
   if(!S.supabase)return;
   const {data,error}=await S.supabase.from('map_settings').select('map_mid').eq('id','main').maybeSingle();
-  if(error){console.error(error);S.pengaturan=[];return}
+  if(error){console.error(error);S.mapError=error.message||'Konfigurasi peta tidak dapat dibaca';S.pengaturan=[];return}
+  S.mapError='';
   S.pengaturan=data?[{id:'peta',mid:data.map_mid}]:[];
 }
 function csvEsc(v){v=String(v==null?'':v);return(v.includes(',')||v.includes('"')||v.includes(String.fromCharCode(10)))?'"'+v.split('"').join('""')+'"':v}
@@ -281,7 +283,7 @@ async function exportMyMaps(det){
   const rows=[['Nama','Wilayah','Alamat','Status','Kode']].concat(S.members.map((m,i)=>[m.panggilan||m.nama,m.wilayah||m.pref||'',alamatJp(m,det),m.status||'aktif',m.kode||'MEM-'+String(i+1).padStart(5,'0')]).filter(r=>r[2]&&r[2]!=='Japan'));
   try{await dl.save({filename:'anggota-untuk-my-maps.csv',data:String.fromCharCode(65279)+rows.map(r=>r.map(csvEsc).join(',')).join(String.fromCharCode(10))})}catch(e){alert('Gagal mengunduh: '+(e.message||e.code||''))}}
 async function saveMid(inp){
-  const u=inp.value.trim(),mm=(u.match(/[?&;]mid=([^&#"'\s<>]+)/)||[])[1]||(/^[A-Za-z0-9_-]{20,}$/.test(u)?u:'');
+  const u=inp.value.trim(),mm=(u.match(/[?&;]mid=([^&#"'\s<>]+)/i)||[])[1]||(/^[A-Za-z0-9_-]{10,}$/.test(u)?u:'');
   if(!mm){alert('Kode tidak dikenali. Tempel kode embed (iframe) dari Google My Maps yang memuat "mid="');return}
   if(!S.mainAdmin){alert('Hanya admin utama yang dapat mengubah peta');return}
   try{
@@ -294,11 +296,12 @@ async function saveMid(inp){
   }catch(e){alert('Gagal menyimpan peta: '+(e.message||'periksa izin admin'))}}
 function mapEmbed(){
   const mid=mapMid();
-  return mid?h('div',{},h('iframe',{src:'https://www.google.com/maps/d/embed?mid='+mid,style:'width:100%;height:calc(100vh - 120px);min-height:520px;border:0;border-radius:18px;background:var(--line)',loading:'lazy',allow:'fullscreen',title:'Google My Maps'}),h('a',{class:'btn s',style:'display:inline-block;margin-top:10px;text-decoration:none',href:'https://www.google.com/maps/d/viewer?mid='+mid,target:'_blank'},'🗺️ Buka di Google My Maps')):h('p',{class:'warn'},'Belum ada peta. Admin dapat mengatur Google My Maps melalui menu Pengaturan Peta.');
+  return mid?h('div',{},h('iframe',{src:mapEmbedUrl(mid),style:'width:100%;height:calc(100vh - 120px);min-height:520px;border:0;border-radius:18px;background:var(--line)',loading:'lazy',allow:'fullscreen',title:'Google My Maps'}),h('a',{class:'btn s',style:'display:inline-block;margin-top:10px;text-decoration:none',href:'https://www.google.com/maps/d/viewer?mid='+encodeURIComponent(mid),target:'_blank'},'🗺️ Buka di Google My Maps')):h('p',{class:'warn'},S.mapError||'Belum ada peta. Admin dapat mengatur Google My Maps melalui menu Pengaturan Peta.');
 }
 function vPeta(){return [mapEmbed()]}
 function vPetaSettings(){
   const mid=mapMid(),det=h('input',{type:'checkbox'}),inp=h('textarea',{rows:4,placeholder:'Tempel kode embed (iframe) dari Google My Maps'});
+  inp.value=mid?mapEmbedUrl(mid):'';
   const ready=S.members.filter(m=>{const a=alamatJp(m,false);return a&&a!=='Japan'}).length;
   return [h('h1',{},'Peta Wilayah'),h('p',{class:'sub'},ready+' dari '+S.members.length+' anggota punya alamat Jepang untuk dijadikan pin'),
     S.mainAdmin&&box(h('b',{},'Pasang & perbarui peta'),
