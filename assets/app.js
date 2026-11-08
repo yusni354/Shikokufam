@@ -677,16 +677,24 @@ function vPesan(){
   entries.sort((a,b)=>a.at-b.at);
   const chatBody=h('div',{class:'chat-body'},...entries.map(entry=>h('div',{class:'chat-line '+(entry.incoming?'incoming':'outgoing')},
     h('div',{class:'chat-bubble'},entry.message,...entry.attachments.map(attachmentView).filter(Boolean)))));
+  let swipeStartX=0,swipeStartY=0;
+  chatBody.ontouchstart=e=>{swipeStartX=e.changedTouches[0].clientX;swipeStartY=e.changedTouches[0].clientY};
+  chatBody.ontouchend=e=>{
+    const dx=e.changedTouches[0].clientX-swipeStartX,dy=e.changedTouches[0].clientY-swipeStartY;
+    if(dx>80&&Math.abs(dx)>Math.abs(dy)){
+      S.openConversation=null;
+      render();
+    }
+  };
   requestAnimationFrame(()=>{chatBody.scrollTop=chatBody.scrollHeight});
   const cards=[
     h('div',{class:'conversation-toolbar'},
-      h('button',{class:'btn s',onclick:()=>{S.openConversation=null;render()}},'← Kembali'),
       h('b',{},group.name)),
     h('section',{class:'chat-card'},
       chatBody,
       replyBox(messages[messages.length-1].id))
   ];
-  return [h('h1',{},S.admin?'Pesan Masuk':'Pesan Saya'),h('p',{class:'sub'},'Percakapan dengan '+group.name),...cards];
+  return cards;
 }
 /* ===== maskot: gambar diam, bisa digeser, ketuk untuk tanya admin ===== */
 const ADMIN_WA=''; /* isi nomor WhatsApp admin, contoh: 6281234567890 */
