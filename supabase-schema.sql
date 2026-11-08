@@ -30,6 +30,19 @@ alter table public.profiles
 
 do $$
 begin
+  if exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'profiles'
+      and column_name = 'region'
+  ) then
+    alter table public.profiles alter column region drop not null;
+  end if;
+end $$;
+
+do $$
+begin
   alter table public.profiles
     add constraint profiles_approval_status_check
     check (approval_status in ('pending', 'approved', 'rejected'));
@@ -127,6 +140,44 @@ drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
+
+create or replace function public.confirm_auth_user_after_approval()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.approval_status = 'approved' and tg_op = 'INSERT' then
+    update auth.users
+    set email_confirmed_at = coalesce(email_confirmed_at, now())
+    where id = new.id
+      and email_confirmed_at is null;
+  elsif new.approval_status = 'approved'
+    and tg_op = 'UPDATE'
+    and old.approval_status is distinct from new.approval_status then
+    update auth.users
+    set email_confirmed_at = coalesce(email_confirmed_at, now())
+    where id = new.id
+      and email_confirmed_at is null;
+  end if;
+  return new;
+end;
+$$;
+
+revoke all on function public.confirm_auth_user_after_approval() from public;
+
+drop trigger if exists on_profile_approved on public.profiles;
+create trigger on_profile_approved
+  after insert or update of approval_status on public.profiles
+  for each row execute procedure public.confirm_auth_user_after_approval();
+
+update auth.users as u
+set email_confirmed_at = coalesce(u.email_confirmed_at, now())
+from public.profiles as p
+where p.id = u.id
+  and p.approval_status = 'approved'
+  and u.email_confirmed_at is null;
 
 grant usage on schema public to supabase_auth_admin;
 grant insert on public.profiles to supabase_auth_admin;
