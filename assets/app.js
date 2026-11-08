@@ -608,7 +608,14 @@ function render(){
   const tb=$('#tb');tb.style.display=S.form?'none':'flex';$('#pet').style.display=S.form?'none':'block';
   tb.replaceChildren(...[['landing','🗺️','Beranda'],['dash','🏠','Ringkasan'],['members','👥','Anggota'],['absen','📝','Absensi'],['forum','💬','Forum']].map(x=>h('a',{class:S.view===x[0]?'on':'',onclick:()=>go(x[0])},h('span',{},x[1]),x[2])));
 }
-function sub(name,key){S.db.collection(name).onSnapshot(s=>{S[key]=s.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(a.at||0)-(b.at||0));render()},()=>{})}
+function sub(name,key){
+  S.db.collection(name).onSnapshot(s=>{
+    const next=s.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(a.at||0)-(b.at||0));
+    const previous=JSON.stringify(S[key]||[]);
+    S[key]=next;
+    if(JSON.stringify(next)!==previous)render();
+  },()=>{})
+}
 render();
 (async()=>{
   try{S.uid=localStorage.getItem('uid');if(!S.uid){S.uid='u'+Math.random().toString(36).slice(2)+Date.now().toString(36);localStorage.setItem('uid',S.uid)}}catch(e){S.uid='u'+Math.random().toString(36).slice(2)}
