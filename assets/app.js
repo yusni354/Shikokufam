@@ -2,7 +2,7 @@ const S={members:[],events:[],topics:[],view:'landing',admin:false,mainAdmin:fal
 const $=s=>document.querySelector(s);
 function h(t,p,...k){const e=document.createElement(t);for(const a in p||{}){if(a==='onclick')e.onclick=p[a];else if(a==='class')e.className=p[a];else e.setAttribute(a,p[a])}k.flat().forEach(c=>{if(c!=null&&c!==false)e.append(c)});return e}
 const ALL=[['landing','🗺️ Beranda'],['dash','🏠 Dashboard'],['members','👥 Data Anggota'],['absen','📝 Absensi'],['forum','💬 Forum'],['import','📥 Import Database',1],['pesan','📨 Pesan Masuk']];
-function go(v){S.view=v;S.form=S.detail=null;document.body.classList.remove('open');render();if(v==='pesan'&&S.admin)markMessagesRead()}
+function go(v){S.view=v;S.form=S.detail=null;document.body.classList.remove('open');render();if(v==='pesan'){if(S.admin)markMessagesRead();else markUserMessagesRead()}}
 $('#mn').onclick=()=>document.body.classList.add('open');
 $('#ov').onclick=()=>document.body.classList.remove('open');
 $('#st').onclick=()=>$('#sp').classList.toggle('open');
@@ -29,6 +29,20 @@ function createLocalDb(){
 }
 function messageFromRow(row){return {id:row.id,nama:row.name,teks:row.message,at:new Date(row.created_at).getTime(),status:row.status,sender_id:row.sender_id}}
 function replyFromRow(row){return {id:row.id,message_id:row.message_id,by:row.sender_id,teks:row.message,at:new Date(row.created_at).getTime()}}
+function userMessageSeen(){
+  try{return JSON.parse(localStorage.getItem('shikoku-family:message-seen:'+S.uid)||'{}')}catch(e){return {}}
+}
+function markUserMessagesRead(){
+  if(!S.uid||S.admin)return;
+  const seen=userMessageSeen();
+  (S.tanya||[]).forEach(message=>{
+    const latest=(S.replies||[]).filter(reply=>reply.message_id===message.id).reduce((time,reply)=>Math.max(time,reply.at||0),0);
+    if(latest)seen[message.id]=latest;
+  });
+  try{localStorage.setItem('shikoku-family:message-seen:'+S.uid,JSON.stringify(seen))}catch(e){console.error('Status pesan tidak dapat disimpan:',e)}
+  S.unreadMessages=0;
+  render();
+}
 async function subscribeToMessages(){
   if(!S.supabase||!S.uid)return;
   if(S.messageChannel)await S.supabase.removeChannel(S.messageChannel);
@@ -51,7 +65,15 @@ async function loadMessages(){
     const {data:replies}=await S.supabase.from('message_replies').select('*').in('message_id',ids).order('created_at',{ascending:true});
     S.replies=(replies||[]).map(replyFromRow);
   }else S.replies=[];
-  S.unreadMessages=S.admin?(data||[]).filter(x=>x.status==='unread').length:0;
+  if(S.admin){
+    S.unreadMessages=(data||[]).filter(x=>x.status==='unread').length;
+  }else{
+    const seen=userMessageSeen();
+    S.unreadMessages=(S.tanya||[]).filter(message=>{
+      const latest=(S.replies||[]).filter(reply=>reply.message_id===message.id).reduce((time,reply)=>Math.max(time,reply.at||0),0);
+      return latest>Number(seen[message.id]||0);
+    }).length;
+  }
   render();
 }
 async function markMessagesRead(){
