@@ -35,9 +35,8 @@ function userMessageSeen(){
 function markUserMessagesRead(){
   if(!S.uid||S.admin)return;
   const seen=userMessageSeen();
-  (S.tanya||[]).forEach(message=>{
-    const latest=(S.replies||[]).filter(reply=>reply.message_id===message.id).reduce((time,reply)=>Math.max(time,reply.at||0),0);
-    if(latest)seen[message.id]=latest;
+  (S.replies||[]).forEach(reply=>{
+    if(reply.by!==S.uid&&reply.at)seen[reply.id]=reply.at;
   });
   try{localStorage.setItem('shikoku-family:message-seen:'+S.uid,JSON.stringify(seen))}catch(e){console.error('Status pesan tidak dapat disimpan:',e)}
   S.unreadMessages=0;
@@ -69,10 +68,9 @@ async function loadMessages(){
     S.unreadMessages=(data||[]).filter(x=>x.status==='unread').length;
   }else{
     const seen=userMessageSeen();
-    S.unreadMessages=(S.tanya||[]).filter(message=>{
-      const latest=(S.replies||[]).filter(reply=>reply.message_id===message.id).reduce((time,reply)=>Math.max(time,reply.at||0),0);
-      return latest>Number(seen[message.id]||0);
-    }).length;
+    S.unreadMessages=(S.replies||[]).filter(reply=>
+      reply.by!==S.uid&&reply.at>Number(seen[reply.id]||0)
+    ).length;
   }
   render();
 }
