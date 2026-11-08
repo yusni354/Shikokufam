@@ -1,4 +1,4 @@
-const S={members:[],events:[],topics:[],view:'landing',admin:false,mainAdmin:false,uid:null,email:'',name:'',approvalStatus:'approved',pendingUsers:[],mapError:'',db:null,supabase:null,authLoading:true,unreadMessages:0};
+const S={members:[],events:[],topics:[],view:'landing',admin:false,mainAdmin:false,uid:null,email:'',name:'',approvalStatus:'approved',pendingUsers:[],mapError:'',db:null,supabase:null,messageChannel:null,authLoading:true,unreadMessages:0};
 const $=s=>document.querySelector(s);
 function h(t,p,...k){const e=document.createElement(t);for(const a in p||{}){if(a==='onclick')e.onclick=p[a];else if(a==='class')e.className=p[a];else e.setAttribute(a,p[a])}k.flat().forEach(c=>{if(c!=null&&c!==false)e.append(c)});return e}
 const ALL=[['landing','🗺️ Beranda'],['dash','🏠 Dashboard'],['members','👥 Data Anggota'],['absen','📝 Absensi'],['forum','💬 Forum'],['import','📥 Import Database',1],['pesan','📨 Pesan Masuk']];
@@ -29,6 +29,16 @@ function createLocalDb(){
 }
 function messageFromRow(row){return {id:row.id,nama:row.name,teks:row.message,at:new Date(row.created_at).getTime(),status:row.status,sender_id:row.sender_id}}
 function replyFromRow(row){return {id:row.id,message_id:row.message_id,by:row.sender_id,teks:row.message,at:new Date(row.created_at).getTime()}}
+async function subscribeToMessages(){
+  if(!S.supabase||!S.uid)return;
+  if(S.messageChannel)await S.supabase.removeChannel(S.messageChannel);
+  S.messageChannel=S.supabase.channel('messages-'+S.uid)
+    .on('postgres_changes',{event:'*',schema:'public',table:'messages'},()=>loadMessages())
+    .on('postgres_changes',{event:'*',schema:'public',table:'message_replies'},()=>loadMessages());
+  S.messageChannel.subscribe(status=>{
+    if(status==='CHANNEL_ERROR'||status==='TIMED_OUT')console.error('Realtime pesan tidak tersedia:',status);
+  });
+}
 async function loadMessages(){
   if(!S.supabase||!S.uid)return;
   let query=S.supabase.from('messages').select('*').order('created_at',{ascending:true});
@@ -65,6 +75,13 @@ async function submitReply(messageId,text){
   if(!S.supabase||!S.uid)throw new Error('Silakan login terlebih dahulu');
   const {error}=await S.supabase.from('message_replies').insert({message_id:messageId,sender_id:S.uid,message:text});
   if(error)throw error;
+  if(S.admin){
+    const {error:statusError}=await S.supabase.from('messages').update({
+      status:'replied',
+      replied_at:new Date().toISOString()
+    }).eq('id',messageId);
+    if(statusError)throw statusError;
+  }
 }
 function accountForm(){
   const email=h('input',{type:'email',placeholder:'Email',autocomplete:'email'});
@@ -489,6 +506,10 @@ render();
   if(window.supabase&&window.SUPABASE_CONFIG?.url&&window.SUPABASE_CONFIG?.anonKey){
     S.supabase=window.supabase.createClient(window.SUPABASE_CONFIG.url,window.SUPABASE_CONFIG.anonKey);
     const applySession=async session=>{
+      if(!session?.user&&S.messageChannel){
+        await S.supabase.removeChannel(S.messageChannel);
+        S.messageChannel=null;
+      }
       S.uid=session?.user?.id||null;S.email=session?.user?.email||'';S.admin=false;S.mainAdmin=false;S.approvalStatus='approved';
       if(session?.user){
         const {data:profile}=await S.supabase.from('profiles').select('name,role,is_main_admin,approval_status').eq('id',session.user.id).maybeSingle();
@@ -496,6 +517,7 @@ render();
         S.mainAdmin=S.admin&&profile?.is_main_admin===true;
         S.approvalStatus=profile?.approval_status||'pending';
         await loadMessages();
+        await subscribeToMessages();
       }
       await loadMapSettings();
       await loadPendingUsers();
@@ -504,7 +526,7 @@ render();
     const {data:{session}}=await S.supabase.auth.getSession();
     await applySession(session);
     S.supabase.auth.onAuthStateChange((_event,next)=>{applySession(next)});
-    setInterval(()=>{if(S.admin)loadMessages();if(S.mainAdmin)loadPendingUsers()},30000);
+    setInterval(()=>{if(S.uid)loadMessages();if(S.mainAdmin)loadPendingUsers()},30000);
   }else S.authLoading=false;
   sub('members','members');sub('events','events');sub('topics','topics');if(!S.supabase)sub('pengaturan','pengaturan');sub('pin','pins');
   render();
@@ -545,7 +567,7 @@ function askForm(){
           const namaValue=nama.value.trim();
           await submitMessage({nama:namaValue,teks:ta.value.trim()});
           S.name=namaValue;m.remove();
-          if(S.admin)await loadMessages();
+          await loadMessages();
           alert('Pertanyaan terkirim dan sudah masuk ke Pesan Masuk.');
         }catch(e){
           console.error(e);

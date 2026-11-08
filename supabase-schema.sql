@@ -80,6 +80,28 @@ create index if not exists messages_status_created_at_idx
 create index if not exists message_replies_message_created_at_idx
   on public.message_replies (message_id, created_at);
 
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'messages'
+  ) then
+    alter publication supabase_realtime add table public.messages;
+  end if;
+  if not exists (
+    select 1
+    from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'message_replies'
+  ) then
+    alter publication supabase_realtime add table public.message_replies;
+  end if;
+end $$;
+
 create or replace function public.is_admin()
 returns boolean
 language sql
