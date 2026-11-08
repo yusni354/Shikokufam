@@ -2,7 +2,7 @@ const S={members:[],events:[],topics:[],view:'landing',admin:false,mainAdmin:fal
 const $=s=>document.querySelector(s);
 function h(t,p,...k){const e=document.createElement(t);for(const a in p||{}){if(a==='onclick')e.onclick=p[a];else if(a==='class')e.className=p[a];else e.setAttribute(a,p[a])}k.flat().forEach(c=>{if(c!=null&&c!==false)e.append(c)});return e}
 const ALL=[['landing','🗺️ Beranda'],['dash','🏠 Dashboard'],['members','👥 Data Anggota'],['absen','📝 Absensi'],['forum','💬 Forum'],['import','📥 Import Database',1],['pesan','📨 Pesan Masuk']];
-function go(v){S.view=v;S.form=S.detail=null;document.body.classList.remove('open');render();if(v==='pesan'){if(S.admin)markMessagesRead();else markUserMessagesRead()}}
+function go(v){S.view=v;S.form=S.detail=null;document.body.classList.remove('open');render();if(v==='pesan')markMessagesRead()}
 $('#mn').onclick=()=>document.body.classList.add('open');
 $('#ov').onclick=()=>document.body.classList.remove('open');
 $('#st').onclick=()=>$('#sp').classList.toggle('open');
@@ -32,13 +32,19 @@ function replyFromRow(row){return {id:row.id,message_id:row.message_id,by:row.se
 function userMessageSeen(){
   try{return JSON.parse(localStorage.getItem('shikoku-family:message-seen:'+S.uid)||'{}')}catch(e){return {}}
 }
-function markUserMessagesRead(){
-  if(!S.uid||S.admin)return;
+function incomingMessageItems(){
+  const replies=(S.replies||[]).filter(reply=>reply.by!==S.uid);
+  return S.admin?[...(S.tanya||[]),...replies]:replies;
+}
+function markMessagesRead(){
+  if(!S.uid)return;
   const seen=userMessageSeen();
-  (S.replies||[]).forEach(reply=>{
-    if(reply.by!==S.uid&&reply.at)seen[reply.id]=reply.at;
-  });
+  incomingMessageItems().forEach(item=>{if(item.at)seen[item.id]=item.at});
   try{localStorage.setItem('shikoku-family:message-seen:'+S.uid,JSON.stringify(seen))}catch(e){console.error('Status pesan tidak dapat disimpan:',e)}
+  if(S.admin&&S.supabase){
+    S.supabase.from('messages').update({status:'read',read_at:new Date().toISOString()}).eq('status','unread')
+      .then(({error})=>{if(error)console.error('Status pesan admin tidak dapat diperbarui:',error)});
+  }
   S.unreadMessages=0;
   render();
 }
@@ -64,21 +70,8 @@ async function loadMessages(){
     const {data:replies}=await S.supabase.from('message_replies').select('*').in('message_id',ids).order('created_at',{ascending:true});
     S.replies=(replies||[]).map(replyFromRow);
   }else S.replies=[];
-  if(S.admin){
-    S.unreadMessages=(data||[]).filter(x=>x.status==='unread').length;
-  }else{
-    const seen=userMessageSeen();
-    S.unreadMessages=(S.replies||[]).filter(reply=>
-      reply.by!==S.uid&&reply.at>Number(seen[reply.id]||0)
-    ).length;
-  }
-  render();
-}
-async function markMessagesRead(){
-  if(!S.supabase||!S.admin||!S.unreadMessages)return;
-  const {error}=await S.supabase.from('messages').update({status:'read',read_at:new Date().toISOString()}).eq('status','unread');
-  if(error){console.error(error);return}
-  S.unreadMessages=0;
+  const seen=userMessageSeen();
+  S.unreadMessages=incomingMessageItems().filter(item=>!seen[item.id]).length;
   render();
 }
 async function submitMessage(data){
@@ -189,7 +182,7 @@ function loginForm(){
 }
 function replyBox(messageId){
   const input=h('textarea',{rows:2,placeholder:'Tulis balasan...'});
-  return h('div',{style:'margin-top:10px'},input,h('button',{class:'btn s',onclick:async()=>{
+  return h('div',{class:'reply-box'},input,h('button',{class:'btn s',onclick:async()=>{
     if(!input.value.trim())return;
     try{await submitReply(messageId,input.value.trim());input.value='';await loadMessages()}
     catch(e){alert('Gagal mengirim balasan: '+e.message)}
@@ -554,14 +547,43 @@ render();
 
 function vPesan(){
   if(!S.uid)return [h('h1',{},'Pesan Masuk'),accountForm()];
-  const L=[...(S.tanya||[])].reverse();
-  const cards=L.length?L.map(x=>h('div',{class:'card',style:'display:block'},
-    h('div',{class:'row'},h('b',{},x.nama||'Anggota'),h('small',{class:'warn'},new Date(x.at||0).toLocaleString('id-ID'))),
-    h('div',{style:'background:#e3f1f8;border-radius:16px;padding:12px;margin:10px 0 12px;white-space:pre-wrap'},x.teks||'Tidak ada pesan tambahan.'),
-    ...(S.replies||[]).filter(r=>r.message_id===x.id).map(r=>h('div',{style:'background:#f4ead7;border-radius:16px;padding:12px;margin:8px 0;white-space:pre-wrap'},h('b',{},r.by===S.uid?'Anda':'Admin'),h('br'),r.teks)),
-    S.admin&&h('button',{class:'btn s',onclick:async()=>{if(!confirm('Hapus pesan ini?'))return;const {error}=await S.supabase.from('messages').delete().eq('id',x.id);if(error)alert('Gagal menghapus pesan: '+error.message);else loadMessages()}},'Hapus'),
-    replyBox(x.id))):[h('p',{class:'warn'},S.admin?'Belum ada pertanyaan.':'Belum ada pesan Anda.')];
-  return [h('h1',{},S.admin?'Pesan Masuk':'Pesan Saya'),h('p',{class:'sub'},L.length+' pesan'),...cards];
+  const groups=[];
+  const byUser=new Map();
+  (S.tanya||[]).forEach(message=>{
+    const key=S.admin?(message.sender_id||'unknown-'+message.nama):(S.uid||'self');
+    let group=byUser.get(key);
+    if(!group){group={key,name:message.nama||'Anggota',messages:[]};byUser.set(key,group);groups.push(group)}
+    group.messages.push(message);
+  });
+  const cards=groups.length?groups.map(group=>{
+    const messages=group.messages;
+    const latest=messages[messages.length-1];
+    const entries=[];
+    messages.forEach(message=>{
+      entries.push({at:message.at||0,incoming:S.admin,message:message.teks||''});
+      (S.replies||[]).filter(reply=>reply.message_id===message.id).forEach(reply=>{
+        entries.push({at:reply.at||0,incoming:reply.by!==S.uid,message:reply.teks||''});
+      });
+    });
+    entries.sort((a,b)=>a.at-b.at);
+    return h('section',{class:'chat-card'},
+      h('div',{class:'chat-head'},
+        h('div',{class:'chat-avatar'},(group.name||'?')[0].toUpperCase()),
+        h('div',{style:'min-width:0;flex:1'},h('b',{},group.name),h('small',{},new Date(latest.at||0).toLocaleString('id-ID'))),
+        S.admin&&h('button',{class:'btn s',title:'Hapus percakapan',onclick:async()=>{
+          if(!confirm('Hapus seluruh percakapan ini?'))return;
+          for(const message of messages){
+            const {error}=await S.supabase.from('messages').delete().eq('id',message.id);
+            if(error){alert('Gagal menghapus percakapan: '+error.message);return}
+          }
+          await loadMessages();
+        }},'Hapus')),
+      h('div',{class:'chat-body'},...entries.map(entry=>h('div',{class:'chat-line '+(entry.incoming?'incoming':'outgoing')},
+        h('div',{class:'chat-bubble'},entry.message)))),
+      replyBox(latest.id)
+    );
+  }):[h('p',{class:'warn'},S.admin?'Belum ada pertanyaan.':'Belum ada pesan Anda.')];
+  return [h('h1',{},S.admin?'Pesan Masuk':'Pesan Saya'),h('p',{class:'sub'},groups.length+' percakapan'),...cards];
 }
 /* ===== maskot: gambar diam, bisa digeser, ketuk untuk tanya admin ===== */
 const ADMIN_WA=''; /* isi nomor WhatsApp admin, contoh: 6281234567890 */
