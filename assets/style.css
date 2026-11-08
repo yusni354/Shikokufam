@@ -113,6 +113,16 @@ body.open #dr{transform:none}body.open #ov{display:block}
 .chat-line.incoming .chat-bubble{background:#e3f1f8;border-top-left-radius:5px}
 .chat-line.outgoing .chat-bubble{background:#d7f5d0;border-top-right-radius:5px}
 .chat-card .reply-box{margin-top:10px}
+.conversation-row{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:12px;width:100%;display:flex;align-items:center;gap:10px;margin-bottom:8px;color:var(--ink);text-align:left}
+.conversation-row:hover{border-color:var(--acc)}
+.conversation-row small{display:block;color:var(--mut);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.conversation-badge{display:grid;place-items:center;min-width:24px;height:24px;padding:0 6px;border-radius:999px;background:#d9455f;color:#fff;font-size:12px;font-weight:700}
+.conversation-toolbar{display:flex;align-items:center;gap:12px;margin:6px 0 12px}
+.attachment-tools{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.attachment-list{display:block;color:var(--mut);overflow-wrap:anywhere;margin-top:5px}
+.chat-bubble img,.chat-image{display:block;max-width:220px;max-height:220px;border-radius:12px;margin-top:6px}
+.chat-file{display:block;color:var(--acc);margin-top:6px;font-weight:600;overflow-wrap:anywhere}
+.chat-bubble audio{display:block;max-width:220px;margin-top:6px}
 #tb{position:fixed;left:12px;right:12px;bottom:calc(10px + env(safe-area-inset-bottom,0px));background:var(--card);border-radius:24px;box-shadow:0 8px 30px rgba(47,134,184,.28);display:flex;justify-content:space-around;padding:8px;z-index:6}
 #tb a{flex:1;text-align:center;font-size:11px;color:var(--mut);padding:6px 0;border-radius:16px;cursor:pointer}
 #tb a span{display:block;font-size:20px}

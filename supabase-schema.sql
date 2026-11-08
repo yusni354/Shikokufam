@@ -63,16 +63,20 @@ create table if not exists public.messages (
     check (status in ('unread', 'read', 'replied')),
   created_at timestamptz not null default now(),
   read_at timestamptz,
-  replied_at timestamptz
+  replied_at timestamptz,
+  attachments jsonb not null default '[]'::jsonb
 );
+alter table public.messages add column if not exists attachments jsonb not null default '[]'::jsonb;
 
 create table if not exists public.message_replies (
   id uuid primary key default gen_random_uuid(),
   message_id uuid not null references public.messages(id) on delete cascade,
   sender_id uuid not null references auth.users(id) on delete cascade,
   message text not null check (char_length(trim(message)) between 1 and 5000),
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  attachments jsonb not null default '[]'::jsonb
 );
+alter table public.message_replies add column if not exists attachments jsonb not null default '[]'::jsonb;
 
 create index if not exists messages_status_created_at_idx
   on public.messages (status, created_at desc);
@@ -303,6 +307,34 @@ grant select, update, delete on public.messages to authenticated;
 grant select, insert on public.message_replies to authenticated;
 
 alter table public.message_replies enable row level security;
+
+insert into storage.buckets (id, name, public)
+values ('message-attachments', 'message-attachments', true)
+on conflict (id) do update set public = true;
+
+drop policy if exists "Message participants can upload attachments" on storage.objects;
+create policy "Message participants can upload attachments"
+  on storage.objects for insert
+  to authenticated
+  with check (
+    bucket_id = 'message-attachments'
+    and (storage.foldername(name))[1] = (select auth.uid())::text
+  );
+
+drop policy if exists "Anyone can read message attachments" on storage.objects;
+create policy "Anyone can read message attachments"
+  on storage.objects for select
+  to anon, authenticated
+  using (bucket_id = 'message-attachments');
+
+drop policy if exists "Owners can delete message attachments" on storage.objects;
+create policy "Owners can delete message attachments"
+  on storage.objects for delete
+  to authenticated
+  using (
+    bucket_id = 'message-attachments'
+    and (storage.foldername(name))[1] = (select auth.uid())::text
+  );
 
 drop policy if exists "Message participants can read replies" on public.message_replies;
 create policy "Message participants can read replies"
