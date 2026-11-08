@@ -675,13 +675,15 @@ function vPesan(){
     });
   });
   entries.sort((a,b)=>a.at-b.at);
+  const chatBody=h('div',{class:'chat-body'},...entries.map(entry=>h('div',{class:'chat-line '+(entry.incoming?'incoming':'outgoing')},
+    h('div',{class:'chat-bubble'},entry.message,...entry.attachments.map(attachmentView).filter(Boolean)))));
+  requestAnimationFrame(()=>{chatBody.scrollTop=chatBody.scrollHeight});
   const cards=[
     h('div',{class:'conversation-toolbar'},
       h('button',{class:'btn s',onclick:()=>{S.openConversation=null;render()}},'← Kembali'),
       h('b',{},group.name)),
     h('section',{class:'chat-card'},
-      h('div',{class:'chat-body'},...entries.map(entry=>h('div',{class:'chat-line '+(entry.incoming?'incoming':'outgoing')},
-        h('div',{class:'chat-bubble'},entry.message,...entry.attachments.map(attachmentView).filter(Boolean))))),
+      chatBody,
       replyBox(messages[messages.length-1].id))
   ];
   return [h('h1',{},S.admin?'Pesan Masuk':'Pesan Saya'),h('p',{class:'sub'},'Percakapan dengan '+group.name),...cards];
