@@ -277,7 +277,9 @@ function replyBox(messageId){
     recorder.onstop=()=>{stream.getTracks().forEach(track=>track.stop());picker.files.push(new File(recorded,'voice-note.webm',{type:'audio/webm'}));picker.label.textContent='Voice note siap dikirim';recorder=null;record.textContent='🎙️ Rekam'};
     recorder.start();record.textContent='⏹️ Selesai';
   };
-  return h('div',{class:'reply-box'},input,picker.buttons,record,picker.label,h('button',{class:'btn',onclick:async e=>{
+  const menu=h('div',{class:'attachment-menu'},picker.buttons,record);
+  const plus=h('button',{class:'composer-plus',type:'button',title:'Lampiran',onclick:()=>menu.classList.toggle('open')},'+');
+  const send=h('button',{class:'btn',onclick:async e=>{
     if(!input.value.trim()&&!picker.files.length)return;
     try{
       e.currentTarget.disabled=true;
@@ -285,7 +287,8 @@ function replyBox(messageId){
       await submitReply(messageId,input.value.trim(),attachments);
       await loadMessages();
     }catch(error){e.currentTarget.disabled=false;alert('Gagal mengirim balasan: '+error.message)}
-  }},'Kirim'));
+  }},'Kirim');
+  return h('div',{class:'reply-box'},menu,h('div',{class:'composer-row'},input,plus,send),picker.label);
 }
 function guard(){return S.db?null:h('p',{class:'warn'},'Penyimpanan belum tersedia.')}
 
@@ -682,8 +685,8 @@ function vPesan(){
   chatBody.ontouchend=e=>{
     const dx=e.changedTouches[0].clientX-swipeStartX,dy=e.changedTouches[0].clientY-swipeStartY;
     if(dx>80&&Math.abs(dx)>Math.abs(dy)){
-      S.openConversation=null;
-      render();
+      chatBody.classList.add('swipe-back');
+      setTimeout(()=>{S.openConversation=null;render()},220);
     }
   };
   requestAnimationFrame(()=>{chatBody.scrollTop=chatBody.scrollHeight});
@@ -708,12 +711,14 @@ function askForm(){
   nama.value=S.name||'';
   const ta=h('textarea',{rows:5,placeholder:'Tulis pertanyaan untuk admin...',autocomplete:'off'});
   const picker=attachmentPicker();
+  const askMenu=h('div',{class:'attachment-menu'},picker.buttons);
+  const askPlus=h('button',{class:'composer-plus',type:'button',title:'Lampiran',onclick:()=>askMenu.classList.toggle('open')},'+');
   const m=h('div',{id:'qm'},h('div',{class:'card',style:'display:block;max-width:420px'},
     h('b',{},'💬 Tanya Admin'),
     h('p',{class:'warn',style:'margin:4px 0 2px'},'Sampaikan pertanyaan Anda. Admin akan membalasnya.'),
     h('label',{class:'lb'},'Nama lengkap *',nama),
     h('label',{class:'lb'},'Pertanyaan *',ta),
-    picker.buttons,picker.label,
+    askMenu,askPlus,picker.label,
     h('div',{class:'row',style:'justify-content:flex-start;margin-top:8px'},
       h('button',{class:'btn',onclick:async()=>{
         if(!nama.value.trim()||(!ta.value.trim()&&!picker.files.length)){alert('Nama dan pertanyaan atau lampiran wajib diisi');return}
