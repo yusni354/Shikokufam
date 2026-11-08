@@ -1,4 +1,4 @@
-const S={members:[],events:[],topics:[],view:'landing',openConversation:null,admin:false,mainAdmin:false,uid:null,email:'',name:'',approvalStatus:'approved',pendingUsers:[],mapError:'',db:null,supabase:null,messageChannel:null,authLoading:true,unreadMessages:0};
+const S={members:[],events:[],topics:[],view:'landing',openConversation:null,messageSignature:'',admin:false,mainAdmin:false,uid:null,email:'',name:'',approvalStatus:'approved',pendingUsers:[],mapError:'',db:null,supabase:null,messageChannel:null,authLoading:true,unreadMessages:0};
 const $=s=>document.querySelector(s);
 function h(t,p,...k){const e=document.createElement(t);for(const a in p||{}){if(a==='onclick')e.onclick=p[a];else if(a==='class')e.className=p[a];else e.setAttribute(a,p[a])}k.flat().forEach(c=>{if(c!=null&&c!==false)e.append(c)});return e}
 const ALL=[['landing','🗺️ Beranda'],['dash','🏠 Dashboard'],['members','👥 Data Anggota'],['absen','📝 Absensi'],['forum','💬 Forum'],['import','📥 Import Database',1],['pesan','📨 Pesan Masuk']];
@@ -29,6 +29,19 @@ function createLocalDb(){
 }
 function messageFromRow(row){return {id:row.id,nama:row.name,teks:row.message,attachments:row.attachments||[],at:new Date(row.created_at).getTime(),status:row.status,sender_id:row.sender_id}}
 function replyFromRow(row){return {id:row.id,message_id:row.message_id,by:row.sender_id,teks:row.message,attachments:row.attachments||[],at:new Date(row.created_at).getTime()}}
+function updateMessageBadges(){
+  const value=String(S.unreadMessages||0);
+  document.querySelectorAll('[data-message-badge]').forEach(badge=>{
+    badge.textContent=value;
+    badge.style.display=S.unreadMessages>0?'':'none';
+  });
+  const nav=document.querySelector('[data-message-nav]');
+  if(nav){
+    let badge=nav.querySelector('.nav-badge');
+    if(S.unreadMessages>0&&!badge){badge=h('span',{class:'nav-badge'},value);nav.append(badge)}
+    if(badge){badge.textContent=value;badge.style.display=S.unreadMessages>0?'':'none'}
+  }
+}
 function userMessageSeen(){
   try{return JSON.parse(localStorage.getItem('shikoku-family:message-seen:'+S.uid)||'{}')}catch(e){return {}}
 }
@@ -89,15 +102,25 @@ async function loadMessages(){
   if(!S.admin)query=query.eq('sender_id',S.uid);
   const {data,error}=await query;
   if(error){console.error(error);return}
-  S.tanya=(data||[]).map(messageFromRow);
+  const nextMessages=(data||[]).map(messageFromRow);
   const ids=(data||[]).map(x=>x.id);
+  let nextReplies=[];
   if(ids.length){
     const {data:replies}=await S.supabase.from('message_replies').select('*').in('message_id',ids).order('created_at',{ascending:true});
-    S.replies=(replies||[]).map(replyFromRow);
-  }else S.replies=[];
+    nextReplies=(replies||[]).map(replyFromRow);
+  }
+  const signature=JSON.stringify({
+    messages:nextMessages.map(item=>[item.id,item.status,item.at,item.attachments]),
+    replies:nextReplies.map(item=>[item.id,item.message_id,item.at,item.attachments])
+  });
+  const changed=signature!==S.messageSignature;
+  S.messageSignature=signature;
+  S.tanya=nextMessages;
+  S.replies=nextReplies;
   const seen=userMessageSeen();
   S.unreadMessages=incomingMessageItems().filter(item=>!seen[item.id]).length;
-  render();
+  updateMessageBadges();
+  if(changed&&S.view==='pesan')render();
 }
 async function submitMessage(data){
   if(!S.supabase)throw new Error('Supabase belum tersedia');
@@ -306,7 +329,7 @@ function vLanding(){
 }
 function vDash(){
   const c=(e,t,d,n,v)=>h('button',{class:'card',onclick:()=>go(v)},
-    h('span',{class:'e',style:'position:relative'},e,v==='pesan'&&S.unreadMessages>0&&h('span',{class:'icon-badge'},String(S.unreadMessages))),
+    h('span',{class:'e',style:'position:relative'},e,v==='pesan'&&h('span',{class:'icon-badge','data-message-badge':'true',style:S.unreadMessages>0?'':'display:none'},String(S.unreadMessages))),
     h('span',{style:'flex:1'},h('b',{},t),h('small',{},d),h('br'),h('b',{style:'font-size:15px'},n)),'›');
   return [h('h1',{},'Selamat datang'+(S.name?', '+S.name.split(' ')[0]:'')+' 👋'),
     h('p',{class:'sub'},new Date().toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'})),
@@ -572,7 +595,7 @@ function render(){
     return;
   }
   const d=$('#dr');d.replaceChildren(h('p',{class:'sub',style:'padding:0 14px'},h('b',{style:'color:var(--ink)'},'KOMUNITAS ID-JP'),h('br'),'Database Anggota'),
-    ...ALL.filter(x=>!x[2]||(x[3]?S.mainAdmin:S.admin)).map(x=>h('a',{class:S.view===x[0]?'on':'',onclick:()=>go(x[0])},
+    ...ALL.filter(x=>!x[2]||(x[3]?S.mainAdmin:S.admin)).map(x=>h('a',{class:S.view===x[0]?'on':'',onclick:()=>go(x[0]),...(x[0]==='pesan'?{'data-message-nav':'true'}:{})},
       x[1],x[0]==='pesan'&&S.unreadMessages>0&&h('span',{class:'nav-badge'},String(S.unreadMessages)))),
     h('button',{class:'menu-logout',onclick:async()=>{await S.supabase.auth.signOut()}},'🚪 Keluar'));
   $('#sw').style.display=S.mainAdmin?'flex':'none';
