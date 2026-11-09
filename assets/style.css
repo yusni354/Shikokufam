@@ -142,3 +142,6 @@ body.open #dr{transform:none}body.open #ov{display:block}
 #pm{position:fixed;left:16px;right:16px;bottom:calc(200px + env(safe-area-inset-bottom,0px));max-width:360px;margin:auto;background:var(--card);border:1px solid var(--line);border-radius:22px;padding:16px;display:flex;flex-direction:column;gap:10px;box-shadow:0 12px 40px rgba(47,134,184,.3);z-index:11}
 #pm .btn{text-align:center;text-decoration:none;display:block}
 #qm{position:fixed;inset:0;background:rgba(23,50,77,.45);display:grid;place-items:center;padding:16px;z-index:12}
+body.navigation-hidden #mn,body.navigation-hidden #dr,body.navigation-hidden #ov,body.navigation-hidden #tb{display:none!important}
+body.navigation-hidden main{padding-bottom:16px}
+body.navigation-hidden #pet{bottom:calc(10px + env(safe-area-inset-bottom,0px))}
