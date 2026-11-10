@@ -1,15 +1,34 @@
 const S={members:[],events:[],topics:[],cleaningDuties:[],view:'landing',openConversation:null,messageSignature:'',admin:false,mainAdmin:false,uid:null,email:'',name:'',approvalStatus:'approved',pendingUsers:[],mapError:'',db:null,supabase:null,messageChannel:null,authLoading:true,unreadMessages:0};
 const $=s=>document.querySelector(s);
 function h(t,p,...k){const e=document.createElement(t);for(const a in p||{}){if(a==='onclick')e.onclick=p[a];else if(a==='class')e.className=p[a];else e.setAttribute(a,p[a])}k.flat().forEach(c=>{if(c!=null&&c!==false)e.append(c)});return e}
-const ALL=[['landing','🏠 Home'],['dash','📊 Ringkasan'],['members','👥 Data Anggota'],['absen','📝 Absensi'],['piket','🧹 Jadwal Piket'],['peta','🗺️ Peta & Wilayah'],['forum','💬 Forum'],['import','📥 Import Database',1],['pesan','📨 Pesan Masuk']];
-function go(v){S.view=v;S.form=S.detail=S.dutyForm=null;if(v==='pesan'&&S.admin)S.openConversation=null;document.body.classList.remove('open');render();if(v==='pesan'&&!S.admin)markMessagesRead()}
+const WILAYAH=[['Tokushima','#d95763'],['Takamatsu','#3985c6'],['Marugame','#e28b36'],['Zentsuji / Takuma','#8e68b5'],['Kochi','#24947e'],['Matsuyama','#d45e9f'],['Ehime','#6f9e3b'],['Niihama','#6073c4']];
+const ALL=[['landing','🏠 Home'],['dash','📊 Ringkasan'],['members','👥 Daftar Anggota'],['absen','📝 Absensi'],['piket','🧹 Jadwal Piket'],['peta','🗺️ Peta & Wilayah'],['forum','💬 Forum'],['import','📥 Import Database',1],['pesan','📨 Pesan Masuk']];
+function go(v){S.view=v;S.form=S.detail=S.dutyForm=null;S.detailOrigin=null;if(v==='pesan'&&S.admin)S.openConversation=null;document.body.classList.remove('open');render();if(v==='pesan'&&!S.admin)markMessagesRead()}
 $('#mn').onclick=()=>document.body.classList.add('open');
 $('#ov').onclick=()=>document.body.classList.remove('open');
 $('#st').onclick=()=>$('#sp').classList.toggle('open');
 $('#mp').onclick=()=>{$('#sp').classList.remove('open');go('map-settings')};
 $('#ap').onclick=()=>{$('#sp').classList.remove('open');go('approvals')};
 
-function wilayah(){const m={};S.members.forEach(x=>{const w=x.wilayah||'Belum diisi';(m[w]=m[w]||[]).push(x)});return m}
+function regionColor(value){return WILAYAH.find(([name])=>name===value)?.[1]||'#718096'}
+function memberRegion(member){
+  const known=value=>WILAYAH.find(([name])=>name.toLowerCase()===String(value||'').trim().toLowerCase())?.[0];
+  const fromText=value=>{
+    const text=normalizeImportLabel(String(value||''));
+    if(text.includes('tokushima'))return 'Tokushima';
+    if(text.includes('takamatsu'))return 'Takamatsu';
+    if(text.includes('marugame'))return 'Marugame';
+    if(text.includes('zentsuji')||text.includes('takuma'))return 'Zentsuji / Takuma';
+    if(text.includes('kochi'))return 'Kochi';
+    if(text.includes('matsuyama'))return 'Matsuyama';
+    if(text.includes('niihama')||text.includes('nihama'))return 'Niihama';
+    return '';
+  };
+  return known(member.wilayah)||fromText(member.kota)||fromText(member.alamat_jp)||
+    (known(member.pref==='Kagawa'?'':member.pref))||'Belum dipilih';
+}
+function wilayah(){const m={};S.members.forEach(x=>{const w=memberRegion(x);(m[w]=m[w]||[]).push(x)});return m}
+function openMember(member,origin){S.detail=member;S.detailOrigin=origin;S.view='members';render()}
 function createLocalDb(){
   const listeners={};
   const key=name=>'shikoku-family:'+name;
@@ -296,6 +315,21 @@ function vHome(){
   const today=new Date(),todayKey=[today.getFullYear(),String(today.getMonth()+1).padStart(2,'0'),String(today.getDate()).padStart(2,'0')].join('-');
   const upcomingDuties=[...S.cleaningDuties].filter(duty=>duty.tanggal&&duty.tanggal>=todayKey).sort((a,b)=>a.tanggal.localeCompare(b.tanggal)).slice(0,2);
   const recentEvents=[...S.events].sort((a,b)=>(b.at||0)-(a.at||0)).slice(0,2);
+  const memberGroups=wilayah();
+  const regionCards=WILAYAH.map(([name,color])=>{
+    const members=[...(memberGroups[name]||[])].sort((a,b)=>(a.nama||'').localeCompare(b.nama||'','id'));
+    return h('section',{class:'home-region-card',style:'--region-color:'+color},
+      h('div',{class:'home-region-heading'},h('b',{},name),h('span',{},members.length+' anggota')),
+      members.length
+        ?h('div',{class:'home-region-members'},...members.map(member=>
+          h('button',{class:'home-region-member',onclick:()=>openMember(member,'landing')},
+            member.foto?h('img',{src:'/_blob/'+member.foto,alt:''}):h('span',{class:'member-avatar-placeholder'},(member.nama||'?').trim().slice(0,1).toUpperCase()),
+            h('span',{},member.nama||'Nama belum diisi'),h('span',{class:'home-region-arrow'},'›'))))
+        :h('p',{class:'home-region-empty'},'Belum ada anggota di wilayah ini.')
+    );
+  });
+  if(memberGroups['Belum dipilih']?.length)regionCards.push(h('section',{class:'home-region-card home-region-unknown'},h('div',{class:'home-region-heading'},h('b',{},'Wilayah belum dipilih'),h('span',{},memberGroups['Belum dipilih'].length+' anggota')),
+    ...memberGroups['Belum dipilih'].map(member=>h('button',{class:'home-region-member',onclick:()=>openMember(member,'landing')},h('span',{class:'member-avatar-placeholder'},(member.nama||'?').trim().slice(0,1).toUpperCase()),h('span',{},member.nama||'Nama belum diisi'),h('span',{class:'home-region-arrow'},'›')))));
   const shortcuts=[['🧹','Jadwal Piket','piket'],['📝','Absensi','absen'],['💬','Forum','forum'],['🗺️','Peta','peta']];
   const dutyRows=upcomingDuties.flatMap(duty=>{
     const assignments=Array.isArray(duty.assignments)&&duty.assignments.length?duty.assignments:[{nama:duty.nama||'',tugas:duty.tugas||''}];
@@ -310,6 +344,9 @@ function vHome(){
       h('div',{},h('small',{},today.toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'})),h('h1',{},'Selamat datang'+(S.name?', '+S.name.split(' ')[0]:'')+'!'),h('p',{},'Senang bisa berkumpul bersama keluarga Shikoku.'))
     ),
     h('div',{class:'stats home-stats'},...[['Anggota',S.members.length],['Kegiatan',S.events.length],['Wilayah',Object.keys(wilayah()).length]].map(item=>h('div',{},h('small',{},item[0]),h('b',{},String(item[1]))))),
+    h('div',{class:'home-section-heading'},h('h2',{},'Daftar anggota'),S.admin&&h('button',{class:'btn s',onclick:()=>go('members')},'+ Tambah')),
+    h('p',{class:'home-member-intro'},'Pilih nama anggota untuk membuka kartu identitas lengkap.'),
+    h('div',{class:'home-region-list'},...regionCards),
     h('div',{class:'home-section-heading'},h('h2',{},'Akses cepat'),h('small',{},'Yang sering dibuka')),
     h('div',{class:'home-shortcuts'},...shortcuts.map(([icon,label,view])=>h('button',{class:'home-shortcut',onclick:()=>go(view)},h('span',{},icon),h('b',{},label),h('span',{class:'home-shortcut-arrow'},'›')))),
     h('div',{class:'home-section-heading'},h('h2',{},'Jadwal piket terdekat'),h('button',{class:'btn s',onclick:()=>go('piket')},'Lihat semua')),
@@ -327,7 +364,7 @@ function vDash(){
     h('p',{class:'sub'},new Date().toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'})),
     h('div',{class:'card',style:'display:block'},h('small',{class:'warn'},'User ID'),h('br'),h('b',{},S.email||S.uid||'-')),
     h('div',{class:'stats'},...[['Anggota',S.members.length],['Kegiatan',S.events.length],['Wilayah',Object.keys(wilayah()).length]].map(x=>h('div',{},h('small',{},x[0]),h('b',{},String(x[1]))))),
-    c('🗄️','Database','Kelola data anggota komunitas',S.members.length+' anggota','members'),
+    c('👥','Daftar Anggota','Kelola data anggota komunitas',S.members.length+' anggota','members'),
     c('📋','Absensi','Kegiatan & kehadiran anggota',S.events.length+' kegiatan','absen'),
     c('🧹','Jadwal Piket','Jadwal kebersihan komunitas',S.cleaningDuties.length+' jadwal','piket'),
     c('💬','Forum','Diskusi & komentar anggota',S.topics.length+' topik','forum'),
@@ -338,35 +375,86 @@ function vDash(){
 }
 const PERAN=['Anggota','Pengurus'],STATUS=['aktif','nonaktif'];
 function vMembers(){
-  if(S.form)return [formCard()];
-  const wl=[...new Set(S.members.map(m=>m.wilayah).filter(Boolean))].sort();
-  const sel=(opts,key,all)=>{const s=h('select',{},h('option',{value:''},all),...opts.map(o=>h('option',{value:o},o)));s.value=S[key]||'';s.onchange=()=>{S[key]=s.value;draw()};return s};
-  const q=h('input',{placeholder:'Cari nama, nomor WhatsApp, kota, wilayah'});q.value=S.q||'';q.oninput=()=>{S.q=q.value;draw()};
-  const cnt=h('p',{class:'sub'}),tbl=h('div',{class:'card',style:'display:block;padding:0;overflow:hidden'}),bar=h('div');
-  S.sel=S.sel||new Set();
+  if(S.form)return [memberFormCard()];
+  const search=h('input',{type:'search',placeholder:'Cari nama, WhatsApp, kota, wilayah, atau nomor anggota'}),region=h('select',{}),status=h('select',{});
+  const regions=WILAYAH.map(([name])=>name);
+  if(S.members.some(member=>memberRegion(member)==='Belum dipilih'))regions.push('Belum dipilih');
+  region.replaceChildren(h('option',{value:''},'Semua wilayah'),...regions.map(value=>h('option',{value},value)));
+  status.replaceChildren(h('option',{value:''},'Semua status'),...STATUS.map(value=>h('option',{value},value)));
+  search.value=S.memberQuery||'';region.value=S.memberRegion||'';status.value=S.memberStatus||'';
+  const count=h('p',{class:'member-results-count'}),list=h('div',{class:'member-grid'});
   function draw(){
-    const t=(S.q||'').toLowerCase();
-    const rows=S.members.map((m,i)=>({...m,kode:m.kode||'MEM-'+String(i+1).padStart(5,'0')})).filter(m=>(!t||[m.nama,m.wa,m.kota,m.wilayah,m.kode].some(x=>(x||'').toLowerCase().includes(t)))&&(!S.fw||m.wilayah===S.fw)&&(!S.fp||(m.peran||'Anggota')===S.fp)&&(!S.fs||(m.status||'aktif')===S.fs));
-    cnt.textContent=rows.length+' anggota ditampilkan';
-    const all=h('input',{type:'checkbox'});all.checked=rows.length>0&&rows.every(m=>S.sel.has(m.id));all.onchange=()=>{rows.forEach(m=>all.checked?S.sel.add(m.id):S.sel.delete(m.id));draw()};
-    tbl.replaceChildren(h('div',{class:'mrow hd'},S.admin&&all,h('span',{style:'flex:1'},'Anggota'),h('span',{style:'margin-right:84px'},'Status')),
-      ...rows.map(m=>{const c=h('input',{type:'checkbox'});c.checked=S.sel.has(m.id);c.onchange=()=>{c.checked?S.sel.add(m.id):S.sel.delete(m.id);draw()};
-        return h('div',{class:'mrow'},S.admin&&c,h('div',{class:'av'},(m.nama||'?')[0].toUpperCase()),
-          h('div',{style:'flex:1;min-width:0'},h('b',{style:'text-transform:uppercase;overflow-wrap:anywhere'},m.nama),h('br'),h('small',{class:'warn'},m.kode)),
-          h('span',{class:'ok'+((m.status||'aktif')==='aktif'?'':' off')},m.status||'aktif'),
-          h('button',{class:'btn s',title:'Lihat',onclick:()=>{S.detail=m;S.form=null;render()}},'👁'),
-          S.admin&&h('button',{class:'btn s',title:'Ubah',onclick:()=>{S.form=m;S.detail=null;render()}},'✎'))}));
-    if(!rows.length)tbl.append(h('p',{class:'warn',style:'padding:16px'},'Belum ada anggota.'));
-    bar.replaceChildren(...[S.admin&&S.sel.size>0&&h('button',{class:'btn',style:'margin-bottom:12px',onclick:async()=>{if(!confirm('Hapus '+S.sel.size+' anggota terpilih?'))return;for(const id of S.sel)await S.db.collection('members').doc(id).delete();S.sel.clear()}},'Hapus '+S.sel.size+' terpilih')].filter(Boolean));
+    const query=(S.memberQuery||'').trim().toLowerCase();
+    const rows=S.members.filter(member=>
+      (!query||[member.nama,member.panggilan,member.wa,member.kota,member.wilayah,member.pref,member.kode].some(value=>String(value||'').toLowerCase().includes(query)))&&
+      (!S.memberRegion||memberRegion(member)===S.memberRegion)&&
+      (!S.memberStatus||(member.status||'aktif')===S.memberStatus)
+    ).sort((a,b)=>(a.nama||'').localeCompare(b.nama||'','id'));
+    count.textContent='Menampilkan '+rows.length+' dari '+S.members.length+' anggota';
+    list.replaceChildren(...(rows.length?rows.map((member,index)=>{
+      const code=member.kode||'MEM-'+String(index+1).padStart(5,'0'),area=memberRegion(member),location=[member.kota,member.pref].filter(Boolean).join(', ');
+      return h('article',{class:'member-card',style:'--region-color:'+regionColor(area)},
+        member.foto?h('img',{class:'member-avatar',src:'/_blob/'+member.foto,alt:'Foto '+(member.nama||'anggota')}):h('div',{class:'member-avatar member-avatar-placeholder'},(member.nama||'?').trim().slice(0,1).toUpperCase()),
+        h('div',{class:'member-card-info'},h('div',{class:'member-name-line'},h('b',{},member.nama||'Nama belum diisi'),h('span',{class:'member-region-tag'},area),h('span',{class:'ok'+((member.status||'aktif')==='aktif'?'':' off')},member.status||'aktif')),
+          h('small',{},[code,location].filter(Boolean).join(' · ')),
+          h('small',{},member.wa||member.email||'Kontak belum diisi')),
+        h('div',{class:'member-card-actions'},
+          h('button',{class:'btn s',onclick:()=>openMember(member,'members')},'Lihat kartu ID'),
+          S.admin&&h('button',{class:'btn s',onclick:()=>{S.form={...member};S.detail=null;render()}},'✎ Edit'),
+          S.admin&&h('button',{class:'btn s member-delete',onclick:async()=>{
+            if(!confirm('Hapus data anggota '+(member.nama||'ini')+'?'))return;
+            try{await S.db.collection('members').doc(member.id).delete()}catch(error){console.error(error);alert('Gagal menghapus data anggota: '+(error.message||'periksa koneksi'))}
+          }},'Hapus')))
+    }):[h('div',{class:'member-empty'},h('span',{},S.members.length?'🔎':'👥'),h('b',{},S.members.length?'Anggota tidak ditemukan':'Belum ada data anggota'),h('p',{},S.members.length?'Coba kata kunci atau filter wilayah yang lain.':'Data anggota yang ditambahkan akan tampil di sini.'))]));
   }
+  search.oninput=()=>{S.memberQuery=search.value;draw()};
+  region.onchange=()=>{S.memberRegion=region.value;draw()};
+  status.onchange=()=>{S.memberStatus=status.value;draw()};
   draw();
-  return [h('div',{class:'top'},h('div',{},h('h1',{},'Data Anggota'),cnt),S.admin&&h('button',{class:'btn',onclick:()=>{S.form={};S.detail=null;render()}},'+ Tambah Anggota')),guard(),
+  return [
+    h('div',{class:'member-page-heading'},h('div',{},h('p',{class:'member-eyebrow'},'KOMUNITAS SHIKOKU FAMILY'),h('h1',{},'Daftar Anggota'),h('p',{class:'sub'},'Temukan dan kelola informasi anggota komunitas.')),
+      S.admin&&h('button',{class:'btn',onclick:()=>{S.form={};S.detail=null;render()}},'+ Tambah Anggota')),
+    guard(),
     S.detail&&detailCard(),
-    h('div',{class:'card',style:'display:block'},q,h('div',{class:'fl'},sel(wl,'fw','Semua Wilayah'),sel(PERAN,'fp','Semua'),sel(STATUS,'fs','Semua Status'))),bar,tbl];
+    h('div',{class:'member-toolbar'},search,h('div',{class:'member-filters'},region,status)),
+    count,list
+  ];
 }
-function detailCard(){const m=S.detail;return h('div',{class:'card',style:'display:block'},m.foto&&h('img',{src:'/_blob/'+m.foto,style:'width:80px;height:80px;border-radius:50%;object-fit:cover;display:block;margin-bottom:8px'}),h('b',{style:'text-transform:uppercase'},m.nama),h('br'),
-  ...[['Panggilan',m.panggilan],['Jenis kelamin',m.kelamin],['Tanggal lahir',m.lahir],['WhatsApp',m.wa],['Email',m.email],['Wilayah',m.wilayah],['Kota',m.kota],['Prefektur',m.pref],['Stasiun',m.stasiun],['Alamat Jepang',m.alamat_jp],['Kabupaten/Kota (ID)',m.kab],['Alamat Indonesia',m.alamat_id],['Pekerjaan',m.bidang],['Perusahaan',m.perusahaan],['Status tinggal',m.tinggal],['Instagram',m.instagram],['TikTok',m.tiktok],['Facebook',m.facebook],['Catatan',m.catatan],['Status',m.status||'aktif']].map(r=>h('div',{class:'warn'},r[0]+': '+(r[1]||'-'))),
-  h('button',{class:'btn s',style:'margin-top:8px',onclick:()=>{S.detail=null;render()}},'Tutup'))}
+function detailCard(){
+  const member=S.detail,area=memberRegion(member),code=member.kode||'MEM-'+String(member.id||'00000').replace(/\D/g,'').slice(-5).padStart(5,'0'),sections=[
+    ['Identitas & Keanggotaan',[['Nama lengkap',member.nama],['Nama panggilan',member.panggilan],['Nomor anggota',code],['Jenis kelamin',member.kelamin],['Tanggal lahir',member.lahir],['Umur',member.umur],['Status',member.status||'aktif'],['Peran',member.peran||'Anggota'],['Pernikahan',member.nikah],['MT',member.mt]]],
+    ['Kontak & Keluarga',[['WhatsApp',member.wa],['Email',member.email],['Nama pengurus daerah',member.pengurus],['Nomor HP pengurus daerah',member.hp_pengurus],['Nama orang tua',member.ortu],['Nomor HP orang tua',member.hp_ortu],['Instagram',member.instagram],['TikTok',member.tiktok],['Facebook',member.facebook]]],
+    ['Alamat Indonesia',[['Kelompok',member.kelompok],['Desa',member.desa],['Daerah',member.daerah],['Provinsi',member.prov],['Kabupaten/Kota',member.kab],['Kecamatan',member.kec],['Alamat',member.alamat_id]]],
+    ['Alamat & Pekerjaan di Jepang',[['Wilayah',area],['Prefektur',member.pref],['Kota',member.kota],['Kecamatan',member.kec_jp],['Kode pos',member.kodepos],['Stasiun',member.stasiun],['Alamat',member.alamat_jp],['Mulai tinggal',member.mulai_jp],['Status visa',member.tinggal],['Bidang pekerjaan',member.bidang],['Perusahaan',member.perusahaan]]],
+    ['Catatan',[['Catatan',member.catatan]]]
+  ];
+  const barcodeText=/^IJCCS-\d+$/i.test(code)?code.slice(code.lastIndexOf('-')+1).padStart(10,'0'):String(Math.abs(Array.from(code).reduce((hash,char)=>Math.imul(hash,31)+char.charCodeAt(0)|0,7))).padStart(10,'0').slice(-10);
+  const code39={'0':'nnnwwnwnn','1':'wnnwnnnnw','2':'nnwwnnnnw','3':'wnwwnnnnn','4':'nnnwwnnnw','5':'wnnwwnnnn','6':'nnwwwnnnn','7':'nnnwnnwnw','8':'wnnwnnwnn','9':'nnwwnnwnn','*':'nwnnwnwnn'};
+  const barcode=h('svg',{class:'member-barcode',viewBox:'0 0 1 54',role:'img','aria-label':'Barcode anggota '+code});
+  let x=0;
+  for(const char of '*'+barcodeText+'*'){
+    code39[char].split('').forEach((width,index)=>{
+      const size=width==='w'?5:2;
+      if(index%2===0)barcode.append(h('rect',{x,y:0,width:size,height:48}));
+      x+=size;
+    });
+    x+=2;
+  }
+  barcode.setAttribute('viewBox','0 0 '+x+' 54');
+  return h('section',{class:'member-profile-page',style:'--region-color:'+regionColor(area)},
+    h('div',{class:'member-profile-toolbar'},h('button',{class:'btn s',onclick:()=>{S.detail=null;const origin=S.detailOrigin;S.detailOrigin=null;S.view=origin==='landing'?'landing':'members';render()}},'← Kembali'),
+      S.admin&&h('button',{class:'btn s',onclick:()=>{S.form={...member};S.detail=null;S.detailOrigin=null;render()}},'✎ Edit data')),
+    h('article',{class:'member-id-card'},
+      h('div',{class:'member-id-banner'},h('span',{},'SHIKOKU FAMILY'),h('span',{class:'member-region-tag'},area)),
+      h('div',{class:'member-id-main'},
+        member.foto?h('img',{class:'member-id-photo',src:'/_blob/'+member.foto,alt:'Foto '+(member.nama||'anggota')}):h('div',{class:'member-id-photo member-avatar-placeholder'},(member.nama||'?').trim().slice(0,1).toUpperCase()),
+        h('div',{class:'member-id-info'},h('small',{},'KARTU ANGGOTA'),h('h1',{},member.nama||'Nama belum diisi'),h('b',{},code),h('p',{},[member.kota,member.pref].filter(Boolean).join(' · ')||area),h('span',{class:'ok'+((member.status||'aktif')==='aktif'?'':' off')},member.status||'aktif'))),
+      h('div',{class:'member-id-barcode'},barcode,h('small',{},code))),
+    ...sections.filter(([,rows])=>rows.some(([,value])=>value)).map(([title,rows])=>h('section',{class:'member-detail-section'},h('h3',{},title),h('div',{class:'member-detail-grid'},...rows.filter(([,value])=>value).map(([label,value])=>h('div',{class:'member-detail-item'},h('small',{},label),h('span',{},value)))))),
+    (member.surat||[]).length>0&&h('section',{class:'member-detail-section'},h('h3',{},'Foto Surat Sambung'),...(member.surat||[]).map((id,index)=>h('a',{class:'member-file-link',href:'/_blob/'+id,target:'_blank',rel:'noopener'},'📎 Buka lampiran '+(index+1)))),
+    S.admin&&h('div',{class:'member-detail-actions'},h('button',{class:'btn',onclick:()=>{S.form={...member};S.detail=null;S.detailOrigin=null;render()}},'✎ Edit data anggota'))
+  );
+}
 const PREF=['Ehime','Kagawa','Kochi','Tokushima','Hokkaido','Aomori','Iwate','Miyagi','Akita','Yamagata','Fukushima','Ibaraki','Tochigi','Gunma','Saitama','Chiba','Tokyo','Kanagawa','Niigata','Toyama','Ishikawa','Fukui','Yamanashi','Nagano','Gifu','Shizuoka','Aichi','Mie','Shiga','Kyoto','Osaka','Hyogo','Nara','Wakayama','Tottori','Shimane','Okayama','Hiroshima','Yamaguchi','Fukuoka','Saga','Nagasaki','Kumamoto','Oita','Miyazaki','Kagoshima','Okinawa'];
 const PROV=['Aceh','Sumatera Utara','Sumatera Barat','Riau','Kepulauan Riau','Jambi','Sumatera Selatan','Bangka Belitung','Bengkulu','Lampung','DKI Jakarta','Banten','Jawa Barat','Jawa Tengah','DI Yogyakarta','Jawa Timur','Bali','Nusa Tenggara Barat','Nusa Tenggara Timur','Kalimantan Barat','Kalimantan Tengah','Kalimantan Selatan','Kalimantan Timur','Kalimantan Utara','Sulawesi Utara','Gorontalo','Sulawesi Tengah','Sulawesi Barat','Sulawesi Selatan','Sulawesi Tenggara','Maluku','Maluku Utara','Papua','Papua Barat','Papua Barat Daya','Papua Selatan','Papua Tengah','Papua Pegunungan'];
 const BLN=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
@@ -439,9 +527,13 @@ function parseMemberPaste(text){
   if(data.mulai_jp)data.mulai_jp=data.mulai_jp.trim();
   if(data.alamat_jp){
     const address=data.alamat_jp.trim();
-    const cities=[['marugame','Marugame','Kagawa'],['takamatsu','Takamatsu','Kagawa'],['matsuyama','Matsuyama','Ehime'],['kochi','Kochi','Kochi'],['tokushima','Tokushima','Tokushima']];
-    const city=cities.find(([needle])=>normalizeImportLabel(address).includes(needle));
-    if(city){data.kota=city[1];data.pref=city[2];data.wilayah=city[2]}
+    const normalizedAddress=normalizeImportLabel(address);
+    const cities=[['zentsuji','Zentsuji / Takuma','Kagawa'],['takuma','Zentsuji / Takuma','Kagawa'],['niihama','Niihama','Ehime'],['nihama','Niihama','Ehime'],['marugame','Marugame','Kagawa'],['takamatsu','Takamatsu','Kagawa'],['matsuyama','Matsuyama','Ehime'],['kochi','Kochi','Kochi'],['tokushima','Tokushima','Tokushima']];
+    const city=cities.find(([needle])=>normalizedAddress.includes(needle));
+    if(city){data.kota=city[1];data.pref=city[2];data.wilayah=city[1]}
+    else if(normalizedAddress.includes('ehime')){data.pref='Ehime';data.wilayah='Ehime'}
+    else if(normalizedAddress.includes('kochi')){data.pref='Kochi';data.wilayah='Kochi'}
+    else if(normalizedAddress.includes('tokushima')){data.pref='Tokushima';data.wilayah='Tokushima'}
     data.alamat_jp=address;
   }
   if(data.tinggal){
@@ -473,35 +565,52 @@ function autoFill(txt){
 }
 async function up(file,key,multi){
   if(!file)return;if(!S.assets){alert('Unggah foto hanya tersedia untuk admin');return}
-  try{const r=await S.assets.upload(file);S.form[key]=multi?[...(S.form[key]||[]),r.id]:r.id;render()}catch(e){alert('Gagal mengunggah')}}
+  try{const r=await S.assets.upload(file);S.form[key]=multi?[...(S.form[key]||[]),r.id]:r.id;render()}catch(e){console.error(e);alert('Gagal mengunggah file: '+(e.message||'periksa koneksi dan ukuran file'))}}
 function pick(label,acc,cap,cb){const i=h('input',{type:'file',accept:acc,style:'display:none'});if(cap)i.setAttribute('capture','environment');i.onchange=()=>cb(i.files[0]);return h('button',{class:'btn s',onclick:()=>i.click()},label)}
 async function saveForm(){
   const f=S.form;
-  if(!f.wilayah){S.step=0;alert('Wilayah wajib diisi');return render()}
-  if(!(f.nama||'').trim()){S.step=0;alert('Nama lengkap wajib diisi');return render()}
+  if(!(f.nama||'').trim()){alert('Nama lengkap wajib diisi.');return}
+  if(!f.wilayah){alert('Wilayah atau prefektur di Jepang wajib dipilih.');return}
   const d={...f};delete d.id;d.peran=d.peran||'Anggota';d.status=d.status||'aktif';
   try{if(f.id)await S.db.collection('members').doc(f.id).set(d);else await S.db.collection('members').add({...d,at:Date.now()});S.form=null;render()}catch(e){console.error(e);alert('Tidak bisa menyimpan: '+(e.message||'periksa koneksi dan izin database'))}}
-function formCard(){
+function memberFormCard(){
   const f=S.form;
-  if(S._fr!==f){S._fr=f;S.step=0;if(!f.id&&!f.kode){const n=Math.max(S.members.length,...S.members.map(m=>parseInt(String(m.kode||'').split('-').pop())||0))+1;f.kode='IJCCS-'+String(n).padStart(4,'0')}}
-  const yr=Array.from({length:12},(_,i)=>String(new Date().getFullYear()-i));
-  const auto=()=>{const ta=h('textarea',{rows:8,placeholder:'1. Nama Lengkap : Nama Anda\n2. Jenis Kelamin : laki-laki\n3. Tgl/bln/thn lahir : 20-04-1987\n4. Umur : 40\n5. Kelompok, Desa, Daerah di Indonesia : kelompok, desa, daerah\n6. No. Hp Pengurus Daerah + Nama : nomor + nama\n7. Status (lajang/menikah) : menikah\n8. MT (iya/bukan) : bukan\n9. Mulai Tinggal di Jepang : 22-09-2026\n10. Alamat Tinggal di Jepang : jotocho marugame\n11. Status Visa : tokuteginou 1\n12. No. HP/WA : nomor WhatsApp\n13. Facebook : nama akun\n14. No. HP Orang Tua + Nama : nomor + nama\n15. Foto Surat Sambung :\n16. Foto Setengah Badan (terbaru) :'});const b=h('button',{class:'btn s',onclick:()=>autoFill(ta.value)},'Isi Otomatis');return box(h('b',{},'Isi Otomatis'),ta,b,h('p',{class:'warn'},'Pemrosesan dilakukan di perangkat ini. Teks akan mengisi formulir; periksa hasilnya lalu tekan Simpan. Foto Surat Sambung dan Foto Setengah Badan perlu diunggah pada langkah berikutnya.'))};
-  const fotoBox=()=>box(h('b',{},'Foto Setengah Badan (terbaru)'),h('br'),f.foto&&h('img',{src:'/_blob/'+f.foto,style:'width:80px;height:80px;border-radius:50%;object-fit:cover;margin:8px 0;display:block'}),pick('Ambil Foto','image/jpeg,image/png,image/webp',1,x=>up(x,'foto')),' ',pick('Pilih dari Galeri','image/jpeg,image/png,image/webp',0,x=>up(x,'foto')),h('p',{class:'warn'},'Pilih foto terbaru. Format JPG, JPEG, PNG, WEBP.'));
-  const suratBox=()=>box(h('b',{},'Foto Surat Sambung'),h('br'),...(f.surat||[]).map((id,i)=>h('div',{class:'row',style:'margin:6px 0'},h('a',{href:'/_blob/'+id,target:'_blank'},'Lampiran '+(i+1)),h('button',{class:'btn s',onclick:()=>{f.surat=f.surat.filter(x=>x!==id);render()}},'✕'))),pick('Ambil Foto','image/*,application/pdf',1,x=>up(x,'surat',1)),' ',pick('Pilih dari Galeri','image/*,application/pdf',0,x=>up(x,'surat',1)),h('p',{class:'warn'},'Unggah foto, scan, atau PDF. Boleh beberapa file.'));
-  const T=[
-   ['Identitas',()=>[S.admin&&auto(),box(h('b',{},'Identitas'),fld('Wilayah *','wilayah',{opts:PREF,ph:'Pilih wilayah'}),fld('Nomor Anggota','kode'),fld('Nama Lengkap *','nama'),fld('Nama Panggilan','panggilan'),fld('Jenis Kelamin','kelamin',{opts:['Laki-laki','Perempuan']}),fld('Tanggal Lahir','lahir',{type:'date'}),fld('Umur','umur'),fld('Status','status',{opts:STATUS}),fld('Peran','peran',{opts:PERAN}),fld('Pernikahan','nikah',{opts:['Belum menikah','Menikah','Cerai']}),fld('MT','mt'),fld('Nama Orang Tua','ortu'),fld('No. HP Orang Tua','hp_ortu',{ph:'+62xxxxxxxxxx'}),h('div',{class:'fl'},fld('Bulan Kedatangan','bln',{opts:BLN}),fld('Tahun','thn',{opts:yr})),fld('Mulai Tinggal di Jepang','mulai_jp',{ph:'Contoh: April 2022'}))]],
-   ['Alamat Indonesia',()=>[box(h('b',{},'Alamat Indonesia'),fld('Provinsi','prov',{opts:PROV,ph:'Pilih provinsi'}),fld('Kabupaten/Kota','kab'),fld('Kecamatan','kec'),fld('Desa/Kelurahan','desa'),fld('Kelompok','kelompok'),fld('Daerah','daerah'),fld('Alamat Lengkap Indonesia (nama jalan, nomor rumah, gedung, RT/RW)','alamat_id',{area:1,ph:'Contoh: Jl. Kebon Sirih No. 10, RT 3/RW 5'}),fld('Nama Pengurus Daerah','pengurus'),fld('No. HP Pengurus Daerah','hp_pengurus',{ph:'+81xxxxxxxxxx'}))]],
-   ['Alamat Jepang',()=>[box(h('b',{},'Alamat Jepang'),fld('Kode Pos','kodepos',{ph:'7 digit, misal 1600022'}),fld('Prefektur','pref',{opts:PREF,ph:'Pilih prefektur'}),fld('Kota','kota'),fld('Kecamatan (romaji)','kec_jp'),fld('Stasiun Terdekat','stasiun'),fld('Alamat Jalan / Gedung Jepang','alamat_jp',{area:1,ph:'Nama jalan, nomor blok, gedung, dsb. (romaji)'}))]],
-   ['Pekerjaan & Kontak',()=>[box(h('b',{},'Bidang Pekerjaan'),fld('Bidang Pekerjaan','bidang'),fld('Nama Perusahaan','perusahaan'),fld('Status Tinggal di Jepang','tinggal',{opts:TGL,ph:'Pilih status tinggal'})),box(h('b',{},'Kontak & Media Sosial'),fld('Nomor HP / WA','wa',{ph:'+81xxxxxxxxxx'}),fld('Email','email',{type:'email'}),fld('Instagram','instagram',{ph:'@username'}),fld('TikTok','tiktok',{ph:'@username'}),fld('Facebook','facebook'))]],
-   ['Foto, Surat & Catatan',()=>[fotoBox(),suratBox(),box(h('b',{},'Catatan'),fld('','catatan',{area:1,ph:'Catatan tambahan...'}))]]
-  ];
-  const last=S.step===T.length-1;
-  return h('div',{},h('div',{class:'row',style:'justify-content:flex-start;gap:12px;margin:8px 0'},h('button',{class:'ic',onclick:()=>{S.form=null;render()}},'←'),h('h1',{style:'margin:0;font-size:24px'},f.id?'Ubah Anggota':'Tambah Anggota')),
-    h('p',{class:'sub',style:'margin-bottom:6px'},'Langkah '+(S.step+1)+' dari '+T.length+': '+T[S.step][0]),
-    h('div',{class:'dots'},...T.map((_,i)=>h('span',{class:i<=S.step?'on':''}))),
-    ...T[S.step][1](),
-    h('div',{class:'nav'},S.step>0&&h('button',{class:'btn s',onclick:()=>{S.step--;render();scrollTo(0,0)}},'Kembali'),
-      h('button',{class:'btn',onclick:()=>{if(last)saveForm();else{S.step++;render();scrollTo(0,0)}}},last?'Simpan':'Lanjut')))}
+  if(!f.id&&!f.kode){
+    const n=Math.max(S.members.length,...S.members.map(member=>parseInt(String(member.kode||'').split('-').pop())||0))+1;
+    f.kode='IJCCS-'+String(n).padStart(4,'0');
+  }
+  const years=Array.from({length:12},(_,index)=>String(new Date().getFullYear()-index));
+  const fieldGrid=(...fields)=>h('div',{class:'member-form-grid'},...fields);
+  const auto=()=>{
+    const text=h('textarea',{rows:8,placeholder:'1. Nama Lengkap : Nama Anda\n2. Jenis Kelamin : laki-laki\n3. Tgl/bln/thn lahir : 20-04-1987\n4. Umur : 40\n5. Kelompok, Desa, Daerah di Indonesia : kelompok, desa, daerah\n6. No. Hp Pengurus Daerah + Nama : nomor + nama\n7. Status (lajang/menikah) : menikah\n8. MT (iya/bukan) : bukan\n9. Mulai Tinggal di Jepang : 22-09-2026\n10. Alamat Tinggal di Jepang : jotocho marugame\n11. Status Visa : tokuteginou 1\n12. No. HP/WA : nomor WhatsApp\n13. Facebook : nama akun\n14. No. HP Orang Tua + Nama : nomor + nama\n15. Foto Surat Sambung :\n16. Foto Setengah Badan (terbaru) :'});
+    return box(h('div',{class:'member-section-heading'},h('div',{},h('b',{},'Isi dari teks salinan'),h('small',{},'Tempel data diri untuk mengisi kolom secara otomatis.')),h('span',{},'✨')),
+      text,h('button',{class:'btn s',onclick:()=>autoFill(text.value)},'Isi Otomatis'),
+      h('p',{class:'warn'},'Data diproses langsung di perangkat ini. Foto dan Surat Sambung diunggah terpisah. Periksa kembali hasilnya sebelum menyimpan.'));
+  };
+  const photoBox=()=>box(h('b',{},'Foto Setengah Badan (terbaru)'),
+    f.foto&&h('img',{src:'/_blob/'+f.foto,style:'width:88px;height:88px;border-radius:18px;object-fit:cover;display:block;margin:10px 0'}),
+    h('div',{class:'fl'},pick('📷 Ambil foto','image/jpeg,image/png,image/webp',1,file=>up(file,'foto')),pick('Pilih foto','image/jpeg,image/png,image/webp',0,file=>up(file,'foto'))));
+  const documentBox=()=>box(h('b',{},'Foto Surat Sambung'),
+    ...(f.surat||[]).map((id,index)=>h('div',{class:'member-file-row'},h('a',{href:'/_blob/'+id,target:'_blank'},'📎 Lampiran '+(index+1)),h('button',{class:'btn s',onclick:()=>{f.surat=f.surat.filter(value=>value!==id);render()}},'Hapus'))),
+    h('div',{class:'fl'},pick('📷 Ambil / foto dokumen','image/*,application/pdf',1,file=>up(file,'surat',1)),pick('Pilih dokumen','image/*,application/pdf',0,file=>up(file,'surat',1))),
+    h('small',{class:'member-help'},'Bisa menambahkan lebih dari satu foto atau PDF.'));
+  return h('div',{class:'member-editor'},
+    h('div',{class:'member-editor-heading'},h('button',{class:'btn s',onclick:()=>{S.form=null;render()}},'← Kembali'),
+      h('div',{},h('p',{class:'member-eyebrow'},'DATA KOMUNITAS'),h('h1',{},f.id?'Edit data anggota':'Anggota baru'),h('p',{class:'sub'},'Lengkapi profil dalam satu halaman. Kolom bertanda * wajib diisi.'))),
+    S.admin&&auto(),
+    box(h('div',{class:'member-section-heading'},h('div',{},h('b',{},'Profil anggota'),h('small',{},'Identitas dan keanggotaan'))),
+      fieldGrid(fld('Nama lengkap *','nama'),fld('Nama panggilan','panggilan'),fld('Nomor anggota','kode'),fld('Wilayah anggota *','wilayah',{opts:WILAYAH.map(([name])=>name),ph:'Pilih wilayah'}),fld('Jenis kelamin','kelamin',{opts:['Laki-laki','Perempuan']}),fld('Tanggal lahir','lahir',{type:'date'}),fld('Umur','umur',{type:'number'}),fld('Status anggota','status',{opts:STATUS}),fld('Peran','peran',{opts:PERAN}),fld('Status pernikahan','nikah',{opts:['Belum menikah','Menikah','Cerai']}),fld('MT','mt'),fld('Bulan kedatangan','bln',{opts:BLN}),fld('Tahun kedatangan','thn',{opts:years}),fld('Mulai tinggal di Jepang','mulai_jp',{ph:'Contoh: 22-09-2026'}))),
+    box(h('div',{class:'member-section-heading'},h('div',{},h('b',{},'Kontak & keluarga'),h('small',{},'Nomor telepon, orang tua, dan media sosial'))),
+      fieldGrid(fld('Nomor HP / WhatsApp','wa',{type:'tel'}),fld('Email','email',{type:'email'}),fld('Nama orang tua','ortu'),fld('Nomor HP orang tua','hp_ortu',{type:'tel'}),fld('Instagram','instagram',{ph:'@username'}),fld('TikTok','tiktok',{ph:'@username'}),fld('Facebook','facebook'))),
+    box(h('div',{class:'member-section-heading'},h('div',{},h('b',{},'Asal di Indonesia'),h('small',{},'Wilayah, kelompok, dan alamat asal'))),
+      fieldGrid(fld('Kelompok','kelompok'),fld('Desa / Kelurahan','desa'),fld('Daerah','daerah'),fld('Provinsi','prov',{opts:PROV,ph:'Pilih provinsi'}),fld('Kabupaten / Kota','kab'),fld('Kecamatan','kec'),fld('Alamat lengkap Indonesia','alamat_id',{area:1}))),
+    box(h('div',{class:'member-section-heading'},h('div',{},h('b',{},'Alamat & pekerjaan di Jepang'),h('small',{},'Informasi tempat tinggal saat ini'))),
+      fieldGrid(fld('Prefektur','pref',{opts:PREF,ph:'Pilih prefektur'}),fld('Kota','kota'),fld('Kecamatan (romaji)','kec_jp'),fld('Kode pos','kodepos',{inputmode:'numeric'}),fld('Stasiun terdekat','stasiun'),fld('Alamat jalan / gedung','alamat_jp',{area:1}),fld('Status visa','tinggal',{opts:TGL,ph:'Pilih status visa'}),fld('Bidang pekerjaan','bidang'),fld('Nama perusahaan','perusahaan'),fld('Nama pengurus daerah','pengurus'),fld('Nomor HP pengurus daerah','hp_pengurus',{type:'tel'}))),
+    photoBox(),documentBox(),
+    box(h('div',{class:'member-section-heading'},h('div',{},h('b',{},'Catatan tambahan'))),fld('Catatan','catatan',{area:1})),
+    h('div',{class:'member-editor-actions'},h('button',{class:'btn s',onclick:()=>{S.form=null;render()}},'Batal'),h('button',{class:'btn',onclick:saveForm},f.id?'Simpan perubahan':'Simpan anggota'))
+  );
+}
 function vAbsen(){
   const t=h('input',{placeholder:'Nama kegiatan'});
   const list=S.events.map(e=>{const a=e.hadir||[],ya=a.includes(S.uid);
