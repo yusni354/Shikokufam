@@ -1,4 +1,4 @@
-const S={members:[],events:[],topics:[],cleaningDuties:[],view:'landing',openConversation:null,messageSignature:'',admin:false,mainAdmin:false,adminMenuOpen:false,uid:null,email:'',name:'',approvalStatus:'approved',pendingUsers:[],mapError:'',storageErrors:{},storageImporting:false,memberMediaUrls:new Map(),memberMediaPending:new Set(),memberMediaFailed:new Set(),legacyMediaPaths:new Map(),memberMediaError:'',activityScannerStop:null,activityFeedback:null,db:null,legacyDb:null,supabase:null,messageChannel:null,authLoading:true,unreadMessages:0};
+const S={members:[],events:[],topics:[],cleaningDuties:[],view:'landing',openConversation:null,messageSignature:'',admin:false,mainAdmin:false,adminMenuOpen:false,uid:null,email:'',name:'',approvalStatus:'approved',pendingUsers:[],mapError:'',storageErrors:{},storageImporting:false,memberMediaUrls:new Map(),memberMediaPending:new Set(),memberMediaFailed:new Set(),legacyMediaPaths:new Map(),memberMediaError:'',memberUploadState:null,activityScannerStop:null,activityFeedback:null,db:null,legacyDb:null,supabase:null,messageChannel:null,authLoading:true,unreadMessages:0};
 const $=s=>document.querySelector(s);
 try{
   localStorage.removeItem('shikoku-family:visit-consent');
@@ -1052,15 +1052,37 @@ function autoFill(txt){
 }
 async function up(file,key,multi){
   if(!file)return;
-  if(!S.supabase&&!S.assets){alert('Unggah file hanya tersedia untuk admin dengan layanan penyimpanan aktif');return}
+  if(!S.admin){alert('Hanya admin yang dapat mengunggah foto dan dokumen anggota.');return}
+  if(!S.supabase&&!S.assets){alert('Layanan penyimpanan belum tersedia. Muat ulang aplikasi atau periksa koneksi.');return}
+  if(S.memberUploadState?.form===S.form&&S.memberUploadState.status==='uploading')return;
+  const targetForm=S.form;
+  S.memberUploadState={form:targetForm,status:'uploading',message:'Mengunggah file ke penyimpanan bersama...'};
+  render();
   try{
     const id=S.supabase?await uploadPrivateMemberMedia(file):(await S.assets.upload(file)).id;
-    S.form[key]=multi?[...(S.form[key]||[]),id]:id;
+    targetForm[key]=multi?[...(targetForm[key]||[]),id]:id;
+    S.memberUploadState={form:targetForm,status:'success',message:'File berhasil diunggah. Simpan profil untuk menyimpan perubahan.'};
     render();
-  }catch(e){console.error(e);alert('Gagal mengunggah file: '+(e.message||'periksa koneksi dan ukuran file'))}}
+  }catch(error){
+    console.error('Unggah media anggota gagal:',error);
+    const detail=[error.message,error.error_description,error.statusCode,error.code].filter(Boolean).join(' · ');
+    const lower=detail.toLowerCase();
+    let message=detail||'Kesalahan tidak diketahui';
+    if(lower.includes('bucket')&&(lower.includes('not found')||lower.includes('does not exist'))){
+      message='Bucket member-files belum tersedia. Jalankan ulang supabase-schema.sql di Supabase SQL Editor.';
+    }else if(lower.includes('row-level security')||lower.includes('unauthorized')||lower.includes('not authorized')||String(error.statusCode)==='403'){
+      message='Supabase menolak unggahan. Pastikan akun ini berstatus admin dan kebijakan Storage dari supabase-schema.sql sudah dijalankan.';
+    }else if(lower.includes('too large')||lower.includes('payload')||lower.includes('size limit')){
+      message='File terlalu besar untuk batas unggah Supabase. Pilih file yang lebih kecil.';
+    }
+    S.memberUploadState={form:targetForm,status:'error',message:'Gagal mengunggah: '+message};
+    render();
+  }
+}
 function pick(label,acc,cap,cb){const i=h('input',{type:'file',accept:acc,style:'display:none'});if(cap)i.setAttribute('capture','environment');i.onchange=()=>cb(i.files[0]);return h('button',{class:'btn s',onclick:()=>i.click()},icon(cap?'camera':'attachment',16),h('span',{},label))}
 async function saveForm(){
   const f=S.form;
+  if(S.memberUploadState?.form===f&&S.memberUploadState.status==='uploading'){alert('Tunggu sampai unggah file selesai sebelum menyimpan profil.');return}
   if(!(f.nama||'').trim()){alert('Nama lengkap wajib diisi.');return}
   const inferredLocation=inferJapanLocation(f.alamat_jp,f.kota,f.kec_jp,f.kodepos,f.pref,f.wilayah);
   if(inferredLocation){
@@ -1080,7 +1102,7 @@ async function saveForm(){
   }
   f.pref=allowedPref;
   const d={...f};delete d.id;Object.keys(d).forEach(key=>{if(typeof d[key]==='string'&&!['foto'].includes(key))d[key]=cleanMemberValue(d[key]).toUpperCase()});d.peran=d.peran||'ANGGOTA';d.status=d.status||'AKTIF';
-  try{if(f.id)await S.db.collection('members').doc(f.id).set(d);else await S.db.collection('members').add({...d,at:Date.now()});S.form=null;render()}catch(e){console.error(e);alert('Tidak bisa menyimpan: '+(e.message||'periksa koneksi dan izin database'))}}
+  try{if(f.id)await S.db.collection('members').doc(f.id).set(d);else await S.db.collection('members').add({...d,at:Date.now()});S.form=null;S.memberUploadState=null;render()}catch(e){console.error(e);alert('Tidak bisa menyimpan: '+(e.message||'periksa koneksi dan izin database'))}}
 function memberFormCard(){
   const f=S.form;
   if(!f.id&&!f.kode){
@@ -1097,6 +1119,7 @@ function memberFormCard(){
   };
   const photoBox=()=>box(h('b',{},'Foto Setengah Badan (terbaru)'),
     f.foto&&h('img',{...memberMediaAttributes(f.foto,'src'),style:'width:88px;height:88px;border-radius:18px;object-fit:cover;display:block;margin:10px 0'}),
+    S.memberUploadState?.form===f&&h('p',{class:'warn '+(S.memberUploadState.status==='error'?'storage-warning':'')},S.memberUploadState.message),
     h('div',{class:'fl'},pick('Ambil foto','image/jpeg,image/png,image/webp',1,file=>up(file,'foto')),pick('Pilih foto','image/jpeg,image/png,image/webp',0,file=>up(file,'foto'))));
   const documentBox=()=>box(h('b',{},'Foto Surat Sambung'),
     ...(f.surat||[]).map((id,index)=>h('div',{class:'member-file-row'},h('a',{...memberMediaAttributes(id,'href'),target:'_blank'},icon('attachment',16),h('span',{},'Lampiran '+(index+1))),h('button',{class:'btn s',onclick:()=>{f.surat=f.surat.filter(value=>value!==id);render()}},'Hapus'))),
