@@ -5,9 +5,44 @@ try{
   sessionStorage.removeItem('shikoku-family:visit-location-jp-postal-v1');
 }catch(error){console.warn('Cache lama peta kunjungan tidak dapat dihapus:',error)}
 function h(t,p,...k){const e=document.createElement(t);for(const a in p||{}){if(a==='onclick')e.onclick=p[a];else if(a==='class')e.className=p[a];else e.setAttribute(a,p[a])}k.flat().forEach(c=>{if(c!=null&&c!==false)e.append(c)});return e}
+const ICON_PATHS={
+  menu:['M4 6h16','M4 12h16','M4 18h16'],
+  home:['m3 10 9-7 9 7','M5 9v11h14V9','M9 20v-6h6v6'],
+  chart:['M3 3v18h18','m19 9-5 5-4-4-6 6'],
+  users:['M16 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2','M10 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8','M20 21v-2a4 4 0 0 0-3-3.87','M16 3.13a4 4 0 0 1 0 7.75'],
+  calendar:['M8 2v4','M16 2v4','M3 10h18','M5 4h14a2 2 0 0 1 2 2v14H3V6a2 2 0 0 1 2-2Z'],
+  brush:['m9 11-6 6v3h9l3-3','M22 12c0 5-4 9-9 9','M15 5l4 4','m14 4 3-3 4 4-3 3','M12 7l5 5'],
+  map:['M3 6l6-3 6 3 6-3v15l-6 3-6-3-6 3z','M9 3v15','M15 6v15'],
+  messages:['M21 11.5a8.5 8.5 0 0 1-12.1 7.7L3 21l1.8-5.3A8.5 8.5 0 1 1 21 11.5Z','M8 11h.01','M12 11h.01','M16 11h.01'],
+  inbox:['M4 4h16l2 11h-6l-2 3h-4l-2-3H2z','M2 15h6','M16 15h6'],
+  settings:['M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z','M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-1.7 2.94-.08-.02a1.7 1.7 0 0 0-1.8.7l-.04.07h-3.4l-.04-.07a1.7 1.7 0 0 0-1.8-.7l-.08.02-1.7-2.94.06-.06A1.7 1.7 0 0 0 9.6 15l-.08-.04v-3.4l.08-.04a1.7 1.7 0 0 0-.34-1.88L9.2 9.58l1.7-2.94.08.02a1.7 1.7 0 0 0 1.8-.7l.04-.07h3.4l.04.07a1.7 1.7 0 0 0 1.8.7l.08-.02 1.7 2.94-.06.06a1.7 1.7 0 0 0-.34 1.88l.08.04v3.4z'],
+  check:['m5 12 4 4L19 6'],
+  lock:['M5 11h14v10H5z','M8 11V7a4 4 0 1 1 8 0v4'],
+  attachment:['m21.4 11.6-8.5 8.5a6 6 0 0 1-8.5-8.5l9.2-9.2a4 4 0 0 1 5.7 5.7l-9.2 9.2a2 2 0 0 1-2.8-2.8l8.5-8.5'],
+  camera:['M14 5l1.5 2H20a2 2 0 0 1 2 2v10H2V9a2 2 0 0 1 2-2h4l1.5-2z','M12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z'],
+  mic:['M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z','M19 10v2a7 7 0 0 1-14 0v-2','M12 19v3','M8 22h8'],
+  edit:['M12 20h9','M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z'],
+  search:['M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16Z','m21 21-4.3-4.3'],
+  trash:['M3 6h18','M8 6V4h8v2','m19 6-1 14H6L5 6','M10 11v5','M14 11v5'],
+  pin:['M20 10c0 5-8 12-8 12S4 15 4 10a8 8 0 1 1 16 0Z','M12 10a2.5 2.5 0 1 0 0 .01'],
+  logout:['M10 17l5-5-5-5','M15 12H3','M12 3h7a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-7'],
+  plus:['M12 5v14','M5 12h14'],
+  close:['M18 6 6 18','m6 6 12 12'],
+  clock:['M12 8v4l3 2','M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z'],
+  scan:['M4 7V5a1 1 0 0 1 1-1h2','M17 4h2a1 1 0 0 1 1 1v2','M20 17v2a1 1 0 0 1-1 1h-2','M7 20H5a1 1 0 0 1-1-1v-2','M4 12h16'],
+  sparkles:['m12 3 1.9 5.8L20 11l-6.1 2.2L12 19l-1.9-5.8L4 11l6.1-2.2L12 3Z','m19 14 1.2 2.8L23 18l-2.8 1.2L19 22l-1.2-2.8L15 18l2.8-1.2Z'],
+  back:['m15 18-6-6 6-6','M9 12h12'],
+  external:['M14 3h7v7','M10 14 21 3','M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5'],
+};
+function icon(name,size=20){
+  const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+  svg.setAttribute('viewBox','0 0 24 24');svg.setAttribute('width',String(size));svg.setAttribute('height',String(size));svg.setAttribute('fill','none');svg.setAttribute('stroke','currentColor');svg.setAttribute('stroke-width','1.8');svg.setAttribute('stroke-linecap','round');svg.setAttribute('stroke-linejoin','round');svg.setAttribute('aria-hidden','true');svg.classList.add('app-icon');
+  for(const d of ICON_PATHS[name]||[]) {const path=document.createElementNS('http://www.w3.org/2000/svg','path');path.setAttribute('d',d);svg.append(path)}
+  return svg;
+}
 const WILAYAH=[['Tokushima','#d95763'],['Takamatsu','#3985c6'],['Marugame','#e28b36'],['Zentsuji / Takuma','#8e68b5'],['Kochi','#24947e'],['Matsuyama','#d45e9f'],['Ehime','#6f9e3b'],['Niihama','#6073c4']];
-const ALL=[['landing','🏠 Home'],['dash','📊 Ringkasan'],['members','👥 Daftar Anggota'],['kegiatan','🎉 Kegiatan'],['piket','🧹 Jadwal Piket'],['peta','🗺️ Peta & Wilayah'],['forum','💬 Forum'],['pesan','📨 Pesan Masuk']];
-const ADMIN_MENU=[['map-settings','🗺️ Pengaturan Peta'],['approvals','👥 Persetujuan Akun']];
+const ALL=[['landing','Home','','','home'],['dash','Ringkasan','','','chart'],['members','Daftar Anggota','','','users'],['kegiatan','Kegiatan','','','calendar'],['piket','Jadwal Piket','','','brush'],['peta','Peta & Wilayah','','','map'],['forum','Forum','','','messages'],['pesan','Pesan Masuk','','','inbox']];
+const ADMIN_MENU=[['map-settings','Pengaturan Peta','map'],['approvals','Persetujuan Akun','users']];
 function isAdminSettingsView(){return ADMIN_MENU.some(([view])=>view===S.view)}
 function syncAdminTheme(){
   document.body.classList.toggle('admin-dark',S.mainAdmin&&(S.adminMenuOpen||isAdminSettingsView()));
@@ -15,6 +50,9 @@ function syncAdminTheme(){
 }
 function go(v){S.view=v;S.adminMenuOpen=false;S.form=S.detail=S.dutyForm=null;S.detailOrigin=null;if(v==='pesan'&&S.admin)S.openConversation=null;document.body.classList.remove('open');syncAdminTheme();render();if(v==='pesan'&&!S.admin)markMessagesRead()}
 $('#mn').onclick=()=>document.body.classList.add('open');
+$('#mn').replaceChildren(icon('menu',21));
+$('#st').replaceChildren(icon('settings',19));
+document.querySelector('.logo')?.replaceChildren(icon('check',19));
 $('#ov').onclick=()=>{
   document.body.classList.remove('open');
   if(S.adminMenuOpen){S.adminMenuOpen=false;render()}else syncAdminTheme();
@@ -221,7 +259,8 @@ function accountForm(){
   const name=h('input',{placeholder:'Nama lengkap',autocomplete:'name'});
   const notice=h('p',{class:'warn'});
   let signup=false;
-  const title=h('b',{},'🔐 Masuk ke Shikoku Family');
+  const titleText=h('span',{},'Masuk ke Shikoku Family');
+  const title=h('b',{},icon('lock',20),titleText);
   const forgot=h('button',{class:'btn s',onclick:async()=>{
     const emailValue=email.value.trim();
     if(!emailValue){notice.textContent='Masukkan email terlebih dahulu untuk menerima tautan reset password.';email.focus();return}
@@ -237,7 +276,7 @@ function accountForm(){
   const signupTab=h('button',{class:'auth-tab',onclick:()=>setMode(true)},'Daftar');
   const setMode=next=>{
     signup=next;nameLabel.style.display=signup?'':'none';
-    title.textContent=signup?'📝 Daftar sebagai anggota':'🔐 Masuk ke Shikoku Family';
+    titleText.textContent=signup?'Daftar sebagai anggota':'Masuk ke Shikoku Family';
     loginTab.className=signup?'auth-tab':'auth-tab on';signupTab.className=signup?'auth-tab on':'auth-tab';
   };
   nameLabel.style.display='none';
@@ -307,7 +346,7 @@ function loginForm(){
   const email=h('input',{type:'email',placeholder:'Email admin',autocomplete:'email'});
   const password=h('input',{type:'password',placeholder:'Password',autocomplete:'current-password'});
   const notice=h('p',{class:'warn'});
-  return box(h('b',{},'🔐 Login Admin'),h('p',{class:'sub'},'Masuk untuk membaca pesan yang diterima.'),h('label',{class:'lb'},'Email',email),h('label',{class:'lb'},'Password',password),notice,h('button',{class:'btn',onclick:async()=>{
+  return box(h('b',{},icon('lock',18),h('span',{},'Login Admin')),h('p',{class:'sub'},'Masuk untuk membaca pesan yang diterima.'),h('label',{class:'lb'},'Email',email),h('label',{class:'lb'},'Password',password),notice,h('button',{class:'btn',onclick:async()=>{
     notice.textContent='Memproses...';
     const {error}=await S.supabase.auth.signInWithPassword({email:email.value.trim(),password:password.value});
     notice.textContent=error?error.message:'Login berhasil.';
@@ -332,7 +371,7 @@ function attachmentView(attachment){
   if(!attachment?.url)return null;
   if(attachment.type?.startsWith('image/'))return h('a',{href:attachment.url,target:'_blank'},h('img',{src:attachment.url,alt:attachment.name||'Gambar lampiran',class:'chat-image'}));
   if(attachment.type?.startsWith('audio/'))return h('audio',{controls:true,src:attachment.url});
-  return h('a',{href:attachment.url,target:'_blank',class:'chat-file'},'📎 '+(attachment.name||'Buka lampiran'));
+  return h('a',{href:attachment.url,target:'_blank',class:'chat-file'},icon('attachment',16),h('span',{},attachment.name||'Buka lampiran'));
 }
 function attachmentPicker(){
   const files=[];
@@ -345,12 +384,12 @@ function attachmentPicker(){
   const camera=h('input',{type:'file',accept:'image/*',capture:'environment',style:'display:none'});
   file.onchange=()=>update(file);camera.onchange=()=>update(camera);
   return {files,label,buttons:h('div',{class:'attachment-tools'},
-    h('button',{class:'btn s',onclick:()=>file.click()},'📎 File'),
-    h('button',{class:'btn s',onclick:()=>camera.click()},'📷 Kamera'))};
+    h('button',{class:'btn s',onclick:()=>file.click()},icon('attachment',16),h('span',{},'File')),
+    h('button',{class:'btn s',onclick:()=>camera.click()},icon('camera',16),h('span',{},'Kamera')))};
 }
 function replyBox(messageId){
   const input=h('textarea',{rows:2,placeholder:'Tulis balasan...'});
-  const picker=attachmentPicker(),record=h('button',{class:'btn s'},'🎙️ Rekam');
+  const picker=attachmentPicker(),record=h('button',{class:'btn s'},icon('mic',16),h('span',{},'Rekam'));
   let recorder,recorded=[];
   record.onclick=async()=>{
     if(recorder){recorder.stop();return}
@@ -359,7 +398,7 @@ function replyBox(messageId){
     recorded=[];
     recorder=new MediaRecorder(stream);
     recorder.ondataavailable=e=>{if(e.data.size)recorded.push(e.data)};
-    recorder.onstop=()=>{stream.getTracks().forEach(track=>track.stop());picker.files.push(new File(recorded,'voice-note.webm',{type:'audio/webm'}));picker.label.textContent='Voice note siap dikirim';recorder=null;record.textContent='🎙️ Rekam'};
+    recorder.onstop=()=>{stream.getTracks().forEach(track=>track.stop());picker.files.push(new File(recorded,'voice-note.webm',{type:'audio/webm'}));picker.label.textContent='Voice note siap dikirim';recorder=null;record.replaceChildren(icon('mic',16),h('span',{},'Rekam'))};
     recorder.start();record.textContent='⏹️ Selesai';
   };
   const menu=h('div',{class:'attachment-menu'},picker.buttons,record);
@@ -418,7 +457,7 @@ function vHome(){
   });
   if(memberGroups['Belum dipilih']?.length)regionCards.push(h('section',{class:'home-region-card home-region-unknown'},h('div',{class:'home-region-heading'},h('b',{},'Wilayah belum dipilih'),h('span',{},memberGroups['Belum dipilih'].length+' anggota')),
     ...memberGroups['Belum dipilih'].map(member=>h('button',{class:'home-region-member',onclick:()=>openMember(member,'landing')},h('span',{class:'member-avatar-placeholder'},(member.nama||'?').trim().slice(0,1).toUpperCase()),h('span',{},member.nama||'Nama belum diisi'),h('span',{class:'home-region-arrow'},'›')))));
-  const shortcuts=[['🧹','Jadwal Piket','piket'],['🎉','Kegiatan','kegiatan'],['💬','Forum','forum'],['🗺️','Peta','peta']];
+  const shortcuts=[['brush','Jadwal Piket','piket'],['calendar','Kegiatan','kegiatan'],['messages','Forum','forum'],['map','Peta','peta']];
   const dutyRows=upcomingDuties.flatMap(duty=>{
     const assignments=Array.isArray(duty.assignments)&&duty.assignments.length?duty.assignments:[{nama:duty.nama||'',tugas:duty.tugas||''}];
     return [h('div',{class:'home-duty'},
@@ -428,7 +467,7 @@ function vHome(){
   });
   return [
     h('section',{class:'home-welcome'},
-      h('span',{class:'home-welcome-icon'},'👋'),
+      h('span',{class:'home-welcome-icon'},icon('users',25)),
       h('div',{},h('small',{},today.toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'})),h('h1',{},'Selamat datang'+(S.name?', '+S.name.split(' ')[0]:'')+'!'),h('p',{},'Senang bisa berkumpul bersama keluarga Shikoku.'))
     ),
     h('div',{class:'stats home-stats'},...[['Anggota',S.members.length],['Kegiatan',S.events.length],['Wilayah',Object.keys(wilayah()).length]].map(item=>h('div',{},h('small',{},item[0]),h('b',{},String(item[1]))))),
@@ -436,29 +475,29 @@ function vHome(){
     h('p',{class:'home-member-intro'},'Pilih nama anggota untuk membuka kartu identitas lengkap.'),
     h('div',{class:'home-region-list'},...regionCards),
     h('div',{class:'home-section-heading'},h('h2',{},'Akses cepat'),h('small',{},'Yang sering dibuka')),
-    h('div',{class:'home-shortcuts'},...shortcuts.map(([icon,label,view])=>h('button',{class:'home-shortcut',onclick:()=>go(view)},h('span',{},icon),h('b',{},label),h('span',{class:'home-shortcut-arrow'},'›')))),
+    h('div',{class:'home-shortcuts'},...shortcuts.map(([glyph,label,view])=>h('button',{class:'home-shortcut',onclick:()=>go(view)},h('span',{class:'home-shortcut-icon'},icon(glyph,22)),h('b',{},label),h('span',{class:'home-shortcut-arrow'},'›')))),
     h('div',{class:'home-section-heading'},h('h2',{},'Jadwal piket terdekat'),h('button',{class:'btn s',onclick:()=>go('piket')},'Lihat semua')),
-    upcomingDuties.length?h('div',{class:'home-agenda'},...dutyRows):h('div',{class:'home-empty'},h('span',{},'🧹'),h('p',{},'Belum ada jadwal piket mendatang.')),
+    upcomingDuties.length?h('div',{class:'home-agenda'},...dutyRows):h('div',{class:'home-empty'},icon('brush',23),h('p',{},'Belum ada jadwal piket mendatang.')),
     h('div',{class:'home-section-heading'},h('h2',{},'Kegiatan komunitas'),h('button',{class:'btn s',onclick:()=>go('kegiatan')},'Lihat kegiatan')),
-    recentEvents.length?h('div',{class:'home-events'},...recentEvents.map(event=>h('div',{class:'home-event'},h('span',{},'🎉'),h('div',{},h('b',{},event.judul||'Kegiatan komunitas'),h('small',{},eventParticipantCount(event)+' peserta · '+eventAttendanceCount(event)+' hadir'))))):h('div',{class:'home-empty'},h('span',{},'🎉'),h('p',{},'Belum ada kegiatan komunitas.')),
-    h('button',{class:'home-admin-link',onclick:askForm},'💬 Butuh bantuan? Hubungi Admin')
+    recentEvents.length?h('div',{class:'home-events'},...recentEvents.map(event=>h('div',{class:'home-event'},icon('calendar',19),h('div',{},h('b',{},event.judul||'Kegiatan komunitas'),h('small',{},eventParticipantCount(event)+' peserta · '+eventAttendanceCount(event)+' hadir'))))):h('div',{class:'home-empty'},icon('calendar',23),h('p',{},'Belum ada kegiatan komunitas.')),
+    h('button',{class:'home-admin-link',onclick:askForm},icon('messages',17),' Butuh bantuan? Hubungi Admin')
   ];
 }
 function vDash(){
-  const c=(e,t,d,n,v)=>h('button',{class:'card',onclick:()=>go(v)},
-    h('span',{class:'e',style:'position:relative'},e,v==='pesan'&&h('span',{class:'icon-badge','data-message-badge':'true',style:S.unreadMessages>0?'':'display:none'},String(S.unreadMessages))),
+  const c=(glyph,t,d,n,v)=>h('button',{class:'card',onclick:()=>go(v)},
+    h('span',{class:'e',style:'position:relative'},icon(glyph,23),v==='pesan'&&h('span',{class:'icon-badge','data-message-badge':'true',style:S.unreadMessages>0?'':'display:none'},String(S.unreadMessages))),
     h('span',{style:'flex:1'},h('b',{},t),h('small',{},d),h('br'),h('b',{style:'font-size:15px'},n)),'›');
-  return [h('h1',{},'Selamat datang'+(S.name?', '+S.name.split(' ')[0]:'')+' 👋'),
+  return [h('h1',{},'Selamat datang'+(S.name?', '+S.name.split(' ')[0]:'')+'!'),
     h('p',{class:'sub'},new Date().toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'})),
     h('div',{class:'card',style:'display:block'},h('small',{class:'warn'},'User ID'),h('br'),h('b',{},S.email||S.uid||'-')),
     h('div',{class:'stats'},...[['Anggota',S.members.length],['Kegiatan',S.events.length],['Wilayah',Object.keys(wilayah()).length]].map(x=>h('div',{},h('small',{},x[0]),h('b',{},String(x[1]))))),
-    c('👥','Daftar Anggota','Kelola data anggota komunitas',S.members.length+' anggota','members'),
-    c('🎉','Kegiatan','Agenda, peserta, dan absensi anggota',S.events.length+' kegiatan','kegiatan'),
-    c('🧹','Jadwal Piket','Jadwal kebersihan komunitas',S.cleaningDuties.length+' jadwal','piket'),
-    c('💬','Forum','Diskusi & komentar anggota',S.topics.length+' topik','forum'),
-    c('📨','Pesan Masuk','Pesan dan balasan admin',S.admin?((S.tanya?.length||0)+' pesan'):'Pesan saya','pesan'),
-    c('🗺️','Peta & Wilayah','Sebaran anggota di Jepang',Object.keys(wilayah()).length+' wilayah','peta'),
-    h('button',{class:'card',onclick:async()=>{await S.supabase.auth.signOut()}},h('span',{class:'e'},'🚪'),h('span',{style:'flex:1'},h('b',{},'Keluar'),h('small',{},'Akhiri sesi akun')),'›')];
+    c('users','Daftar Anggota','Kelola data anggota komunitas',S.members.length+' anggota','members'),
+    c('calendar','Kegiatan','Agenda, peserta, dan absensi anggota',S.events.length+' kegiatan','kegiatan'),
+    c('brush','Jadwal Piket','Jadwal kebersihan komunitas',S.cleaningDuties.length+' jadwal','piket'),
+    c('messages','Forum','Diskusi & komentar anggota',S.topics.length+' topik','forum'),
+    c('inbox','Pesan Masuk','Pesan dan balasan admin',S.admin?((S.tanya?.length||0)+' pesan'):'Pesan saya','pesan'),
+    c('map','Peta & Wilayah','Sebaran anggota di Jepang',Object.keys(wilayah()).length+' wilayah','peta'),
+    h('button',{class:'card',onclick:async()=>{await S.supabase.auth.signOut()}},h('span',{class:'e'},icon('logout',22)),h('span',{style:'flex:1'},h('b',{},'Keluar'),h('small',{},'Akhiri sesi akun')),'›')];
 }
 const PERAN=['Anggota','Pengurus'],STATUS=['aktif','nonaktif'];
 function vMembers(){
@@ -478,8 +517,8 @@ function vMembers(){
       (!S.memberStatus||(member.status||'aktif').toLowerCase()===S.memberStatus)
     ).sort((a,b)=>(a.nama||'').localeCompare(b.nama||'','id'));
     count.textContent='Menampilkan '+rows.length+' dari '+S.members.length+' anggota';
-    list.replaceChildren(...(rows.length?rows.map((member,index)=>{
-      const code=member.kode||'MEM-'+String(index+1).padStart(5,'0'),area=memberRegion(member),location=[member.kota,member.pref].filter(Boolean).join(', ');
+    list.replaceChildren(...(rows.length?rows.map(member=>{
+      const code=memberCode(member),area=memberRegion(member),location=[member.kota,member.pref].filter(Boolean).join(', ');
       return h('article',{class:'member-card',style:'--region-color:'+regionColor(area)},
         member.foto?h('img',{class:'member-avatar',src:'/_blob/'+member.foto,alt:'Foto '+(member.nama||'anggota')}):h('div',{class:'member-avatar member-avatar-placeholder'},(member.nama||'?').trim().slice(0,1).toUpperCase()),
         h('div',{class:'member-card-info'},h('div',{class:'member-name-line'},h('b',{},(member.nama||'Nama belum diisi').toUpperCase()),h('span',{class:'member-region-tag'},area.toUpperCase()),h('span',{class:'ok'+((member.status||'aktif').toLowerCase()==='aktif'?'':' off')},(member.status||'aktif').toUpperCase())),
@@ -487,12 +526,12 @@ function vMembers(){
           h('small',{},member.wa?memberValue('wa',member.wa):member.email||'Kontak belum diisi')),
         h('div',{class:'member-card-actions'},
           h('button',{class:'btn s',onclick:()=>openMember(member,'members')},'Lihat kartu ID'),
-          S.admin&&h('button',{class:'btn s',onclick:()=>{S.form={...member};S.detail=null;render()}},'✎ Edit'),
+          S.admin&&h('button',{class:'btn s',onclick:()=>{S.form={...member};S.detail=null;render()}},icon('edit',15),h('span',{},'Edit')),
           S.admin&&h('button',{class:'btn s member-delete',onclick:async()=>{
             if(!confirm('Hapus data anggota '+(member.nama||'ini')+'?'))return;
             try{await S.db.collection('members').doc(member.id).delete()}catch(error){console.error(error);alert('Gagal menghapus data anggota: '+(error.message||'periksa koneksi'))}
           }},'Hapus')))
-    }):[h('div',{class:'member-empty'},h('span',{},S.members.length?'🔎':'👥'),h('b',{},S.members.length?'Anggota tidak ditemukan':'Belum ada data anggota'),h('p',{},S.members.length?'Coba kata kunci atau filter wilayah yang lain.':'Data anggota yang ditambahkan akan tampil di sini.'))]));
+    }):[h('div',{class:'member-empty'},icon(S.members.length?'search':'users',25),h('b',{},S.members.length?'Anggota tidak ditemukan':'Belum ada data anggota'),h('p',{},S.members.length?'Coba kata kunci atau filter wilayah yang lain.':'Data anggota yang ditambahkan akan tampil di sini.'))]));
   }
   search.oninput=()=>{S.memberQuery=search.value;draw()};
   region.onchange=()=>{S.memberRegion=region.value;draw()};
@@ -527,28 +566,30 @@ function detailCard(){
   const barcodeText=memberBarcodeValue(member);
   const code39={'0':'nnnwwnwnn','1':'wnnwnnnnw','2':'nnwwnnnnw','3':'wnwwnnnnn','4':'nnnwwnnnw','5':'wnnwwnnnn','6':'nnwwwnnnn','7':'nnnwnnwnw','8':'wnnwnnwnn','9':'nnwwnnwnn','*':'nwnnwnwnn'};
   const barcode=h('svg',{class:'member-barcode',viewBox:'0 0 1 54',role:'img','aria-label':'Barcode anggota '+code});
-  let x=0;
+  const quietZone=20;
+  let x=quietZone;
   for(const char of '*'+barcodeText+'*'){
     code39[char].split('').forEach((width,index)=>{
       const size=width==='w'?5:2;
-      if(index%2===0)barcode.append(h('rect',{x,y:0,width:size,height:48}));
+      if(index%2===0)barcode.append(h('rect',{x,y:2,width:size,height:50,fill:'currentColor'}));
       x+=size;
     });
     x+=2;
   }
+  x+=quietZone;
   barcode.setAttribute('viewBox','0 0 '+x+' 54');
   return h('section',{class:'member-profile-page',style:'--region-color:'+regionColor(area)},
     h('div',{class:'member-profile-toolbar'},h('button',{class:'btn s',onclick:()=>{S.detail=null;const origin=S.detailOrigin;S.detailOrigin=null;S.view=origin==='landing'?'landing':'members';render()}},'← Kembali'),
-      S.admin&&h('button',{class:'btn s',onclick:()=>{S.form={...member};S.detail=null;S.detailOrigin=null;render()}},'✎ Edit data')),
+      S.admin&&h('button',{class:'btn s',onclick:()=>{S.form={...member};S.detail=null;S.detailOrigin=null;render()}},icon('edit',15),h('span',{},'Edit data'))),
     h('article',{class:'member-id-card'},
       h('div',{class:'member-id-banner'},h('span',{},'SHIKOKU FAMILY'),h('span',{class:'member-region-tag'},area)),
       h('div',{class:'member-id-main'},
         member.foto?h('img',{class:'member-id-photo',src:'/_blob/'+member.foto,alt:'Foto '+(member.nama||'anggota')}):h('div',{class:'member-id-photo member-avatar-placeholder'},(member.nama||'?').trim().slice(0,1).toUpperCase()),
         h('div',{class:'member-id-info'},h('small',{},'KARTU ANGGOTA'),h('h1',{},(member.nama||'Nama belum diisi').toUpperCase()),h('b',{},code.toUpperCase()),h('p',{},[member.kota,member.pref].filter(Boolean).join(' · ').toUpperCase()||area.toUpperCase()),h('span',{class:'ok'+((member.status||'aktif').toLowerCase()==='aktif'?'':' off')},(member.status||'aktif').toUpperCase()))),
-      h('div',{class:'member-id-barcode'},barcode,h('small',{},code))),
+      h('div',{class:'member-id-barcode'},h('b',{class:'member-barcode-label'},'BARCODE KEHADIRAN'),barcode,h('small',{},'ID anggota: '+code),h('small',{class:'member-barcode-help'},'Tunjukkan barcode ini untuk dipindai saat absensi kegiatan.'))),
     ...sections.filter(([,rows])=>rows.some(([,value])=>value)).map(([title,rows])=>h('section',{class:'member-detail-section'},h('h3',{},title.toUpperCase()),h('div',{class:'member-detail-grid'},...rows.filter(([,value])=>value).map(([label,value])=>h('div',{class:'member-detail-item'},h('small',{},label.toUpperCase()),h('span',{},memberValue(label==='WhatsApp'?'wa':label==='Nomor HP pengurus daerah'?'hp_pengurus':label==='Nomor HP orang tua'?'hp_ortu':label.toLowerCase(),value))))))),
-    (member.surat||[]).length>0&&h('section',{class:'member-detail-section'},h('h3',{},'Foto Surat Sambung'),...(member.surat||[]).map((id,index)=>h('a',{class:'member-file-link',href:'/_blob/'+id,target:'_blank',rel:'noopener'},'📎 Buka lampiran '+(index+1)))),
-    S.admin&&h('div',{class:'member-detail-actions'},h('button',{class:'btn',onclick:()=>{S.form={...member};S.detail=null;S.detailOrigin=null;render()}},'✎ Edit data anggota'))
+    (member.surat||[]).length>0&&h('section',{class:'member-detail-section'},h('h3',{},'Foto Surat Sambung'),...(member.surat||[]).map((id,index)=>h('a',{class:'member-file-link',href:'/_blob/'+id,target:'_blank',rel:'noopener'},icon('attachment',16),h('span',{},'Buka lampiran '+(index+1))))),
+    S.admin&&h('div',{class:'member-detail-actions'},h('button',{class:'btn',onclick:()=>{S.form={...member};S.detail=null;S.detailOrigin=null;render()}},icon('edit',16),h('span',{},'Edit data anggota')))
   );
 }
 const PREF=['Ehime','Kagawa','Kochi','Tokushima','Hokkaido','Aomori','Iwate','Miyagi','Akita','Yamagata','Fukushima','Ibaraki','Tochigi','Gunma','Saitama','Chiba','Tokyo','Kanagawa','Niigata','Toyama','Ishikawa','Fukui','Yamanashi','Nagano','Gifu','Shizuoka','Aichi','Mie','Shiga','Kyoto','Osaka','Hyogo','Nara','Wakayama','Tottori','Shimane','Okayama','Hiroshima','Yamaguchi','Fukuoka','Saga','Nagasaki','Kumamoto','Oita','Miyazaki','Kagoshima','Okinawa'];
@@ -675,7 +716,7 @@ function autoFill(txt){
 async function up(file,key,multi){
   if(!file)return;if(!S.assets){alert('Unggah foto hanya tersedia untuk admin');return}
   try{const r=await S.assets.upload(file);S.form[key]=multi?[...(S.form[key]||[]),r.id]:r.id;render()}catch(e){console.error(e);alert('Gagal mengunggah file: '+(e.message||'periksa koneksi dan ukuran file'))}}
-function pick(label,acc,cap,cb){const i=h('input',{type:'file',accept:acc,style:'display:none'});if(cap)i.setAttribute('capture','environment');i.onchange=()=>cb(i.files[0]);return h('button',{class:'btn s',onclick:()=>i.click()},label)}
+function pick(label,acc,cap,cb){const i=h('input',{type:'file',accept:acc,style:'display:none'});if(cap)i.setAttribute('capture','environment');i.onchange=()=>cb(i.files[0]);return h('button',{class:'btn s',onclick:()=>i.click()},icon(cap?'camera':'attachment',16),h('span',{},label))}
 async function saveForm(){
   const f=S.form;
   if(!(f.nama||'').trim()){alert('Nama lengkap wajib diisi.');return}
@@ -692,16 +733,16 @@ function memberFormCard(){
   const fieldGrid=(...fields)=>h('div',{class:'member-form-grid'},...fields);
   const auto=()=>{
     const text=h('textarea',{rows:8,placeholder:'1. Nama Lengkap : Nama Anda\n2. Jenis Kelamin : laki-laki\n3. Tgl/bln/thn lahir : 20-04-1987\n4. Umur : 40\n5. Kelompok, Desa, Daerah di Indonesia : kelompok, desa, daerah\n6. No. Hp Pengurus Daerah + Nama : nomor + nama\n7. Status (lajang/menikah) : menikah\n8. MT (iya/bukan) : bukan\n9. Mulai Tinggal di Jepang : 22-09-2026\n10. Alamat Tinggal di Jepang : jotocho marugame\n11. Status Visa : tokuteginou 1\n12. No. HP/WA : nomor WhatsApp\n13. Facebook : nama akun\n14. No. HP Orang Tua + Nama : nomor + nama\n15. Foto Surat Sambung :\n16. Foto Setengah Badan (terbaru) :'});
-    return box(h('div',{class:'member-section-heading'},h('div',{},h('b',{},'Isi dari teks salinan'),h('small',{},'Tempel data diri untuk mengisi kolom secara otomatis.')),h('span',{},'✨')),
+    return box(h('div',{class:'member-section-heading'},h('div',{},h('b',{},'Isi dari teks salinan'),h('small',{},'Tempel data diri untuk mengisi kolom secara otomatis.')),icon('sparkles',20)),
       text,h('button',{class:'btn s',onclick:()=>autoFill(text.value)},'Isi Otomatis'),
       h('p',{class:'warn'},'Data diproses langsung di perangkat ini. Foto dan Surat Sambung diunggah terpisah. Periksa kembali hasilnya sebelum menyimpan.'));
   };
   const photoBox=()=>box(h('b',{},'Foto Setengah Badan (terbaru)'),
     f.foto&&h('img',{src:'/_blob/'+f.foto,style:'width:88px;height:88px;border-radius:18px;object-fit:cover;display:block;margin:10px 0'}),
-    h('div',{class:'fl'},pick('📷 Ambil foto','image/jpeg,image/png,image/webp',1,file=>up(file,'foto')),pick('Pilih foto','image/jpeg,image/png,image/webp',0,file=>up(file,'foto'))));
+    h('div',{class:'fl'},pick('Ambil foto','image/jpeg,image/png,image/webp',1,file=>up(file,'foto')),pick('Pilih foto','image/jpeg,image/png,image/webp',0,file=>up(file,'foto'))));
   const documentBox=()=>box(h('b',{},'Foto Surat Sambung'),
-    ...(f.surat||[]).map((id,index)=>h('div',{class:'member-file-row'},h('a',{href:'/_blob/'+id,target:'_blank'},'📎 Lampiran '+(index+1)),h('button',{class:'btn s',onclick:()=>{f.surat=f.surat.filter(value=>value!==id);render()}},'Hapus'))),
-    h('div',{class:'fl'},pick('📷 Ambil / foto dokumen','image/*,application/pdf',1,file=>up(file,'surat',1)),pick('Pilih dokumen','image/*,application/pdf',0,file=>up(file,'surat',1))),
+    ...(f.surat||[]).map((id,index)=>h('div',{class:'member-file-row'},h('a',{href:'/_blob/'+id,target:'_blank'},icon('attachment',16),h('span',{},'Lampiran '+(index+1))),h('button',{class:'btn s',onclick:()=>{f.surat=f.surat.filter(value=>value!==id);render()}},'Hapus'))),
+    h('div',{class:'fl'},pick('Ambil / foto dokumen','image/*,application/pdf',1,file=>up(file,'surat',1)),pick('Pilih dokumen','image/*,application/pdf',0,file=>up(file,'surat',1))),
     h('small',{class:'member-help'},'Bisa menambahkan lebih dari satu foto atau PDF.'));
   return h('div',{class:'member-editor'},
     h('div',{class:'member-editor-heading'},h('button',{class:'btn s',onclick:()=>{S.form=null;render()}},'← Kembali'),
@@ -741,7 +782,7 @@ function activityCard(event){
   const legacyCount=Array.isArray(event.hadir_anggota)?0:(event.hadir||[]).length;
   const feedback=S.activityFeedback&&String(S.activityFeedback.eventId)===String(event.id)?S.activityFeedback.message:'';
   const content=[
-    h('div',{class:'activity-heading'},h('div',{},h('h2',{},event.judul||'Kegiatan komunitas'),h('p',{class:'activity-meta'},dateLabel+(event.waktu?' · '+event.waktu:'')),event.lokasi&&h('p',{class:'activity-meta'},'📍 '+event.lokasi)),S.admin&&h('button',{class:'btn s',onclick:async()=>{
+    h('div',{class:'activity-heading'},h('div',{},h('h2',{},event.judul||'Kegiatan komunitas'),h('p',{class:'activity-meta'},icon('calendar',15),h('span',{},dateLabel+(event.waktu?' · '+event.waktu:''))),event.lokasi&&h('p',{class:'activity-meta'},icon('pin',15),h('span',{},event.lokasi))),S.admin&&h('button',{class:'btn s',onclick:async()=>{
       if(!confirm('Hapus kegiatan "'+(event.judul||'ini')+'"?'))return;
       try{await S.db.collection('events').doc(event.id).delete()}catch(error){console.error(error);alert('Gagal menghapus kegiatan: '+(error.message||'periksa koneksi'))}
     }},'Hapus kegiatan')),
@@ -760,7 +801,7 @@ function activityCard(event){
       try{await updateActivityMember(event.id,memberSelect.value,'add')}catch(error){console.error(error);alert('Gagal menambahkan peserta: '+(error.message||'periksa koneksi'))}
     };
     const barcodeInput=h('input',{class:'activity-barcode-input',placeholder:'Pindai barcode kartu anggota',autocomplete:'off'});
-    const scanButton=h('button',{class:'btn s',type:'button'},'📷 Buka kamera');
+    const scanButton=h('button',{class:'btn s',type:'button'},icon('camera',16),h('span',{},'Buka kamera'));
     const scannerVideo=h('video',{class:'activity-scanner-video',autoplay:'',muted:'',playsinline:'true',style:'display:none'});
     const processBarcode=async value=>{
       const code=String(value||'').trim().replace(/^\*|\*$/g,'').toUpperCase();
@@ -799,13 +840,13 @@ function activityCard(event){
         stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'},audio:false});
         active=true;
         scannerVideo.srcObject=stream;scannerVideo.style.display='block';
-        scanButton.textContent='Berhenti memindai';
+        scanButton.replaceChildren(icon('close',16),h('span',{},'Berhenti memindai'));
         stopScanner=()=>{
           active=false;
           if(frame)cancelAnimationFrame(frame);
           stream.getTracks().forEach(track=>track.stop());
           scannerVideo.srcObject=null;scannerVideo.style.display='none';
-          scanButton.textContent='📷 Buka kamera';
+          scanButton.replaceChildren(icon('camera',16),h('span',{},'Buka kamera'));
           if(S.activityScannerStop===stopScanner)S.activityScannerStop=null;
         };
         S.activityScannerStop=stopScanner;
@@ -833,7 +874,7 @@ function activityCard(event){
         stopScanner();
         if(stream)stream.getTracks().forEach(track=>track.stop());
         scannerVideo.srcObject=null;scannerVideo.style.display='none';
-        scanButton.textContent='📷 Buka kamera';
+        scanButton.replaceChildren(icon('camera',16),h('span',{},'Buka kamera'));
         console.error(error);
         status.textContent='Kamera tidak dapat dibuka: '+(error.message||'periksa izin kamera atau gunakan scanner USB/Bluetooth');
       }
@@ -889,7 +930,7 @@ function vPiket(){
       h('div',{class:'duty-info'},h('small',{},dateLabel(duty.tanggal)),h('div',{class:'duty-assignments'},...assignmentsFor(duty).map(assignment=>
         h('div',{class:'duty-assignment'},h('b',{},assignment.nama),h('span',{},assignment.tugas))))),
       S.admin&&h('div',{class:'duty-actions'},
-        h('button',{class:'btn s',title:'Edit jadwal',onclick:()=>{S.dutyForm={...duty,assignments:assignmentsFor(duty).map(assignment=>({...assignment}))};render()}},'✎ Edit'),
+        h('button',{class:'btn s',title:'Edit jadwal',onclick:()=>{S.dutyForm={...duty,assignments:assignmentsFor(duty).map(assignment=>({...assignment}))};render()}},icon('edit',15),h('span',{},'Edit')),
         h('button',{class:'btn s',title:'Hapus jadwal',onclick:async()=>{
           if(!confirm('Hapus jadwal piket tanggal '+dateLabel(duty.tanggal)+'?'))return;
           try{await S.db.collection('cleaning_duties').doc(duty.id).delete()}catch(error){console.error(error);alert('Gagal menghapus jadwal: '+(error.message||'periksa koneksi'))}
@@ -913,7 +954,7 @@ function vPiket(){
           h('div',{class:'duty-form-fields'},
             h('label',{class:'lb'},'Nama *',name),
             h('label',{class:'lb'},'Tugas *',task)),
-          form.assignments.length>1&&h('button',{class:'btn s duty-remove',title:'Hapus nama dan tugas ini',onclick:()=>{form.assignments.splice(index,1);drawAssignments()}},'✕'));
+          form.assignments.length>1&&h('button',{class:'btn s duty-remove',title:'Hapus nama dan tugas ini',onclick:()=>{form.assignments.splice(index,1);drawAssignments()}},icon('close',15)));
       }));
     };
     drawAssignments();
@@ -938,7 +979,7 @@ function vPiket(){
   return [h('div',{class:'duty-heading'},h('div',{},h('h1',{},'Jadwal Piket'),h('p',{class:'sub'},'Bersama menjaga kebersihan tempat kita berkumpul.')),h('span',{class:'duty-count'},S.cleaningDuties.length+' jadwal')),
     S.admin&&!form&&h('button',{class:'btn duty-add',onclick:()=>{const today=new Date();S.dutyForm={tanggal:[today.getFullYear(),String(today.getMonth()+1).padStart(2,'0'),String(today.getDate()).padStart(2,'0')].join('-'),assignments:[{nama:'',tugas:''}]};render()}},'+ Tambah jadwal'),
     editor,
-    cards.length?h('div',{class:'duty-list'},...cards):h('div',{class:'duty-empty'},h('span',{},'🧹'),h('b',{},'Belum ada jadwal piket'),h('p',{},S.admin?'Tambahkan jadwal pertama untuk mulai mengatur tugas kebersihan.':'Jadwal piket yang akan datang akan tampil di sini.'))];
+    cards.length?h('div',{class:'duty-list'},...cards):h('div',{class:'duty-empty'},icon('brush',24),h('b',{},'Belum ada jadwal piket'),h('p',{},S.admin?'Tambahkan jadwal pertama untuk mulai mengatur tugas kebersihan.':'Jadwal piket yang akan datang akan tampil di sini.'))];
 }
 function vForum(){
   const t=h('input',{placeholder:'Judul topik'}),b=h('textarea',{placeholder:'Isi diskusi',rows:3});
@@ -993,7 +1034,7 @@ async function clearMap(){
   }catch(e){alert('Gagal menghapus peta: '+(e.message||'periksa izin admin'))}}
 function mapEmbed(){
   const mid=mapMid();
-  return mid?h('div',{},h('iframe',{src:mapEmbedUrl(mid),style:'width:100%;height:calc(100vh - 120px);min-height:520px;border:0;border-radius:18px;background:var(--line)',loading:'lazy',allow:'fullscreen',title:'Google My Maps'}),h('a',{class:'btn s',style:'display:inline-block;margin-top:10px;text-decoration:none',href:'https://www.google.com/maps/d/viewer?mid='+encodeURIComponent(mid),target:'_blank'},'🗺️ Buka di Google My Maps')):h('p',{class:'warn'},S.mapError||'Belum ada peta. Admin dapat mengatur Google My Maps melalui menu Pengaturan Peta.');
+  return mid?h('div',{},h('iframe',{src:mapEmbedUrl(mid),style:'width:100%;height:calc(100vh - 120px);min-height:520px;border:0;border-radius:18px;background:var(--line)',loading:'lazy',allow:'fullscreen',title:'Google My Maps'}),h('a',{class:'btn s',style:'display:inline-flex;align-items:center;margin-top:10px;text-decoration:none',href:'https://www.google.com/maps/d/viewer?mid='+encodeURIComponent(mid),target:'_blank'},icon('external',16),h('span',{},'Buka di Google My Maps'))):h('p',{class:'warn'},S.mapError||'Belum ada peta. Admin dapat mengatur Google My Maps melalui menu Pengaturan Peta.');
 }
 function vPeta(){return [mapEmbed()]}
 async function setApproval(id,status){
@@ -1068,22 +1109,22 @@ function vPetaLegacy(){
     ...(pins.length?pins.map(p=>h('div',{class:'card'},h('span',{style:'flex:1;min-width:0'},h('b',{},p.nama),h('small',{},p.alamat||'')),h('button',{class:'btn s',onclick:()=>{const[x,y]=px(p.lng,p.lat);S.vb=[x-90,y-100,180,200];S.sp=p.id;render()}},'Lihat'),S.admin&&h('button',{class:'btn s',onclick:()=>{if(confirm('Hapus pin ini?'))S.db.collection('pin').doc(p.id).delete()}},'\u2715'))):[h('p',{class:'warn'},'Belum ada pin.')]),
     h('b',{style:'display:block;margin:6px 4px 10px'},'Sebaran per wilayah'),...sebaran()];
 }
-function sebaran(){const w=wilayah(),k=Object.keys(w);return k.length?k.map(n=>h('div',{class:'card',style:'display:block'},h('div',{class:'row'},h('b',{},'📍 '+n.toUpperCase()),h('span',{class:'tag'},w[n].length+' anggota')),h('small',{},w[n].map(x=>(x.nama||'').toUpperCase()).join(', ')))):[h('p',{class:'warn'},'Belum ada data wilayah.')]}
+function sebaran(){const w=wilayah(),k=Object.keys(w);return k.length?k.map(n=>h('div',{class:'card',style:'display:block'},h('div',{class:'row'},h('b',{},icon('pin',16),h('span',{},n.toUpperCase())),h('span',{class:'tag'},w[n].length+' anggota')),h('small',{},w[n].map(x=>(x.nama||'').toUpperCase()).join(', ')))):[h('p',{class:'warn'},'Belum ada data wilayah.')]}
 const V={landing:vHome,dash:vDash,members:vMembers,kegiatan:vKegiatan,piket:vPiket,peta:vPeta,forum:vForum,'map-settings':vPetaSettings,approvals:vApprovals,pesan:vPesan};
 function renderDrawer(){
   const d=$('#dr');
   if(S.adminMenuOpen){
     d.replaceChildren(
       h('p',{class:'sub',style:'padding:0 14px'},h('b',{style:'color:var(--ink)'},'PENGATURAN ADMIN'),h('br'),'Pengelolaan situs'),
-      ...ADMIN_MENU.map(([view,label])=>h('a',{class:S.view===view?'on':'',onclick:()=>go(view)},label)),
-      h('button',{class:'menu-logout',onclick:()=>go('landing')},'← Kembali ke menu utama')
+      ...ADMIN_MENU.map(([view,label,glyph])=>h('a',{class:S.view===view?'on':'',onclick:()=>go(view)},icon(glyph),h('span',{},label))),
+      h('button',{class:'menu-logout',onclick:()=>go('landing')},icon('back',17),h('span',{},'Kembali ke menu utama'))
     );
     return;
   }
   d.replaceChildren(h('p',{class:'sub',style:'padding:0 14px'},h('b',{style:'color:var(--ink)'},'KOMUNITAS ID-JP'),h('br'),'Database Anggota'),
     ...ALL.filter(x=>!x[2]||(x[3]?S.mainAdmin:S.admin)).map(x=>h('a',{class:S.view===x[0]?'on':'',onclick:()=>go(x[0]),...(x[0]==='pesan'?{'data-message-nav':'true'}:{})},
-      x[1],x[0]==='pesan'&&S.unreadMessages>0&&h('span',{class:'nav-badge'},String(S.unreadMessages)))),
-    h('button',{class:'menu-logout',onclick:async()=>{await S.supabase.auth.signOut()}},'🚪 Keluar'));
+      icon(x[4],19),h('span',{},x[1]),x[0]==='pesan'&&S.unreadMessages>0&&h('span',{class:'nav-badge'},String(S.unreadMessages)))),
+    h('button',{class:'menu-logout',onclick:async()=>{await S.supabase.auth.signOut()}},icon('logout',17),h('span',{},'Keluar')));
 }
 function render(){
   if(S.activityScannerStop)S.activityScannerStop();
@@ -1101,7 +1142,7 @@ function render(){
     $('#dr').replaceChildren();
     $('#app').replaceChildren(h('div',{class:'landing'},h('section',{class:'hero'},
       h('p',{style:'font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-bottom:10px'},'SHIKOKU FAMILY'),
-      h('h1',{},'Selamat datang 👋'),
+      h('h1',{},'Selamat datang!'),
       h('p',{},'Silakan masuk atau buat akun untuk bergabung dan menerima balasan dari admin.'),
       accountForm()
     )));
@@ -1122,7 +1163,7 @@ function render(){
   if(!V[S.view]||['map-settings','approvals'].includes(S.view)&&!S.mainAdmin||current?.[2]&&!S.admin)S.view='landing';
   $('#app').replaceChildren(...[].concat(V[S.view]()).filter(Boolean));
   const tb=$('#tb');tb.style.display=S.form?'none':'flex';$('#pet').style.display=S.form?'none':'block';
-  tb.replaceChildren(...[['landing','🏠','Home'],['dash','📊','Ringkasan'],['members','👥','Anggota'],['kegiatan','🎉','Kegiatan'],['piket','🧹','Piket'],['forum','💬','Forum']].map(x=>h('a',{class:S.view===x[0]?'on':'',onclick:()=>go(x[0])},h('span',{},x[1]),x[2])));
+  tb.replaceChildren(...[['landing','home','Home'],['dash','chart','Ringkasan'],['members','users','Anggota'],['kegiatan','calendar','Kegiatan'],['piket','brush','Piket'],['forum','messages','Forum']].map(x=>h('a',{class:S.view===x[0]?'on':'',onclick:()=>go(x[0])},icon(x[1],19),h('span',{},x[2]))));
 }
 function sub(name,key){
   S.db.collection(name).onSnapshot(s=>{
@@ -1227,7 +1268,7 @@ function askForm(){
   const askMenu=h('div',{class:'attachment-menu'},picker.buttons);
   const askPlus=h('button',{class:'composer-plus',type:'button',title:'Lampiran',onclick:()=>askMenu.classList.toggle('open')},'+');
   const m=h('div',{id:'qm'},h('div',{class:'card',style:'display:block;max-width:420px'},
-    h('b',{},'💬 Tanya Admin'),
+    h('b',{},icon('messages',18),h('span',{},'Tanya Admin')),
     h('p',{class:'warn',style:'margin:4px 0 2px'},'Sampaikan pertanyaan Anda. Admin akan membalasnya.'),
     h('label',{class:'lb'},'Nama lengkap *',nama),
     h('label',{class:'lb'},'Pertanyaan *',ta),
@@ -1252,9 +1293,9 @@ function askForm(){
   document.body.append(m);ta.focus()}
 function openMenu(){
   if($('#pm'))return closeMenu();
-  document.body.append(h('div',{id:'pm'},h('b',{},'Mau tanya apa? 😊'),
-    h('button',{class:'btn',onclick:askForm},'✍️ Tulis pertanyaan ke Admin'),
-    ADMIN_WA&&h('a',{class:'btn s',href:'https://wa.me/'+ADMIN_WA+'?text='+encodeURIComponent('Halo Admin, saya mau bertanya...'),target:'_blank'},'📲 Chat WhatsApp Admin'),
+  document.body.append(h('div',{id:'pm'},h('b',{},icon('messages',18),h('span',{},'Mau tanya apa?')),
+    h('button',{class:'btn',onclick:askForm},icon('edit',16),h('span',{},'Tulis pertanyaan ke Admin')),
+    ADMIN_WA&&h('a',{class:'btn s',href:'https://wa.me/'+ADMIN_WA+'?text='+encodeURIComponent('Halo Admin, saya mau bertanya...'),target:'_blank'},icon('messages',16),h('span',{},'Chat WhatsApp Admin')),
     h('button',{class:'btn s',onclick:closeMenu},'Tutup')))}
 pet.addEventListener('pointerdown',e=>{const r=pet.getBoundingClientRect();drag={x:e.clientX,y:e.clientY,l:r.left,t:r.top,m:false};try{pet.setPointerCapture(e.pointerId)}catch(_){}});
 pet.addEventListener('pointermove',e=>{
