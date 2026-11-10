@@ -25,6 +25,7 @@ const ICON_PATHS={
   search:['M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16Z','m21 21-4.3-4.3'],
   trash:['M3 6h18','M8 6V4h8v2','m19 6-1 14H6L5 6','M10 11v5','M14 11v5'],
   pin:['M20 10c0 5-8 12-8 12S4 15 4 10a8 8 0 1 1 16 0Z','M12 10a2.5 2.5 0 1 0 0 .01'],
+  phone:['M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.4 19.4 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7l.5 3.2a2 2 0 0 1-.6 1.7L7.1 10.5a16 16 0 0 0 6.4 6.4l1.9-1.9a2 2 0 0 1 1.7-.6l3.2.5a2 2 0 0 1 1.7 2Z'],
   logout:['M10 17l5-5-5-5','M15 12H3','M12 3h7a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-7'],
   plus:['M12 5v14','M5 12h14'],
   close:['M18 6 6 18','m6 6 12 12'],
@@ -538,11 +539,29 @@ function memberCode(member){
   return String(member.kode||'MEM-'+String(member.id||'00000').replace(/\D/g,'').slice(-5).padStart(5,'0'));
 }
 function memberBarcodeValue(member){
+  const id=String(member.id||'');
+  if(!id)return '';
+  const bytes=new TextEncoder().encode(id);
+  let numeric=BigInt(0);
+  for(const byte of bytes)numeric=numeric*BigInt(256)+BigInt(byte);
+  return 'SF'+bytes.length.toString(36).toUpperCase()+'-'+numeric.toString(36).toUpperCase();
+}
+function legacyMemberBarcodeValue(member){
   const code=memberCode(member);
   return /^IJCCS-\d+$/i.test(code)
     ?code.slice(code.lastIndexOf('-')+1).padStart(10,'0')
     :String(Math.abs(Array.from(code).reduce((hash,char)=>Math.imul(hash,31)+char.charCodeAt(0)|0,7))).padStart(10,'0').slice(-10);
 }
+const CODE39_PATTERNS={
+  '0':'nnnwwnwnn','1':'wnnwnnnnw','2':'nnwwnnnnw','3':'wnwwnnnnn','4':'nnnwwnnnw',
+  '5':'wnnwwnnnn','6':'nnwwwnnnn','7':'nnnwnnwnw','8':'wnnwnnwnn','9':'nnwwnnwnn',
+  A:'wnnnnwnnw',B:'nnwnnwnnw',C:'wnwnnwnnn',D:'nnnnwwnnw',E:'wnnnwwnnn',
+  F:'nnwnwwnnn',G:'nnnnnwwnw',H:'wnnnnwwnn',I:'nnwnnwwnn',J:'nnnnwwwnn',
+  K:'wnnnnnnww',L:'nnwnnnnww',M:'wnwnnnnwn',N:'nnnnwnnww',O:'wnnnwnnww',
+  P:'nnwnwnnwn',Q:'nnnnnnwww',R:'wnnnnnwwn',S:'nnwnnnwwn',T:'nnnnwnwwn',
+  U:'wwnnnnnnw',V:'nwwnnnnnw',W:'wwwnnnnnn',X:'nwnwnnnnw',Y:'wwnwnnnnn',
+  Z:'nwwwnnnnn','-':'nwnnnnwnw','*':'nwnnwnwnn'
+};
 function detailCard(){
   const member=S.detail,area=memberRegion(member),code=memberCode(member),sections=[
     ['Identitas & Keanggotaan',[['Nama lengkap',member.nama],['Nama panggilan',member.panggilan],['Nomor anggota',code],['Jenis kelamin',member.kelamin],['Tanggal lahir',member.lahir],['Umur',member.umur],['Status',member.status||'aktif'],['Peran',member.peran||'Anggota'],['Pernikahan',member.nikah],['MT',member.mt]]],
@@ -552,12 +571,11 @@ function detailCard(){
     ['Catatan',[['Catatan',member.catatan]]]
   ];
   const barcodeText=memberBarcodeValue(member);
-  const code39={'0':'nnnwwnwnn','1':'wnnwnnnnw','2':'nnwwnnnnw','3':'wnwwnnnnn','4':'nnnwwnnnw','5':'wnnwwnnnn','6':'nnwwwnnnn','7':'nnnwnnwnw','8':'wnnwnnwnn','9':'nnwwnnwnn','*':'nwnnwnwnn'};
   const barcode=h('svg',{class:'member-barcode',viewBox:'0 0 1 54',role:'img','aria-label':'Barcode anggota '+code});
   const quietZone=20;
   let x=quietZone;
   for(const char of '*'+barcodeText+'*'){
-    code39[char].split('').forEach((width,index)=>{
+    CODE39_PATTERNS[char].split('').forEach((width,index)=>{
       const size=width==='w'?5:2;
       if(index%2===0)barcode.append(h('rect',{x,y:2,width:size,height:50,fill:'currentColor'}));
       x+=size;
@@ -573,7 +591,7 @@ function detailCard(){
       h('div',{class:'member-id-banner'},h('span',{},'SHIKOKU FAMILY'),h('span',{class:'member-region-tag'},area)),
       h('div',{class:'member-id-main'},
         member.foto?h('img',{class:'member-id-photo',src:'/_blob/'+member.foto,alt:'Foto '+(member.nama||'anggota')}):h('div',{class:'member-id-photo member-avatar-placeholder'},(member.nama||'?').trim().slice(0,1).toUpperCase()),
-        h('div',{class:'member-id-info'},h('small',{},'KARTU ANGGOTA'),h('h1',{},(member.nama||'Nama belum diisi').toUpperCase()),h('b',{},code.toUpperCase()),h('p',{},[member.kota,member.pref].filter(Boolean).join(' · ').toUpperCase()||area.toUpperCase()),h('span',{class:'ok'+((member.status||'aktif').toLowerCase()==='aktif'?'':' off')},(member.status||'aktif').toUpperCase()))),
+        h('div',{class:'member-id-info'},h('small',{},'KARTU ANGGOTA'),h('h1',{},(member.nama||'Nama belum diisi').toUpperCase()),member.wa&&h('p',{class:'member-id-phone'},icon('phone',14),h('span',{},member.wa)),h('b',{},code.toUpperCase()),h('p',{},[member.kota,member.pref].filter(Boolean).join(' · ').toUpperCase()||area.toUpperCase()),h('span',{class:'ok'+((member.status||'aktif').toLowerCase()==='aktif'?'':' off')},(member.status||'aktif').toUpperCase()))),
       h('div',{class:'member-id-barcode'},h('b',{class:'member-barcode-label'},'BARCODE KEHADIRAN'),barcode,h('small',{},'ID anggota: '+code),h('small',{class:'member-barcode-help'},'Tunjukkan barcode ini untuk dipindai saat absensi kegiatan.'))),
     ...sections.filter(([,rows])=>rows.some(([,value])=>value)).map(([title,rows])=>h('section',{class:'member-detail-section'},h('h3',{},title.toUpperCase()),h('div',{class:'member-detail-grid'},...rows.filter(([,value])=>value).map(([label,value])=>h('div',{class:'member-detail-item'},h('small',{},label.toUpperCase()),h('span',{},memberValue(label==='WhatsApp'?'wa':label==='Nomor HP pengurus daerah'?'hp_pengurus':label==='Nomor HP orang tua'?'hp_ortu':label.toLowerCase(),value))))))),
     (member.surat||[]).length>0&&h('section',{class:'member-detail-section'},h('h3',{},'Foto Surat Sambung'),...(member.surat||[]).map((id,index)=>h('a',{class:'member-file-link',href:'/_blob/'+id,target:'_blank',rel:'noopener'},icon('attachment',16),h('span',{},'Buka lampiran '+(index+1))))),
@@ -714,12 +732,18 @@ function parseMemberPaste(text){
   for(const key of ['kelompok','desa','daerah'])if(data[key])data[key]=cleanIndonesiaPlace(data[key],key);
   const splitContact=(value,nameKey,phoneKey)=>{
     if(!value)return;
-    const phone=value.match(/\+?\d[\d\s().-]{6,}\d/);
-    if(phone){
-      data[phoneKey]=phone[0].trim();
-      const name=value.replace(phone[0],'').replace(/^[\s+,:;-]+|[\s+,:;-]+$/g,'').trim();
-      if(name)data[nameKey]=name;
-    }else data[nameKey]=value.trim();
+    const matches=[...value.matchAll(/(?:\+|00)?\d[\d\s().-]*\d/g)]
+      .filter(match=>match[0].replace(/\D/g,'').length>=7&&match[0].replace(/\D/g,'').length<=15)
+      .sort((a,b)=>b[0].replace(/\D/g,'').length-a[0].replace(/\D/g,'').length);
+    const phone=matches[0];
+    if(!phone){data[nameKey]=cleanMemberValue(value);return}
+    data[phoneKey]=phone[0].replace(/[()（）]/g,'').replace(/\s+/g,' ').replace(/^[\s+,:;-]+|[\s+,:;-]+$/g,'').trim();
+    const name=value.slice(0,phone.index)+' '+value.slice(phone.index+phone[0].length);
+    const cleanedName=cleanMemberValue(name)
+      .replace(/^[\s+,:;|\-]+|[\s+,:;|\-]+$/g,'')
+      .replace(/^(?:nama|name)\s*[:：-]\s*/i,'')
+      .trim();
+    if(cleanedName)data[nameKey]=cleanedName;
   };
   splitContact(values[normalizeImportLabel('No. Hp Pengurus Daerah + Nama')], 'pengurus','hp_pengurus');
   if(!data.pengurus&&!data.hp_pengurus)splitContact(data.pengurus_contact,'pengurus','hp_pengurus');
@@ -774,6 +798,12 @@ function autoFill(txt){
   const {data,recognized}=parseMemberPaste(txt);
   if(!recognized.length){alert('Data belum dikenali. Pastikan setiap baris memakai format "Nama Kolom : Isi".');return}
   Object.entries(data).forEach(([key,value])=>{if(value!==null&&value!==undefined&&value!=='')S.form[key]=cleanMemberValue(value).toUpperCase()});
+  const location=inferJapanLocation(data.alamat_jp,S.form.alamat_jp,data.kota,S.form.kota,data.kec_jp,S.form.kec_jp,data.kodepos,S.form.kodepos,data.pref,S.form.pref,data.wilayah,S.form.wilayah);
+  if(location){
+    if(!S.form.pref)S.form.pref=location.pref.toUpperCase();
+    if(!S.form.wilayah)S.form.wilayah=location.wilayah.toUpperCase();
+    if(!S.form.kota&&location.kota)S.form.kota=location.kota.toUpperCase();
+  }
   render();
   const invalidDate=recognized.includes('lahir')&&!data.lahir;
   alert('Data berhasil dibaca ('+recognized.length+' kolom). Periksa kembali isian sebelum disimpan.'+
@@ -832,9 +862,9 @@ function memberFormCard(){
       h('div',{},h('p',{class:'member-eyebrow'},'DATA KOMUNITAS'),h('h1',{},f.id?'Edit data anggota':'Anggota baru'),h('p',{class:'sub'},'Lengkapi profil dalam satu halaman. Kolom bertanda * wajib diisi.'))),
     S.admin&&auto(),
     box(h('div',{class:'member-section-heading'},h('div',{},h('b',{},'Profil anggota'),h('small',{},'Identitas dan keanggotaan'))),
-      fieldGrid(fld('Nama lengkap *','nama'),fld('Nama panggilan','panggilan'),fld('Nomor anggota','kode'),fld('Wilayah anggota *','wilayah',{opts:WILAYAH.map(([name])=>name),ph:'Pilih wilayah'}),fld('Jenis kelamin','kelamin',{opts:['Laki-laki','Perempuan']}),fld('Tanggal lahir','lahir',{type:'date'}),fld('Umur','umur',{type:'number'}),fld('Status anggota','status',{opts:STATUS}),fld('Peran','peran',{opts:PERAN}),fld('Status pernikahan','nikah',{opts:['Belum menikah','Menikah','Cerai']}),fld('MT','mt'),fld('Bulan kedatangan','bln',{opts:BLN}),fld('Tahun kedatangan','thn',{opts:years}),fld('Mulai tinggal di Jepang','mulai_jp',{ph:'Contoh: 22-09-2026'}))),
+      fieldGrid(fld('Nama lengkap *','nama'),fld('Nomor HP / WhatsApp','wa',{type:'tel'}),fld('Nama panggilan','panggilan'),fld('Nomor anggota','kode'),fld('Wilayah anggota *','wilayah',{opts:WILAYAH.map(([name])=>name),ph:'Pilih wilayah'}),fld('Jenis kelamin','kelamin',{opts:['Laki-laki','Perempuan']}),fld('Tanggal lahir','lahir',{type:'date'}),fld('Umur','umur',{type:'number'}),fld('Status anggota','status',{opts:STATUS}),fld('Peran','peran',{opts:PERAN}),fld('Status pernikahan','nikah',{opts:['Belum menikah','Menikah','Cerai']}),fld('MT','mt'),fld('Bulan kedatangan','bln',{opts:BLN}),fld('Tahun kedatangan','thn',{opts:years}),fld('Mulai tinggal di Jepang','mulai_jp',{ph:'Contoh: 22-09-2026'}))),
     box(h('div',{class:'member-section-heading'},h('div',{},h('b',{},'Kontak & keluarga'),h('small',{},'Nomor telepon, orang tua, dan media sosial'))),
-      fieldGrid(fld('Nomor HP / WhatsApp','wa',{type:'tel'}),fld('Email','email',{type:'email'}),fld('Nama orang tua','ortu'),fld('Nomor HP orang tua','hp_ortu',{type:'tel'}),fld('Instagram','instagram',{ph:'@username'}),fld('TikTok','tiktok',{ph:'@username'}),fld('Facebook','facebook'))),
+      fieldGrid(fld('Email','email',{type:'email'}),fld('Nama orang tua','ortu'),fld('Nomor HP orang tua','hp_ortu',{type:'tel'}),fld('Instagram','instagram',{ph:'@username'}),fld('TikTok','tiktok',{ph:'@username'}),fld('Facebook','facebook'))),
     box(h('div',{class:'member-section-heading'},h('div',{},h('b',{},'Asal di Indonesia'),h('small',{},'Wilayah, kelompok, dan alamat asal'))),
       fieldGrid(fld('Kelompok','kelompok'),fld('Desa / Kelurahan','desa'),fld('Daerah','daerah'),fld('Provinsi','prov',{opts:PROV,ph:'Pilih provinsi'}),fld('Kabupaten / Kota','kab'),fld('Kecamatan','kec'),fld('Alamat lengkap Indonesia','alamat_id',{area:1}))),
     box(h('div',{class:'member-section-heading'},h('div',{},h('b',{},'Alamat & pekerjaan di Jepang'),h('small',{},'Informasi tempat tinggal saat ini'))),
@@ -890,7 +920,7 @@ function activityCard(event){
     const processBarcode=async value=>{
       const code=String(value||'').trim().replace(/^\*|\*$/g,'').toUpperCase();
       if(!code){status.textContent='Barcode kosong.';return}
-      const matches=registeredMembers.filter(member=>memberBarcodeValue(member)===code||memberCode(member).toUpperCase()===code);
+      const matches=registeredMembers.filter(member=>memberBarcodeValue(member)===code||legacyMemberBarcodeValue(member)===code||memberCode(member).toUpperCase()===code);
       if(matches.length===0){status.textContent='Barcode tidak cocok dengan anggota terdaftar.';return}
       if(matches.length>1){status.textContent='Barcode cocok dengan beberapa anggota. Periksa nomor kartu terlebih dahulu.';return}
       const member=matches[0];
