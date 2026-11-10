@@ -1,4 +1,4 @@
-const S={members:[],events:[],topics:[],cleaningDuties:[],view:'landing',openConversation:null,messageSignature:'',admin:false,mainAdmin:false,adminMenuOpen:false,uid:null,email:'',name:'',approvalStatus:'approved',pendingUsers:[],mapError:'',storageErrors:{},storageImporting:false,memberMediaUrls:new Map(),memberMediaPending:new Set(),memberMediaFailed:new Set(),legacyMediaPaths:new Map(),memberMediaError:'',activityScannerStop:null,activityFeedback:null,db:null,supabase:null,messageChannel:null,authLoading:true,unreadMessages:0};
+const S={members:[],events:[],topics:[],cleaningDuties:[],view:'landing',openConversation:null,messageSignature:'',admin:false,mainAdmin:false,adminMenuOpen:false,uid:null,email:'',name:'',approvalStatus:'approved',pendingUsers:[],mapError:'',storageErrors:{},storageImporting:false,memberMediaUrls:new Map(),memberMediaPending:new Set(),memberMediaFailed:new Set(),legacyMediaPaths:new Map(),memberMediaError:'',activityScannerStop:null,activityFeedback:null,db:null,legacyDb:null,supabase:null,messageChannel:null,authLoading:true,unreadMessages:0};
 const $=s=>document.querySelector(s);
 try{
   localStorage.removeItem('shikoku-family:visit-consent');
@@ -255,6 +255,37 @@ function readLocalCollection(name){
     return [];
   }
 }
+function readLegacyCollection(name){
+  if(!S.legacyDb)return Promise.resolve([]);
+  return new Promise((resolve,reject)=>{
+    let settled=false,unsubscribe,timer;
+    const finish=(error,rows)=>{
+      if(settled)return;
+      settled=true;
+      clearTimeout(timer);
+      try{unsubscribe?.()}catch(stopError){console.error('Gagal menghentikan pembacaan data lama:',stopError)}
+      if(error)reject(error);
+      else resolve(rows);
+    };
+    timer=setTimeout(()=>finish(new Error('Database lama tidak merespons saat membaca '+name+'.')),10000);
+    try{
+      unsubscribe=S.legacyDb.collection(name).onSnapshot(snapshot=>{
+        try{finish(null,(snapshot?.docs||[]).map(doc=>({id:doc.id,...doc.data()})).filter(row=>row.id))}
+        catch(error){finish(error)}
+      },error=>finish(error));
+      if(settled)unsubscribe?.();
+    }catch(error){finish(error)}
+  });
+}
+async function legacyCollectionRows(name){
+  const [legacyRows,localRows]=await Promise.all([
+    readLegacyCollection(name),
+    Promise.resolve(readLocalCollection(name))
+  ]);
+  const byId=new Map(localRows.map(row=>[String(row.id),row]));
+  legacyRows.forEach(row=>byId.set(String(row.id),row));
+  return [...byId.values()];
+}
 function localDataSummary(){
   const collections=['members','events','topics','cleaning_duties','pin'];
   const rows=collections.reduce((total,name)=>total+readLocalCollection(name).length,0);
@@ -262,19 +293,15 @@ function localDataSummary(){
   try{map=JSON.parse(localStorage.getItem('shikoku-family:pengaturan')||'[]').some(row=>row?.id==='peta'&&row.mid)?1:0}catch(error){console.error('Pengaturan lokal tidak dapat dibaca:',error)}
   return {rows,map};
 }
-function localDataImportDone(){
-  try{return localStorage.getItem('shikoku-family:supabase-imported-v1')==='true'}
-  catch(error){console.error('Status impor lokal tidak dapat dibaca:',error);return false}
-}
 async function importLocalDataToSupabase(){
-  if(!S.supabase||!S.mainAdmin)throw new Error('Hanya admin utama yang dapat mengimpor data perangkat ini.');
+  if(!S.supabase||!S.admin)throw new Error('Hanya admin yang dapat mengimpor data perangkat ini.');
   if(S.storageImporting)return;
   S.storageImporting=true;render();
   let imported=0;
   try{
     const prepared=[];
     for(const name of APP_DATA_COLLECTIONS){
-      let rows=readLocalCollection(name);
+      let rows=await legacyCollectionRows(name);
       if(name==='members'){
         rows=await Promise.all(rows.map(async row=>{
           const {changed,fields}=await migrateMemberMediaFields(row);
@@ -283,6 +310,9 @@ async function importLocalDataToSupabase(){
       }
       prepared.push({name,rows});
     }
+    const rowCount=prepared.reduce((total,item)=>total+item.rows.length,0);
+    const localSettings=(await legacyCollectionRows('pengaturan')).find(row=>row.id==='peta'&&row.mid);
+    if(!rowCount&&!localSettings)throw new Error('Tidak ditemukan data di database lama maupun penyimpanan browser perangkat ini. Pastikan aplikasi dibuka di perangkat dan browser yang berisi data lama.');
     for(const {name,rows} of prepared){
       for(let offset=0;offset<rows.length;offset+=100){
         const batch=rows.slice(offset,offset+100).map(row=>{
@@ -294,7 +324,6 @@ async function importLocalDataToSupabase(){
         imported+=batch.length;
       }
     }
-    const localSettings=readLocalCollection('pengaturan').find(row=>row.id==='peta'&&row.mid);
     if(localSettings){
       const {error}=await S.supabase.from('map_settings').upsert(
         {id:'main',map_mid:localSettings.mid,updated_at:new Date().toISOString()},
@@ -302,11 +331,10 @@ async function importLocalDataToSupabase(){
       );
       if(error)throw error;
     }
-    localStorage.setItem('shikoku-family:supabase-imported-v1','true');
     S.storageImporting=false;
     await loadMapSettings();
     render();
-    alert('Impor data perangkat selesai ('+imported+' data). Data lokal tetap tersimpan; data yang ID-nya sudah ada di Supabase tidak ditimpa.');
+    alert('Impor data perangkat selesai ('+imported+' data ditemukan). Data lokal tetap tersimpan; data yang ID-nya sudah ada di Supabase tidak ditimpa. Muat ulang aplikasi di perangkat lain setelah memastikan akun sudah disetujui.');
   }catch(error){
     S.storageImporting=false;
     console.error('Impor data lokal ke Supabase gagal:',error);
@@ -1505,6 +1533,16 @@ function render(){
     document.body.classList.remove('open');
     return;
   }
+  if(S.supabase&&S.uid&&S.approvalStatus!=='approved'&&!S.admin){
+    $('#dr').replaceChildren();
+    const status=S.approvalStatus==='rejected'?'Akun ini ditolak admin.':'Akun ini belum disetujui admin.';
+    $('#app').replaceChildren(h('section',{class:'card auth-card'},h('b',{},status),h('p',{class:'sub'},'Data anggota, kegiatan, dan wilayah hanya dimuat setelah akun disetujui. Hubungi admin utama untuk memeriksa status akun.'),h('button',{class:'btn',onclick:async()=>{await S.supabase.auth.signOut()}},'Keluar')));
+    $('#tb').style.display='none';
+    $('#pet').style.display='none';
+    $('#sw').style.display='none';
+    document.body.classList.remove('open');
+    return;
+  }
   renderDrawer();
   $('#sw').style.display=S.mainAdmin?'flex':'none';
   const approvalBadge=$('#ab');
@@ -1520,12 +1558,10 @@ function render(){
   if(S.memberMediaError)content.push(h('p',{class:'warn storage-warning'},'Media anggota: '+S.memberMediaError));
   const legacyMediaCount=legacyMemberMediaCount();
   if(S.admin&&S.supabase&&legacyMediaCount)content.push(h('section',{class:'card storage-import'},h('div',{},h('b',{},'Pindahkan media anggota lama'),h('small',{},legacyMediaCount+' foto atau lampiran masih tersimpan di lokasi lama. File akan dipindahkan ke Supabase privat.')) ,h('button',{class:'btn s',onclick:migrateExistingMemberMedia},'Pindahkan media')));
-  if(S.mainAdmin&&S.supabase&&!S.storageImporting&&!localDataImportDone()){
+  if(S.admin&&S.supabase&&!S.storageImporting){
     const summary=localDataSummary();
-    if(summary.rows||summary.map){
-      const importButton=h('button',{class:'btn s',onclick:importLocalDataToSupabase},'Impor ke Supabase');
-      content.push(h('section',{class:'card storage-import'},h('div',{},h('b',{},'Data lama di perangkat ini'),h('small',{},summary.rows+' data lokal'+(summary.map?' dan pengaturan peta':'')+'. Impor mempertahankan ID dan tidak menimpa data dengan ID yang sudah ada.')) ,importButton));
-    }
+    const importButton=h('button',{class:'btn s',onclick:importLocalDataToSupabase},'Coba impor ulang');
+    content.push(h('section',{class:'card storage-import'},h('div',{},h('b',{},'Impor / sinkronkan data lama'),h('small',{},summary.rows+' data terdeteksi di penyimpanan browser. Tombol ini juga memeriksa database lama aplikasi; ID yang sudah ada tidak ditimpa. Jalankan dari perangkat yang berisi data.')) ,importButton));
   }
   if(S.storageImporting)content.push(h('p',{class:'warn'},'Sedang mengimpor data lokal ke database bersama...'));
   content.push(...[].concat(V[S.view]()).filter(Boolean));
@@ -1569,6 +1605,7 @@ render();
 (async()=>{
   try{S.uid=localStorage.getItem('uid');if(!S.uid){S.uid='u'+Math.random().toString(36).slice(2)+Date.now().toString(36);localStorage.setItem('uid',S.uid)}}catch(e){S.uid='u'+Math.random().toString(36).slice(2)}
   try{S.assets=await claude.use('assets')}catch(e){}
+  try{S.legacyDb=await claude.use('db')}catch(error){console.warn('Database lama aplikasi tidak tersedia untuk impor:',error)}
   if(window.supabase&&window.SUPABASE_CONFIG?.url&&window.SUPABASE_CONFIG?.anonKey){
     S.supabase=window.supabase.createClient(window.SUPABASE_CONFIG.url,window.SUPABASE_CONFIG.anonKey);
     S.db=createSupabaseDb(S.supabase);
@@ -1599,7 +1636,7 @@ render();
     S.supabase.auth.onAuthStateChange((_event,next)=>{applySession(next)});
     setInterval(()=>{if(S.uid)loadMessages();if(S.mainAdmin)loadPendingUsers()},30000);
   }else{
-    try{S.db=await claude.use('db')}catch(error){console.warn('Layanan database terintegrasi tidak tersedia; menggunakan penyimpanan lokal perangkat:',error)}
+    S.db=S.legacyDb;
     if(!S.db)S.db=createLocalDb();
     S.authLoading=false;
     startDataSubscriptions();
