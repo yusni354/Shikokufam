@@ -1,7 +1,7 @@
 const S={members:[],events:[],topics:[],cleaningDuties:[],view:'landing',openConversation:null,messageSignature:'',admin:false,mainAdmin:false,uid:null,email:'',name:'',approvalStatus:'approved',pendingUsers:[],mapError:'',db:null,supabase:null,messageChannel:null,authLoading:true,unreadMessages:0};
 const $=s=>document.querySelector(s);
 function h(t,p,...k){const e=document.createElement(t);for(const a in p||{}){if(a==='onclick')e.onclick=p[a];else if(a==='class')e.className=p[a];else e.setAttribute(a,p[a])}k.flat().forEach(c=>{if(c!=null&&c!==false)e.append(c)});return e}
-const ALL=[['landing','🗺️ Beranda'],['dash','🏠 Dashboard'],['members','👥 Data Anggota'],['absen','📝 Absensi'],['piket','🧹 Jadwal Piket'],['forum','💬 Forum'],['import','📥 Import Database',1],['pesan','📨 Pesan Masuk']];
+const ALL=[['landing','🏠 Home'],['dash','📊 Ringkasan'],['members','👥 Data Anggota'],['absen','📝 Absensi'],['piket','🧹 Jadwal Piket'],['peta','🗺️ Peta & Wilayah'],['forum','💬 Forum'],['import','📥 Import Database',1],['pesan','📨 Pesan Masuk']];
 function go(v){S.view=v;S.form=S.detail=S.dutyForm=null;if(v==='pesan'&&S.admin)S.openConversation=null;document.body.classList.remove('open');render();if(v==='pesan'&&!S.admin)markMessagesRead()}
 $('#mn').onclick=()=>document.body.classList.add('open');
 $('#ov').onclick=()=>document.body.classList.remove('open');
@@ -292,43 +292,32 @@ function replyBox(messageId){
 }
 function guard(){return S.db?null:h('p',{class:'warn'},'Penyimpanan belum tersedia.')}
 
-function vLanding(){
-  const memberCount=S.members.length, eventCount=S.events.length;
-  return [h('div',{class:'landing'},
-    h('section',{class:'hero'},
-      h('p',{style:'font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-bottom:10px'},'Komunitas Indonesia di Shikoku'),
-      h('h1',{},'Tumbuh bersama, jauh dari rumah.'),
-      h('p',{},'Shikoku Family menjadi ruang untuk saling terhubung, berbagi informasi, dan membangun kehidupan yang lebih hangat di Jepang.'),
-      h('button',{class:'btn',onclick:askForm},'Gabung Komunitas →'),
-      h('button',{class:'btn s',onclick:()=>go('dash')},'Jelajahi Komunitas')
+function vHome(){
+  const today=new Date(),todayKey=[today.getFullYear(),String(today.getMonth()+1).padStart(2,'0'),String(today.getDate()).padStart(2,'0')].join('-');
+  const upcomingDuties=[...S.cleaningDuties].filter(duty=>duty.tanggal&&duty.tanggal>=todayKey).sort((a,b)=>a.tanggal.localeCompare(b.tanggal)).slice(0,2);
+  const recentEvents=[...S.events].sort((a,b)=>(b.at||0)-(a.at||0)).slice(0,2);
+  const shortcuts=[['🧹','Jadwal Piket','piket'],['📝','Absensi','absen'],['💬','Forum','forum'],['🗺️','Peta','peta']];
+  const dutyRows=upcomingDuties.flatMap(duty=>{
+    const assignments=Array.isArray(duty.assignments)&&duty.assignments.length?duty.assignments:[{nama:duty.nama||'',tugas:duty.tugas||''}];
+    return [h('div',{class:'home-duty'},
+      h('div',{class:'home-duty-date'},h('b',{},String(new Date(duty.tanggal+'T00:00:00').getDate()).padStart(2,'0')),h('small',{},new Date(duty.tanggal+'T00:00:00').toLocaleDateString('id-ID',{month:'short'}))),
+      h('div',{class:'home-duty-info'},...assignments.map(assignment=>h('p',{},h('b',{},assignment.nama),h('span',{},assignment.tugas))))
+    )];
+  });
+  return [
+    h('section',{class:'home-welcome'},
+      h('span',{class:'home-welcome-icon'},'👋'),
+      h('div',{},h('small',{},today.toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'})),h('h1',{},'Selamat datang'+(S.name?', '+S.name.split(' ')[0]:'')+'!'),h('p',{},'Senang bisa berkumpul bersama keluarga Shikoku.'))
     ),
-    h('div',{class:'stats'},...[['Anggota',memberCount],['Kegiatan',eventCount],['Wilayah','Shikoku']].map(x=>h('div',{},h('small',{},x[0]),h('b',{style:'font-size:18px'},String(x[1]))))),
-    h('h2',{class:'section-title'},'Mengapa bergabung?'),
-    h('div',{class:'benefits'},
-      h('div',{class:'benefit'},h('strong',{},'🤝'),h('b',{},'Temukan koneksi'),h('small',{},'Kenali teman dan keluarga Indonesia di berbagai wilayah Shikoku.')),
-      h('div',{class:'benefit'},h('strong',{},'💡'),h('b',{},'Berbagi informasi'),h('small',{},'Dapatkan informasi praktis tentang kehidupan, kerja, dan adaptasi di Jepang.')),
-      h('div',{class:'benefit'},h('strong',{},'🎉'),h('b',{},'Ikuti kegiatan'),h('small',{},'Bergabung dalam kegiatan komunitas dan ciptakan pengalaman baru bersama.'))
-    ),
-    h('h2',{class:'section-title'},'Kegiatan komunitas'),
-    box(h('div',{class:'event-list'},
-      eventCount?S.events.slice(-3).reverse().map(e=>h('div',{class:'event-item'},
-        h('div',{class:'event-date'},h('small',{},'EVENT'),e.judul?e.judul.slice(0,3).toUpperCase():'—'),
-        h('div',{},h('b',{},e.judul),h('small',{class:'warn'},(e.hadir||[]).length+' anggota akan hadir'))
-      )):h('p',{class:'warn',style:'margin:0'},'Belum ada kegiatan. Nantikan agenda komunitas berikutnya.'),
-      eventCount&&h('button',{class:'btn s',style:'margin-top:12px',onclick:()=>go('absen')},'Lihat semua kegiatan')
-    )),
-    h('h2',{class:'section-title'},'Pertanyaan umum'),
-    box(h('details',{class:'faq'},h('summary',{},'Siapa yang bisa bergabung?'),h('p',{},'Siapa pun yang memiliki hubungan dengan Indonesia dan tinggal, pernah tinggal, atau ingin mengenal wilayah Shikoku dipersilakan bergabung.')),
-      h('details',{class:'faq'},h('summary',{},'Apa saja kegiatan komunitas?'),h('p',{},'Kegiatan dapat berupa silaturahmi, berbagi informasi, dukungan pendatang baru, dan agenda sosial lainnya.')),
-      h('details',{class:'faq'},h('summary',{},'Bagaimana cara menghubungi admin?'),h('p',{},'Gunakan maskot Tanya Admin di kanan bawah untuk mengirim pesan langsung kepada pengurus komunitas.'))
-    ),
-    box(h('div',{style:'text-align:center;padding:8px 0'},
-      h('h2',{style:'margin:4px 0 8px'},'Mari terhubung bersama'),
-      h('p',{class:'sub',style:'margin-bottom:14px'},'Ceritakan sedikit tentang Anda. Admin akan membantu mengenalkan komunitas dan kegiatan yang sesuai.'),
-      h('button',{class:'btn',onclick:askForm},'Kirim pesan ke Admin')
-    )),
-    h('div',{class:'landing-footer'},'© '+new Date().getFullYear()+' Shikoku Family · Komunitas Indonesia di Shikoku')
-  )];
+    h('div',{class:'stats home-stats'},...[['Anggota',S.members.length],['Kegiatan',S.events.length],['Wilayah',Object.keys(wilayah()).length]].map(item=>h('div',{},h('small',{},item[0]),h('b',{},String(item[1]))))),
+    h('div',{class:'home-section-heading'},h('h2',{},'Akses cepat'),h('small',{},'Yang sering dibuka')),
+    h('div',{class:'home-shortcuts'},...shortcuts.map(([icon,label,view])=>h('button',{class:'home-shortcut',onclick:()=>go(view)},h('span',{},icon),h('b',{},label),h('span',{class:'home-shortcut-arrow'},'›')))),
+    h('div',{class:'home-section-heading'},h('h2',{},'Jadwal piket terdekat'),h('button',{class:'btn s',onclick:()=>go('piket')},'Lihat semua')),
+    upcomingDuties.length?h('div',{class:'home-agenda'},...dutyRows):h('div',{class:'home-empty'},h('span',{},'🧹'),h('p',{},'Belum ada jadwal piket mendatang.')),
+    h('div',{class:'home-section-heading'},h('h2',{},'Kegiatan komunitas'),h('button',{class:'btn s',onclick:()=>go('absen')},'Buka absensi')),
+    recentEvents.length?h('div',{class:'home-events'},...recentEvents.map(event=>h('div',{class:'home-event'},h('span',{},'🎉'),h('div',{},h('b',{},event.judul||'Kegiatan komunitas'),h('small',{},(event.hadir||[]).length+' anggota akan hadir'))))):h('div',{class:'home-empty'},h('span',{},'🎉'),h('p',{},'Belum ada kegiatan komunitas.')),
+    h('button',{class:'home-admin-link',onclick:askForm},'💬 Butuh bantuan? Hubungi Admin')
+  ];
 }
 function vDash(){
   const c=(e,t,d,n,v)=>h('button',{class:'card',onclick:()=>go(v)},
@@ -637,7 +626,7 @@ function vImport(){
       ta.value='';alert(rows.length+' anggota diimpor');go('members')}},'Import'))];
 }
 
-const V={landing:vPeta,dash:vDash,members:vMembers,absen:vAbsen,piket:vPiket,forum:vForum,import:vImport,'map-settings':vPetaSettings,approvals:vApprovals,pesan:vPesan};
+const V={landing:vHome,dash:vDash,members:vMembers,absen:vAbsen,piket:vPiket,peta:vPeta,forum:vForum,import:vImport,'map-settings':vPetaSettings,approvals:vApprovals,pesan:vPesan};
 function render(){
   if(S.authLoading){
     $('#dr').replaceChildren();
@@ -673,7 +662,7 @@ function render(){
   if(!V[S.view]||['map-settings','approvals'].includes(S.view)&&!S.mainAdmin||current?.[2]&&!S.admin)S.view='landing';
   $('#app').replaceChildren(...[].concat(V[S.view]()).filter(Boolean));
   const tb=$('#tb');tb.style.display=S.form?'none':'flex';$('#pet').style.display=S.form?'none':'block';
-  tb.replaceChildren(...[['landing','🗺️','Beranda'],['dash','🏠','Ringkasan'],['members','👥','Anggota'],['absen','📝','Absensi'],['piket','🧹','Piket'],['forum','💬','Forum']].map(x=>h('a',{class:S.view===x[0]?'on':'',onclick:()=>go(x[0])},h('span',{},x[1]),x[2])));
+  tb.replaceChildren(...[['landing','🏠','Home'],['dash','📊','Ringkasan'],['members','👥','Anggota'],['absen','📝','Absensi'],['piket','🧹','Piket'],['forum','💬','Forum']].map(x=>h('a',{class:S.view===x[0]?'on':'',onclick:()=>go(x[0])},h('span',{},x[1]),x[2])));
 }
 function sub(name,key){
   S.db.collection(name).onSnapshot(s=>{
