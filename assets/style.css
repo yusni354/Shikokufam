@@ -26,6 +26,12 @@ main{padding:16px 16px 110px;max-width:720px;margin:auto}
 h1{font-size:26px;margin:8px 0 2px}
 .sub{color:var(--mut);margin:0 0 16px}
 .warn{color:var(--mut);font-size:14px}
+.storage-warning{padding:12px 14px;border:1px solid #e6b96b;border-radius:14px;background:#fff7e6;color:#805b13;line-height:1.5}
+.storage-import{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.storage-import>div{min-width:0}
+.storage-import b,.storage-import small{display:block}
+.storage-import small{margin-top:4px;color:var(--mut);line-height:1.4}
+.storage-import .btn{flex:none}
 .card{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:16px;margin-bottom:12px;display:flex;align-items:center;gap:14px;width:100%;text-align:left;color:var(--ink);box-shadow:0 4px 16px rgba(47,134,184,.1)}
 .auth-card{max-width:480px;margin:20px auto 0;padding:24px;display:block;text-align:left;box-shadow:0 12px 30px rgba(47,134,184,.14)}
 .auth-card> b{display:flex;align-items:center;gap:9px;font-size:21px;margin-bottom:8px}

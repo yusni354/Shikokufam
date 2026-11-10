@@ -1,4 +1,4 @@
-const S={members:[],events:[],topics:[],cleaningDuties:[],view:'landing',openConversation:null,messageSignature:'',admin:false,mainAdmin:false,adminMenuOpen:false,uid:null,email:'',name:'',approvalStatus:'approved',pendingUsers:[],mapError:'',activityScannerStop:null,activityFeedback:null,db:null,supabase:null,messageChannel:null,authLoading:true,unreadMessages:0};
+const S={members:[],events:[],topics:[],cleaningDuties:[],view:'landing',openConversation:null,messageSignature:'',admin:false,mainAdmin:false,adminMenuOpen:false,uid:null,email:'',name:'',approvalStatus:'approved',pendingUsers:[],mapError:'',storageErrors:{},storageImporting:false,memberMediaUrls:new Map(),memberMediaPending:new Set(),memberMediaFailed:new Set(),legacyMediaPaths:new Map(),memberMediaError:'',activityScannerStop:null,activityFeedback:null,db:null,supabase:null,messageChannel:null,authLoading:true,unreadMessages:0};
 const $=s=>document.querySelector(s);
 try{
   localStorage.removeItem('shikoku-family:visit-consent');
@@ -123,6 +123,218 @@ function createLocalDb(){
     })
   });
   return {collection};
+}
+const APP_DATA_COLLECTIONS=new Set(['members','events','topics','cleaning_duties','pin']);
+function createSupabaseDb(client){
+  const collection=name=>{
+    if(!APP_DATA_COLLECTIONS.has(name))throw new Error('Koleksi aplikasi tidak dikenal: '+name);
+    return {
+      onSnapshot(callback,onError){
+        let active=true,request=0;
+        const reportError=error=>{if(active&&typeof onError==='function')onError(error)};
+        const refresh=async()=>{
+          const current=++request;
+          try{
+            const {data,error}=await client.from('app_data').select('id,data').eq('collection',name);
+            if(!active||current!==request)return;
+            if(error){reportError(error);return}
+            callback({docs:(data||[]).map(row=>({id:row.id,data:()=>({...row.data})}))});
+          }catch(error){reportError(error)}
+        };
+        const channel=client.channel('app-data-'+name+'-'+Math.random().toString(36).slice(2));
+        channel.on('postgres_changes',{event:'*',schema:'public',table:'app_data',filter:'collection=eq.'+name},()=>{void refresh()});
+        channel.subscribe(status=>{
+          if(status==='SUBSCRIBED')void refresh();
+          else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT')reportError(new Error('Koneksi realtime Supabase gagal ('+status+').'));
+        });
+        return ()=>{active=false;request++;void client.removeChannel(channel)};
+      },
+      add:async data=>{
+        const id=crypto.randomUUID();
+        const {error}=await client.from('app_data').insert({collection:name,id,data});
+        if(error)throw error;
+        return {id};
+      },
+      doc:id=>({
+        set:async data=>{
+          const {error}=await client.from('app_data').upsert({collection:name,id:String(id),data,updated_at:new Date().toISOString()},{onConflict:'collection,id'});
+          if(error)throw error;
+        },
+        update:async data=>{
+          const {error}=await client.rpc('merge_app_data',{p_collection:name,p_id:String(id),p_patch:data});
+          if(error)throw error;
+        },
+        delete:async()=>{
+          const {error}=await client.from('app_data').delete().eq('collection',name).eq('id',String(id));
+          if(error)throw error;
+        }
+      })
+    };
+  };
+  return {collection};
+}
+function isPrivateMemberMedia(path){return typeof path==='string'&&path.startsWith('members/')}
+function memberMediaAttributes(path,attribute){
+  if(S.supabase&&isPrivateMemberMedia(path)){
+    const cached=S.memberMediaUrls.get(path);
+    return {'data-member-media':path,...(cached&&cached.expiresAt>Date.now()+30000?{[attribute]:cached.url}:{})};
+  }
+  return {[attribute]:'/_blob/'+path};
+}
+function hydrateMemberMedia(){
+  if(!S.supabase)return;
+  document.querySelectorAll('#app [data-member-media]').forEach(element=>{
+    const path=element.getAttribute('data-member-media');
+    const cached=S.memberMediaUrls.get(path);
+    if(cached&&cached.expiresAt>Date.now()+30000){
+      element.setAttribute(element.tagName==='A'?'href':'src',cached.url);
+      return;
+    }
+    if(S.memberMediaPending.has(path)||S.memberMediaFailed.has(path))return;
+    S.memberMediaPending.add(path);
+    S.supabase.storage.from('member-files').createSignedUrl(path,3600).then(({data,error})=>{
+      if(error)throw error;
+      if(!data?.signedUrl)throw new Error('URL privat tidak tersedia');
+      S.memberMediaUrls.set(path,{url:data.signedUrl,expiresAt:Date.now()+3600000});
+      document.querySelectorAll('#app [data-member-media]').forEach(current=>{
+        if(current.getAttribute('data-member-media')===path)current.setAttribute(current.tagName==='A'?'href':'src',data.signedUrl);
+      });
+    }).catch(error=>{
+      S.memberMediaFailed.add(path);
+      S.memberMediaError=error.message||'Gagal membuka media anggota';
+      console.error('Media privat anggota gagal dimuat:',error);
+      render();
+    }).finally(()=>S.memberMediaPending.delete(path));
+  });
+}
+async function uploadPrivateMemberMedia(file){
+  if(!S.supabase||!S.uid)throw new Error('Login Supabase diperlukan untuk mengunggah media anggota.');
+  const safeName=(file.name||'lampiran').replace(/[^a-zA-Z0-9._-]/g,'-');
+  const path='members/'+S.uid+'/'+crypto.randomUUID()+'-'+safeName;
+  const {error}=await S.supabase.storage.from('member-files').upload(path,file,{contentType:file.type||'application/octet-stream'});
+  if(error)throw error;
+  return path;
+}
+async function migrateLegacyMemberMedia(reference){
+  if(!reference||isPrivateMemberMedia(reference))return reference;
+  if(S.legacyMediaPaths.has(reference))return S.legacyMediaPaths.get(reference);
+  const response=await fetch('/_blob/'+encodeURIComponent(reference));
+  if(!response.ok)throw new Error('File lama '+reference+' tidak dapat dibaca dari perangkat ini.');
+  const blob=await response.blob();
+  const type=blob.type||'application/octet-stream';
+  if(!type.startsWith('image/')&&type!=='application/pdf')throw new Error('Format file lama '+reference+' tidak didukung untuk migrasi.');
+  const file=new File([blob],reference,{type});
+  const path=await uploadPrivateMemberMedia(file);
+  S.legacyMediaPaths.set(reference,path);
+  return path;
+}
+async function migrateMemberMediaFields(member){
+  let changed=false;
+  const next={};
+  if(member.foto&&!isPrivateMemberMedia(member.foto)){
+    next.foto=await migrateLegacyMemberMedia(member.foto);
+    changed=true;
+  }
+  if(Array.isArray(member.surat)){
+    const surat=[];
+    for(const file of member.surat){
+      const path=await migrateLegacyMemberMedia(file);
+      surat.push(path);
+      if(path!==file)changed=true;
+    }
+    if(changed)next.surat=surat;
+  }
+  return {changed,fields:next};
+}
+function readLocalCollection(name){
+  try{
+    const rows=JSON.parse(localStorage.getItem('shikoku-family:'+name)||'[]');
+    return Array.isArray(rows)?rows.filter(row=>row&&row.id&&typeof row==='object'):[];
+  }catch(error){
+    console.error('Data lokal '+name+' tidak dapat dibaca:',error);
+    return [];
+  }
+}
+function localDataSummary(){
+  const collections=['members','events','topics','cleaning_duties','pin'];
+  const rows=collections.reduce((total,name)=>total+readLocalCollection(name).length,0);
+  let map=0;
+  try{map=JSON.parse(localStorage.getItem('shikoku-family:pengaturan')||'[]').some(row=>row?.id==='peta'&&row.mid)?1:0}catch(error){console.error('Pengaturan lokal tidak dapat dibaca:',error)}
+  return {rows,map};
+}
+function localDataImportDone(){
+  try{return localStorage.getItem('shikoku-family:supabase-imported-v1')==='true'}
+  catch(error){console.error('Status impor lokal tidak dapat dibaca:',error);return false}
+}
+async function importLocalDataToSupabase(){
+  if(!S.supabase||!S.mainAdmin)throw new Error('Hanya admin utama yang dapat mengimpor data perangkat ini.');
+  if(S.storageImporting)return;
+  S.storageImporting=true;render();
+  let imported=0;
+  try{
+    const prepared=[];
+    for(const name of APP_DATA_COLLECTIONS){
+      let rows=readLocalCollection(name);
+      if(name==='members'){
+        rows=await Promise.all(rows.map(async row=>{
+          const {changed,fields}=await migrateMemberMediaFields(row);
+          return changed?{...row,...fields}:row;
+        }));
+      }
+      prepared.push({name,rows});
+    }
+    for(const {name,rows} of prepared){
+      for(let offset=0;offset<rows.length;offset+=100){
+        const batch=rows.slice(offset,offset+100).map(row=>{
+          const {id,...data}=row;
+          return {collection:name,id:String(id),data};
+        });
+        const {error}=await S.supabase.from('app_data').upsert(batch,{onConflict:'collection,id',ignoreDuplicates:true});
+        if(error)throw error;
+        imported+=batch.length;
+      }
+    }
+    const localSettings=readLocalCollection('pengaturan').find(row=>row.id==='peta'&&row.mid);
+    if(localSettings){
+      const {error}=await S.supabase.from('map_settings').upsert(
+        {id:'main',map_mid:localSettings.mid,updated_at:new Date().toISOString()},
+        {onConflict:'id',ignoreDuplicates:true}
+      );
+      if(error)throw error;
+    }
+    localStorage.setItem('shikoku-family:supabase-imported-v1','true');
+    S.storageImporting=false;
+    await loadMapSettings();
+    render();
+    alert('Impor data perangkat selesai ('+imported+' data). Data lokal tetap tersimpan; data yang ID-nya sudah ada di Supabase tidak ditimpa.');
+  }catch(error){
+    S.storageImporting=false;
+    console.error('Impor data lokal ke Supabase gagal:',error);
+    render();
+    alert('Impor data gagal: '+(error.message||'periksa koneksi, kebijakan akses, dan apakah skema Supabase terbaru sudah dijalankan.'));
+  }
+}
+function legacyMemberMediaCount(){
+  return S.members.reduce((count,member)=>count+(member.foto&&!isPrivateMemberMedia(member.foto)?1:0)+(Array.isArray(member.surat)?member.surat.filter(file=>file&&!isPrivateMemberMedia(file)).length:0),0);
+}
+async function migrateExistingMemberMedia(){
+  if(!S.admin||!S.supabase)throw new Error('Hanya admin yang dapat memindahkan media anggota.');
+  let migrated=0;
+  try{
+    for(const member of S.members){
+      const {changed,fields}=await migrateMemberMediaFields(member);
+      if(!changed)continue;
+      await S.db.collection('members').doc(member.id).update(fields);
+      migrated++;
+    }
+    S.memberMediaError='';
+    alert('Pemindahan media selesai ('+migrated+' profil anggota).');
+  }catch(error){
+    S.memberMediaError=error.message||'Pemindahan media anggota gagal';
+    console.error('Pemindahan media lama gagal:',error);
+    alert('Pemindahan media gagal: '+S.memberMediaError+' Pastikan file lama dapat dibuka dari perangkat ini.');
+  }
+  render();
 }
 function messageFromRow(row){return {id:row.id,nama:row.name,teks:row.message,attachments:row.attachments||[],at:new Date(row.created_at).getTime(),status:row.status,sender_id:row.sender_id}}
 function replyFromRow(row){return {id:row.id,message_id:row.message_id,by:row.sender_id,teks:row.message,attachments:row.attachments||[],at:new Date(row.created_at).getTime()}}
@@ -439,7 +651,7 @@ function vHome(){
       members.length
         ?h('div',{class:'home-region-members'},...members.map(member=>
           h('button',{class:'home-region-member',onclick:()=>openMember(member,'landing')},
-            member.foto?h('img',{src:'/_blob/'+member.foto,alt:''}):h('span',{class:'member-avatar-placeholder'},(member.nama||'?').trim().slice(0,1).toUpperCase()),
+            member.foto?h('img',{...memberMediaAttributes(member.foto,'src'),alt:''}):h('span',{class:'member-avatar-placeholder'},(member.nama||'?').trim().slice(0,1).toUpperCase()),
             h('span',{},member.nama||'Nama belum diisi'),h('span',{class:'home-region-arrow'},'›'))))
         :h('p',{class:'home-region-empty'},'Belum ada anggota di wilayah ini.')
     );
@@ -509,7 +721,7 @@ function vMembers(){
     list.replaceChildren(...(rows.length?rows.map(member=>{
       const code=memberCode(member),area=memberRegion(member),location=[member.kota,member.pref].filter(Boolean).join(', ');
       return h('article',{class:'member-card',style:'--region-color:'+regionColor(area)},
-        member.foto?h('img',{class:'member-avatar',src:'/_blob/'+member.foto,alt:'Foto '+(member.nama||'anggota')}):h('div',{class:'member-avatar member-avatar-placeholder'},(member.nama||'?').trim().slice(0,1).toUpperCase()),
+        member.foto?h('img',{class:'member-avatar',...memberMediaAttributes(member.foto,'src'),alt:'Foto '+(member.nama||'anggota')}):h('div',{class:'member-avatar member-avatar-placeholder'},(member.nama||'?').trim().slice(0,1).toUpperCase()),
         h('div',{class:'member-card-info'},h('div',{class:'member-name-line'},h('b',{},(member.nama||'Nama belum diisi').toUpperCase()),h('span',{class:'member-region-tag'},area.toUpperCase()),h('span',{class:'ok'+((member.status||'aktif').toLowerCase()==='aktif'?'':' off')},(member.status||'aktif').toUpperCase())),
           h('small',{},[code,location].filter(Boolean).join(' · ').toUpperCase()),
           h('small',{},member.wa?memberValue('wa',member.wa):member.email||'Kontak belum diisi')),
@@ -590,11 +802,11 @@ function detailCard(){
     h('article',{class:'member-id-card'},
       h('div',{class:'member-id-banner'},h('span',{},'SHIKOKU FAMILY'),h('span',{class:'member-region-tag'},area)),
       h('div',{class:'member-id-main'},
-        member.foto?h('img',{class:'member-id-photo',src:'/_blob/'+member.foto,alt:'Foto '+(member.nama||'anggota')}):h('div',{class:'member-id-photo member-avatar-placeholder'},(member.nama||'?').trim().slice(0,1).toUpperCase()),
+        member.foto?h('img',{class:'member-id-photo',...memberMediaAttributes(member.foto,'src'),alt:'Foto '+(member.nama||'anggota')}):h('div',{class:'member-id-photo member-avatar-placeholder'},(member.nama||'?').trim().slice(0,1).toUpperCase()),
         h('div',{class:'member-id-info'},h('small',{},'KARTU ANGGOTA'),h('h1',{},(member.nama||'Nama belum diisi').toUpperCase()),member.wa&&h('p',{class:'member-id-phone'},icon('phone',14),h('span',{},member.wa)),h('b',{},code.toUpperCase()),h('p',{},[member.kota,member.pref].filter(Boolean).join(' · ').toUpperCase()||area.toUpperCase()),h('span',{class:'ok'+((member.status||'aktif').toLowerCase()==='aktif'?'':' off')},(member.status||'aktif').toUpperCase()))),
       h('div',{class:'member-id-barcode'},h('b',{class:'member-barcode-label'},'BARCODE KEHADIRAN'),barcode,h('small',{},'ID anggota: '+code),h('small',{class:'member-barcode-help'},'Tunjukkan barcode ini untuk dipindai saat absensi kegiatan.'))),
     ...sections.filter(([,rows])=>rows.some(([,value])=>value)).map(([title,rows])=>h('section',{class:'member-detail-section'},h('h3',{},title.toUpperCase()),h('div',{class:'member-detail-grid'},...rows.filter(([,value])=>value).map(([label,value])=>h('div',{class:'member-detail-item'},h('small',{},label.toUpperCase()),h('span',{},memberValue(label==='Nomor HP / WhatsApp'?'wa':label==='Nomor HP pengurus daerah'?'hp_pengurus':label==='Nomor HP orang tua'?'hp_ortu':label.toLowerCase(),value))))))),
-    (member.surat||[]).length>0&&h('section',{class:'member-detail-section'},h('h3',{},'Foto Surat Sambung'),...(member.surat||[]).map((id,index)=>h('a',{class:'member-file-link',href:'/_blob/'+id,target:'_blank',rel:'noopener'},icon('attachment',16),h('span',{},'Buka lampiran '+(index+1))))),
+    (member.surat||[]).length>0&&h('section',{class:'member-detail-section'},h('h3',{},'Foto Surat Sambung'),...(member.surat||[]).map((id,index)=>h('a',{class:'member-file-link',...memberMediaAttributes(id,'href'),target:'_blank',rel:'noopener'},icon('attachment',16),h('span',{},'Buka lampiran '+(index+1))))),
     S.admin&&h('div',{class:'member-detail-actions'},h('button',{class:'btn',onclick:()=>{S.form={...member};S.detail=null;S.detailOrigin=null;render()}},icon('edit',16),h('span',{},'Edit data anggota')))
   );
 }
@@ -811,8 +1023,13 @@ function autoFill(txt){
     ((!S.form.pref||!S.form.wilayah)?' Prefektur/wilayah belum dapat dikenali dari alamat. Pilih wilayah di Shikoku atau Okayama dan lengkapi alamat Jepang.':''));
 }
 async function up(file,key,multi){
-  if(!file)return;if(!S.assets){alert('Unggah foto hanya tersedia untuk admin');return}
-  try{const r=await S.assets.upload(file);S.form[key]=multi?[...(S.form[key]||[]),r.id]:r.id;render()}catch(e){console.error(e);alert('Gagal mengunggah file: '+(e.message||'periksa koneksi dan ukuran file'))}}
+  if(!file)return;
+  if(!S.supabase&&!S.assets){alert('Unggah file hanya tersedia untuk admin dengan layanan penyimpanan aktif');return}
+  try{
+    const id=S.supabase?await uploadPrivateMemberMedia(file):(await S.assets.upload(file)).id;
+    S.form[key]=multi?[...(S.form[key]||[]),id]:id;
+    render();
+  }catch(e){console.error(e);alert('Gagal mengunggah file: '+(e.message||'periksa koneksi dan ukuran file'))}}
 function pick(label,acc,cap,cb){const i=h('input',{type:'file',accept:acc,style:'display:none'});if(cap)i.setAttribute('capture','environment');i.onchange=()=>cb(i.files[0]);return h('button',{class:'btn s',onclick:()=>i.click()},icon(cap?'camera':'attachment',16),h('span',{},label))}
 async function saveForm(){
   const f=S.form;
@@ -851,10 +1068,10 @@ function memberFormCard(){
       h('p',{class:'warn'},'Data diproses langsung di perangkat ini. Foto dan Surat Sambung diunggah terpisah. Periksa kembali hasilnya sebelum menyimpan.'));
   };
   const photoBox=()=>box(h('b',{},'Foto Setengah Badan (terbaru)'),
-    f.foto&&h('img',{src:'/_blob/'+f.foto,style:'width:88px;height:88px;border-radius:18px;object-fit:cover;display:block;margin:10px 0'}),
+    f.foto&&h('img',{...memberMediaAttributes(f.foto,'src'),style:'width:88px;height:88px;border-radius:18px;object-fit:cover;display:block;margin:10px 0'}),
     h('div',{class:'fl'},pick('Ambil foto','image/jpeg,image/png,image/webp',1,file=>up(file,'foto')),pick('Pilih foto','image/jpeg,image/png,image/webp',0,file=>up(file,'foto'))));
   const documentBox=()=>box(h('b',{},'Foto Surat Sambung'),
-    ...(f.surat||[]).map((id,index)=>h('div',{class:'member-file-row'},h('a',{href:'/_blob/'+id,target:'_blank'},icon('attachment',16),h('span',{},'Lampiran '+(index+1))),h('button',{class:'btn s',onclick:()=>{f.surat=f.surat.filter(value=>value!==id);render()}},'Hapus'))),
+    ...(f.surat||[]).map((id,index)=>h('div',{class:'member-file-row'},h('a',{...memberMediaAttributes(id,'href'),target:'_blank'},icon('attachment',16),h('span',{},'Lampiran '+(index+1))),h('button',{class:'btn s',onclick:()=>{f.surat=f.surat.filter(value=>value!==id);render()}},'Hapus'))),
     h('div',{class:'fl'},pick('Ambil / foto dokumen','image/*,application/pdf',1,file=>up(file,'surat',1)),pick('Pilih dokumen','image/*,application/pdf',0,file=>up(file,'surat',1))),
     h('small',{class:'member-help'},'Bisa menambahkan lebih dari satu foto atau PDF.'));
   return h('div',{class:'member-editor'},
@@ -1297,32 +1514,73 @@ function render(){
   }
   const current=ALL.find(x=>x[0]===S.view);
   if(!V[S.view]||['map-settings','approvals'].includes(S.view)&&!S.mainAdmin||current?.[2]&&!S.admin)S.view='landing';
-  $('#app').replaceChildren(...[].concat(V[S.view]()).filter(Boolean));
+  const content=[];
+  const storageErrors=Object.values(S.storageErrors||{});
+  if(storageErrors.length)content.push(h('p',{class:'warn storage-warning'},'Database bersama tidak dapat dibaca: '+storageErrors.join(' · ')+' Jalankan pembaruan skema Supabase, lalu muat ulang aplikasi.'));
+  if(S.memberMediaError)content.push(h('p',{class:'warn storage-warning'},'Media anggota: '+S.memberMediaError));
+  const legacyMediaCount=legacyMemberMediaCount();
+  if(S.admin&&S.supabase&&legacyMediaCount)content.push(h('section',{class:'card storage-import'},h('div',{},h('b',{},'Pindahkan media anggota lama'),h('small',{},legacyMediaCount+' foto atau lampiran masih tersimpan di lokasi lama. File akan dipindahkan ke Supabase privat.')) ,h('button',{class:'btn s',onclick:migrateExistingMemberMedia},'Pindahkan media')));
+  if(S.mainAdmin&&S.supabase&&!S.storageImporting&&!localDataImportDone()){
+    const summary=localDataSummary();
+    if(summary.rows||summary.map){
+      const importButton=h('button',{class:'btn s',onclick:importLocalDataToSupabase},'Impor ke Supabase');
+      content.push(h('section',{class:'card storage-import'},h('div',{},h('b',{},'Data lama di perangkat ini'),h('small',{},summary.rows+' data lokal'+(summary.map?' dan pengaturan peta':'')+'. Impor mempertahankan ID dan tidak menimpa data dengan ID yang sudah ada.')) ,importButton));
+    }
+  }
+  if(S.storageImporting)content.push(h('p',{class:'warn'},'Sedang mengimpor data lokal ke database bersama...'));
+  content.push(...[].concat(V[S.view]()).filter(Boolean));
+  $('#app').replaceChildren(...content);
+  hydrateMemberMedia();
   const tb=$('#tb');tb.style.display=S.form?'none':'flex';$('#pet').style.display=S.form?'none':'block';
   tb.replaceChildren(...[['landing','home','Home'],['dash','chart','Ringkasan'],['members','users','Anggota'],['kegiatan','calendar','Kegiatan'],['piket','brush','Piket'],['forum','messages','Forum']].map(x=>h('a',{class:S.view===x[0]?'on':'',onclick:()=>go(x[0])},icon(x[1],19),h('span',{},x[2]))));
 }
 function sub(name,key){
-  S.db.collection(name).onSnapshot(s=>{
+  return S.db.collection(name).onSnapshot(s=>{
+    const hadError=Boolean(S.storageErrors[name]);
+    if(hadError)delete S.storageErrors[name];
     const next=s.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(a.at||0)-(b.at||0));
     const previous=JSON.stringify(S[key]||[]);
     S[key]=next;
-    if(JSON.stringify(next)!==previous)render();
-  },()=>{})
+    if(JSON.stringify(next)!==previous||hadError)render();
+  },error=>{
+    console.error('Koleksi Supabase '+name+' gagal dimuat:',error);
+    S.storageErrors[name]=error.message||'Koneksi gagal';
+    render();
+  });
+}
+let dataUnsubscribers=[];
+function stopDataSubscriptions(){
+  dataUnsubscribers.forEach(unsubscribe=>{try{unsubscribe?.()}catch(error){console.error('Gagal menghentikan subscription data:',error)}});
+  dataUnsubscribers=[];
+}
+function startDataSubscriptions(){
+  stopDataSubscriptions();
+  if(!S.db)return;
+  dataUnsubscribers=[
+    sub('members','members'),
+    sub('events','events'),
+    sub('topics','topics'),
+    sub('cleaning_duties','cleaningDuties'),
+    sub('pin','pins')
+  ];
+  if(!S.supabase)dataUnsubscribers.push(sub('pengaturan','pengaturan'));
 }
 render();
 (async()=>{
   try{S.uid=localStorage.getItem('uid');if(!S.uid){S.uid='u'+Math.random().toString(36).slice(2)+Date.now().toString(36);localStorage.setItem('uid',S.uid)}}catch(e){S.uid='u'+Math.random().toString(36).slice(2)}
   try{S.assets=await claude.use('assets')}catch(e){}
-  try{S.db=await claude.use('db')}catch(e){}
-  if(!S.db)S.db=createLocalDb();
   if(window.supabase&&window.SUPABASE_CONFIG?.url&&window.SUPABASE_CONFIG?.anonKey){
     S.supabase=window.supabase.createClient(window.SUPABASE_CONFIG.url,window.SUPABASE_CONFIG.anonKey);
+    S.db=createSupabaseDb(S.supabase);
     const applySession=async session=>{
       if(!session?.user&&S.messageChannel){
         await S.supabase.removeChannel(S.messageChannel);
         S.messageChannel=null;
       }
-      S.uid=session?.user?.id||null;S.email=session?.user?.email||'';S.admin=false;S.mainAdmin=false;S.approvalStatus='approved';
+      stopDataSubscriptions();
+      const nextUid=session?.user?.id||null;
+      if(S.uid!==nextUid){S.members=[];S.events=[];S.topics=[];S.cleaningDuties=[];S.pins=[];S.storageErrors={};S.memberMediaUrls.clear();S.memberMediaPending.clear();S.memberMediaFailed.clear();S.legacyMediaPaths.clear();S.memberMediaError=''}
+      S.uid=nextUid;S.email=session?.user?.email||'';S.admin=false;S.mainAdmin=false;S.approvalStatus='approved';
       if(session?.user){
         const {data:profile}=await S.supabase.from('profiles').select('name,role,is_main_admin,approval_status').eq('id',session.user.id).maybeSingle();
         S.admin=profile?.role==='admin';S.name=profile?.name||session.user.email||'';
@@ -1333,15 +1591,20 @@ render();
       }
       await loadMapSettings();
       await loadPendingUsers();
+      if(session?.user&&(S.approvalStatus==='approved'||S.admin))startDataSubscriptions();
       S.authLoading=false;render();
     };
     const {data:{session}}=await S.supabase.auth.getSession();
     await applySession(session);
     S.supabase.auth.onAuthStateChange((_event,next)=>{applySession(next)});
     setInterval(()=>{if(S.uid)loadMessages();if(S.mainAdmin)loadPendingUsers()},30000);
-  }else S.authLoading=false;
-  sub('members','members');sub('events','events');sub('topics','topics');sub('cleaning_duties','cleaningDuties');if(!S.supabase)sub('pengaturan','pengaturan');sub('pin','pins');
-  render();
+  }else{
+    try{S.db=await claude.use('db')}catch(error){console.warn('Layanan database terintegrasi tidak tersedia; menggunakan penyimpanan lokal perangkat:',error)}
+    if(!S.db)S.db=createLocalDb();
+    S.authLoading=false;
+    startDataSubscriptions();
+    render();
+  }
 })();
 
 function vPesan(){

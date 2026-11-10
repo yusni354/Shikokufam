@@ -373,3 +373,162 @@ create policy "Message participants can send replies"
 -- values ('UUID_USER_ADMIN', 'Nama Admin', 'admin');
 -- Tandai akun admin utama:
 -- update public.profiles set is_main_admin = true where id = 'UUID_USER_ADMIN';
+
+-- Shared application data for members, events, forum topics, duties, and map pins.
+create table if not exists public.app_data (
+  collection text not null
+    check (collection in ('members', 'events', 'topics', 'cleaning_duties', 'pin')),
+  id text not null,
+  data jsonb not null
+    check (jsonb_typeof(data) = 'object'),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  primary key (collection, id)
+);
+
+create index if not exists app_data_collection_updated_at_idx
+  on public.app_data (collection, updated_at desc);
+
+alter table public.app_data enable row level security;
+alter table public.app_data replica identity full;
+
+create or replace function public.is_approved_member()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.profiles
+    where id = (select auth.uid())
+      and (approval_status = 'approved' or role = 'admin')
+  );
+$$;
+
+revoke all on function public.is_approved_member() from public;
+grant execute on function public.is_approved_member() to authenticated;
+
+create or replace function public.merge_app_data(
+  p_collection text,
+  p_id text,
+  p_patch jsonb
+)
+returns void
+language plpgsql
+set search_path = public
+as $$
+begin
+  if jsonb_typeof(p_patch) is distinct from 'object' then
+    raise exception 'Data patch must be a JSON object';
+  end if;
+
+  update public.app_data
+  set data = data || p_patch,
+      updated_at = now()
+  where collection = p_collection
+    and id = p_id;
+
+  if not found then
+    raise exception 'Application data row not found';
+  end if;
+end;
+$$;
+
+revoke all on function public.merge_app_data(text, text, jsonb) from public;
+grant execute on function public.merge_app_data(text, text, jsonb) to authenticated;
+
+drop policy if exists "Approved members can read application data" on public.app_data;
+create policy "Approved members can read application data"
+  on public.app_data for select
+  to authenticated
+  using (public.is_approved_member());
+
+drop policy if exists "Members can create forum topics and admins can create data" on public.app_data;
+create policy "Members can create forum topics and admins can create data"
+  on public.app_data for insert
+  to authenticated
+  with check (
+    public.is_approved_member()
+    and (
+      public.is_admin()
+      or (
+        collection = 'topics'
+        and data->>'by' = (select auth.uid())::text
+      )
+    )
+  );
+
+drop policy if exists "Admins can update application data" on public.app_data;
+create policy "Admins can update application data"
+  on public.app_data for update
+  to authenticated
+  using (public.is_admin())
+  with check (public.is_admin());
+
+drop policy if exists "Admins can delete application data" on public.app_data;
+create policy "Admins can delete application data"
+  on public.app_data for delete
+  to authenticated
+  using (public.is_admin());
+
+grant select, insert, update, delete on public.app_data to authenticated;
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'app_data'
+  ) then
+    alter publication supabase_realtime add table public.app_data;
+  end if;
+end $$;
+
+-- Private storage for member profile photos and documents.
+insert into storage.buckets (id, name, public)
+values ('member-files', 'member-files', false)
+on conflict (id) do update set public = false;
+
+drop policy if exists "Approved members can read member files" on storage.objects;
+create policy "Approved members can read member files"
+  on storage.objects for select
+  to authenticated
+  using (
+    bucket_id = 'member-files'
+    and public.is_approved_member()
+  );
+
+drop policy if exists "Admins can upload member files" on storage.objects;
+create policy "Admins can upload member files"
+  on storage.objects for insert
+  to authenticated
+  with check (
+    bucket_id = 'member-files'
+    and public.is_admin()
+  );
+
+drop policy if exists "Admins can update member files" on storage.objects;
+create policy "Admins can update member files"
+  on storage.objects for update
+  to authenticated
+  using (
+    bucket_id = 'member-files'
+    and public.is_admin()
+  )
+  with check (
+    bucket_id = 'member-files'
+    and public.is_admin()
+  );
+
+drop policy if exists "Admins can delete member files" on storage.objects;
+create policy "Admins can delete member files"
+  on storage.objects for delete
+  to authenticated
+  using (
+    bucket_id = 'member-files'
+    and public.is_admin()
+  );
