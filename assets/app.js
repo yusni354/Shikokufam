@@ -446,7 +446,7 @@ function vPiket(){
     return h('article',{class:'duty-card'},
       h('div',{class:'duty-date'},date&&h('b',{},String(date.getDate()).padStart(2,'0')),h('small',{},date?date.toLocaleDateString('id-ID',{month:'short'}):'—')),
       h('div',{class:'duty-info'},h('small',{},dateLabel(duty.tanggal)),h('div',{class:'duty-assignments'},...assignmentsFor(duty).map(assignment=>
-        h('div',{class:'duty-assignment'},h('b',{},assignment.nama),h('span',{},assignment.tugas)))),
+        h('div',{class:'duty-assignment'},h('b',{},assignment.nama),h('span',{},assignment.tugas))))),
       S.admin&&h('div',{class:'duty-actions'},
         h('button',{class:'btn s',title:'Edit jadwal',onclick:()=>{S.dutyForm={...duty,assignments:assignmentsFor(duty).map(assignment=>({...assignment}))};render()}},'✎ Edit'),
         h('button',{class:'btn s',title:'Hapus jadwal',onclick:async()=>{
