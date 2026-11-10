@@ -371,6 +371,87 @@ const PREF=['Ehime','Kagawa','Kochi','Tokushima','Hokkaido','Aomori','Iwate','Mi
 const PROV=['Aceh','Sumatera Utara','Sumatera Barat','Riau','Kepulauan Riau','Jambi','Sumatera Selatan','Bangka Belitung','Bengkulu','Lampung','DKI Jakarta','Banten','Jawa Barat','Jawa Tengah','DI Yogyakarta','Jawa Timur','Bali','Nusa Tenggara Barat','Nusa Tenggara Timur','Kalimantan Barat','Kalimantan Tengah','Kalimantan Selatan','Kalimantan Timur','Kalimantan Utara','Sulawesi Utara','Gorontalo','Sulawesi Tengah','Sulawesi Barat','Sulawesi Selatan','Sulawesi Tenggara','Maluku','Maluku Utara','Papua','Papua Barat','Papua Barat Daya','Papua Selatan','Papua Tengah','Papua Pegunungan'];
 const BLN=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
 const TGL=['Technical Intern (Ginou Jisshu)','Specified Skilled Worker (Tokutei Ginou)','Engineer/Specialist','Pelajar','Permanent Resident','Dependent/Keluarga','Lainnya'];
+function normalizeImportLabel(value){return value.normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim()}
+function importDate(value){
+  const match=value.trim().match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})$/);
+  if(!match)return '';
+  const [,day,month,year]=match,iso=year+'-'+month.padStart(2,'0')+'-'+day.padStart(2,'0'),date=new Date(iso+'T00:00:00');
+  return date.getFullYear()===Number(year)&&date.getMonth()+1===Number(month)&&date.getDate()===Number(day)?iso:'';
+}
+function parseMemberPaste(text){
+  const aliases=[
+    [['nama lengkap'],'nama'],[['jenis kelamin'],'kelamin'],[['tgl bln thn lahir','tanggal lahir'],'lahir'],
+    [['umur','usia'],'umur'],[['kelompok desa daerah di indonesia'],'wilayah_indonesia'],
+    [['no hp pengurus daerah nama','no hp pengurus daerah'],'pengurus_contact'],
+    [['status lajang menikah','status lajang menikah cerai'],'nikah'],[['mt iya bukan','mt'],'mt'],
+    [['mulai tinggal di jepang'],'mulai_jp'],[['alamat tinggal di jepang'],'alamat_jp'],
+    [['status visa'],'tinggal'],[['no hp wa','nomor hp wa'],'wa'],[['facebook'],'facebook'],
+    [['no hp orang tua nama','no hp orang tua'],'ortu_contact']
+  ];
+  const values={};
+  let current='';
+  text.split(/\r?\n/).forEach(line=>{
+    const match=line.match(/^\s*(?:\d+\s*[.)]\s*)?([^:：]+?)\s*[:：]\s*(.*)$/);
+    if(match){current=normalizeImportLabel(match[1]);values[current]=match[2].trim()}
+    else if(current&&line.trim())values[current]+=' '+line.trim();
+  });
+  const data={},recognized=[];
+  aliases.forEach(([labels,key])=>{
+    const label=Object.keys(values).find(candidate=>labels.includes(candidate));
+    if(label&&values[label]){data[key]=values[label];recognized.push(key)}
+  });
+  if(data.nama)data.nama=data.nama.trim();
+  if(data.kelamin){
+    const gender=normalizeImportLabel(data.kelamin);
+    if(gender.includes('laki laki'))data.kelamin='Laki-laki';
+    else if(gender.includes('perempuan'))data.kelamin='Perempuan';
+  }
+  if(data.lahir){const converted=importDate(data.lahir);if(converted)data.lahir=converted;else delete data.lahir}
+  if(data.umur)data.umur=data.umur.match(/\d+/)?.[0]||data.umur;
+  if(data.wilayah_indonesia){
+    const [kelompok,desa,daerah]=data.wilayah_indonesia.split(',').map(part=>part.trim());
+    if(kelompok)data.kelompok=kelompok;
+    if(desa)data.desa=desa;
+    if(daerah)data.daerah=daerah;
+    delete data.wilayah_indonesia;
+  }
+  const splitContact=(value,nameKey,phoneKey)=>{
+    if(!value)return;
+    const phone=value.match(/\+?\d[\d\s().-]{6,}\d/);
+    if(phone){
+      data[phoneKey]=phone[0].trim();
+      const name=value.replace(phone[0],'').replace(/^[\s+,:;-]+|[\s+,:;-]+$/g,'').trim();
+      if(name)data[nameKey]=name;
+    }else data[nameKey]=value.trim();
+  };
+  splitContact(values[normalizeImportLabel('No. Hp Pengurus Daerah + Nama')], 'pengurus','hp_pengurus');
+  if(!data.pengurus&&!data.hp_pengurus)splitContact(data.pengurus_contact,'pengurus','hp_pengurus');
+  splitContact(values[normalizeImportLabel('No. HP Orang Tua + Nama')], 'ortu','hp_ortu');
+  if(!data.ortu&&!data.hp_ortu)splitContact(data.ortu_contact,'ortu','hp_ortu');
+  delete data.pengurus_contact;delete data.ortu_contact;
+  if(data.nikah){
+    const status=normalizeImportLabel(data.nikah);
+    if(status.includes('lajang')||status.includes('belum'))data.nikah='Belum menikah';
+    else if(status.includes('menikah'))data.nikah='Menikah';
+    else if(status.includes('cerai'))data.nikah='Cerai';
+  }
+  if(data.mt)data.mt=data.mt.trim();
+  if(data.mulai_jp)data.mulai_jp=data.mulai_jp.trim();
+  if(data.alamat_jp){
+    const address=data.alamat_jp.trim();
+    const cities=[['marugame','Marugame','Kagawa'],['takamatsu','Takamatsu','Kagawa'],['matsuyama','Matsuyama','Ehime'],['kochi','Kochi','Kochi'],['tokushima','Tokushima','Tokushima']];
+    const city=cities.find(([needle])=>normalizeImportLabel(address).includes(needle));
+    if(city){data.kota=city[1];data.pref=city[2];data.wilayah=city[2]}
+    data.alamat_jp=address;
+  }
+  if(data.tinggal){
+    const visa=normalizeImportLabel(data.tinggal);
+    if(visa.includes('tokutei ginou')||visa.includes('tokuteginou'))data.tinggal='Specified Skilled Worker (Tokutei Ginou)';
+    else if(visa.includes('ginou jisshu')||visa.includes('technical intern'))data.tinggal='Technical Intern (Ginou Jisshu)';
+    else if(!TGL.includes(data.tinggal))data.tinggal=data.tinggal.trim();
+  }
+  return {data,recognized};
+}
 function fld(l,k,o){o=o||{};const f=S.form;let e;
   if(o.opts)e=h('select',{},h('option',{value:''},o.ph||'Pilih'),...o.opts.map(x=>h('option',{value:x},x)));
   else if(o.area)e=h('textarea',{rows:3,placeholder:o.ph||''});
@@ -378,12 +459,18 @@ function fld(l,k,o){o=o||{};const f=S.form;let e;
   if(o.opts&&f[k]&&!o.opts.includes(f[k]))e.append(h('option',{value:f[k]},f[k]));e.value=f[k]||'';e.oninput=e.onchange=()=>{f[k]=e.value};
   return h('label',{class:'lb'},l,e)}
 const box=(...k)=>h('div',{class:'card',style:'display:block'},...k);
-async function autoFill(txt,b){
-  if(!S.admin)return;const sm=await claude.use('sample');if(!sm){alert('Isi otomatis belum tersedia');return}
-  if(!txt.trim())return;b.disabled=true;b.textContent='Memproses...';
-  try{const r=await sm.json('Ekstrak data anggota dari teks berikut. Format sumber biasanya berupa daftar bernomor dengan label seperti Nama Lengkap, Jenis Kelamin, Tgl/bln/thn lahir, Umur, Kelompok/Desa/Daerah di Indonesia, No. Hp Pengurus Daerah + Nama, Status (lajang/menikah), MT (iya/bukan), Mulai Tinggal di Jepang, Alamat Tinggal di Jepang, Status Visa, No. HP/WA, Facebook, dan No. HP Orang Tua + Nama. Balas HANYA JSON dengan kunci berikut, kosongkan jika tidak ada: nama,panggilan,kelamin (normalisasi menjadi "Laki-laki" atau "Perempuan"),lahir (YYYY-MM-DD jika lengkap),umur,kelompok,desa,daerah,pengurus,hp_pengurus,nikah (normalisasi menjadi "Belum menikah", "Menikah", atau "Cerai"),mt,mulai_jp,prov,kab,kec,alamat_id,kodepos,pref,kota,kec_jp,stasiun,alamat_jp,tinggal (status visa),wa,facebook,ortu,hp_ortu,email,instagram,tiktok. Jika satu label berisi nama dan nomor telepon, pisahkan ke field nama dan hp yang sesuai. Jangan mengarang data yang kosong. TEKS: '+txt);
-    Object.entries(r||{}).forEach(([k,v])=>{if(v!==null&&v!==undefined&&v!=='')S.form[k]=String(v)});render()}
-  catch(e){alert('Gagal memproses teks');b.disabled=false;b.textContent='Isi Otomatis'}}
+function autoFill(txt){
+  if(!S.admin)return;
+  if(!txt.trim()){alert('Tempel data diri terlebih dahulu.');return}
+  const {data,recognized}=parseMemberPaste(txt);
+  if(!recognized.length){alert('Data belum dikenali. Pastikan setiap baris memakai format "Nama Kolom : Isi".');return}
+  Object.entries(data).forEach(([key,value])=>{if(value!==null&&value!==undefined&&value!=='')S.form[key]=String(value)});
+  render();
+  const invalidDate=recognized.includes('lahir')&&!data.lahir;
+  alert('Data berhasil dibaca ('+recognized.length+' kolom). Periksa kembali isian sebelum disimpan.'+
+    (invalidDate?' Format tanggal lahir tidak dikenali; isi tanggal lahir secara manual.':'')+
+    (!S.form.wilayah?' Pilih Wilayah/prefektur di Jepang sebelum menyimpan.':''));
+}
 async function up(file,key,multi){
   if(!file)return;if(!S.assets){alert('Unggah foto hanya tersedia untuk admin');return}
   try{const r=await S.assets.upload(file);S.form[key]=multi?[...(S.form[key]||[]),r.id]:r.id;render()}catch(e){alert('Gagal mengunggah')}}
@@ -393,14 +480,14 @@ async function saveForm(){
   if(!f.wilayah){S.step=0;alert('Wilayah wajib diisi');return render()}
   if(!(f.nama||'').trim()){S.step=0;alert('Nama lengkap wajib diisi');return render()}
   const d={...f};delete d.id;d.peran=d.peran||'Anggota';d.status=d.status||'aktif';
-  try{if(f.id)await S.db.collection('members').doc(f.id).set(d);else await S.db.collection('members').add({...d,at:Date.now()});S.form=null;render()}catch(e){alert('Tidak bisa menyimpan')}}
+  try{if(f.id)await S.db.collection('members').doc(f.id).set(d);else await S.db.collection('members').add({...d,at:Date.now()});S.form=null;render()}catch(e){console.error(e);alert('Tidak bisa menyimpan: '+(e.message||'periksa koneksi dan izin database'))}}
 function formCard(){
   const f=S.form;
   if(S._fr!==f){S._fr=f;S.step=0;if(!f.id&&!f.kode){const n=Math.max(S.members.length,...S.members.map(m=>parseInt(String(m.kode||'').split('-').pop())||0))+1;f.kode='IJCCS-'+String(n).padStart(4,'0')}}
   const yr=Array.from({length:12},(_,i)=>String(new Date().getFullYear()-i));
-  const auto=()=>{const ta=h('textarea',{rows:8,placeholder:'Tempel data dengan format berikut:\n1. Nama Lengkap : Bahroin Idris Tampubolon\n2. Jenis Kelamin : laki-laki\n3. Tgl/bln/thn lahir :\n4. Umur :\n5. Kelompok, Desa, Daerah di Indonesia :\n6. No. Hp Pengurus Daerah + Nama :\n7. Status (lajang/menikah) :\n8. MT (iya/bukan) :\n9. Mulai Tinggal di Jepang :\n10. Alamat Tinggal di Jepang :\n11. Status Visa :\n12. No. HP/WA :\n13. Facebook :\n14. No. HP Orang Tua + Nama :'});const b=h('button',{class:'btn s',onclick:()=>autoFill(ta.value,b)},'Isi Otomatis');return box(h('b',{},'Isi Otomatis'),ta,b,h('p',{class:'warn'},'Tempel data sesuai template. Sistem akan memetakan isinya ke kolom identitas, alamat, visa, kontak, dan keluarga. Tetap periksa hasilnya sebelum menyimpan.'))};
-  const fotoBox=()=>box(h('b',{},'Foto Diri'),h('br'),f.foto&&h('img',{src:'/_blob/'+f.foto,style:'width:80px;height:80px;border-radius:50%;object-fit:cover;margin:8px 0;display:block'}),pick('Ambil Foto','image/jpeg,image/png,image/webp',1,x=>up(x,'foto')),' ',pick('Pilih dari Galeri','image/jpeg,image/png,image/webp',0,x=>up(x,'foto')),h('p',{class:'warn'},'Format JPG, JPEG, PNG, WEBP.'));
-  const suratBox=()=>box(h('b',{},'Surat Sambung'),h('br'),...(f.surat||[]).map((id,i)=>h('div',{class:'row',style:'margin:6px 0'},h('a',{href:'/_blob/'+id,target:'_blank'},'Lampiran '+(i+1)),h('button',{class:'btn s',onclick:()=>{f.surat=f.surat.filter(x=>x!==id);render()}},'✕'))),pick('Ambil Foto','image/*,application/pdf',1,x=>up(x,'surat',1)),' ',pick('Pilih dari Galeri','image/*,application/pdf',0,x=>up(x,'surat',1)),h('p',{class:'warn'},'Foto, scan, atau PDF. Boleh beberapa file.'));
+  const auto=()=>{const ta=h('textarea',{rows:8,placeholder:'1. Nama Lengkap : Nama Anda\n2. Jenis Kelamin : laki-laki\n3. Tgl/bln/thn lahir : 20-04-1987\n4. Umur : 40\n5. Kelompok, Desa, Daerah di Indonesia : kelompok, desa, daerah\n6. No. Hp Pengurus Daerah + Nama : nomor + nama\n7. Status (lajang/menikah) : menikah\n8. MT (iya/bukan) : bukan\n9. Mulai Tinggal di Jepang : 22-09-2026\n10. Alamat Tinggal di Jepang : jotocho marugame\n11. Status Visa : tokuteginou 1\n12. No. HP/WA : nomor WhatsApp\n13. Facebook : nama akun\n14. No. HP Orang Tua + Nama : nomor + nama\n15. Foto Surat Sambung :\n16. Foto Setengah Badan (terbaru) :'});const b=h('button',{class:'btn s',onclick:()=>autoFill(ta.value)},'Isi Otomatis');return box(h('b',{},'Isi Otomatis'),ta,b,h('p',{class:'warn'},'Pemrosesan dilakukan di perangkat ini. Teks akan mengisi formulir; periksa hasilnya lalu tekan Simpan. Foto Surat Sambung dan Foto Setengah Badan perlu diunggah pada langkah berikutnya.'))};
+  const fotoBox=()=>box(h('b',{},'Foto Setengah Badan (terbaru)'),h('br'),f.foto&&h('img',{src:'/_blob/'+f.foto,style:'width:80px;height:80px;border-radius:50%;object-fit:cover;margin:8px 0;display:block'}),pick('Ambil Foto','image/jpeg,image/png,image/webp',1,x=>up(x,'foto')),' ',pick('Pilih dari Galeri','image/jpeg,image/png,image/webp',0,x=>up(x,'foto')),h('p',{class:'warn'},'Pilih foto terbaru. Format JPG, JPEG, PNG, WEBP.'));
+  const suratBox=()=>box(h('b',{},'Foto Surat Sambung'),h('br'),...(f.surat||[]).map((id,i)=>h('div',{class:'row',style:'margin:6px 0'},h('a',{href:'/_blob/'+id,target:'_blank'},'Lampiran '+(i+1)),h('button',{class:'btn s',onclick:()=>{f.surat=f.surat.filter(x=>x!==id);render()}},'✕'))),pick('Ambil Foto','image/*,application/pdf',1,x=>up(x,'surat',1)),' ',pick('Pilih dari Galeri','image/*,application/pdf',0,x=>up(x,'surat',1)),h('p',{class:'warn'},'Unggah foto, scan, atau PDF. Boleh beberapa file.'));
   const T=[
    ['Identitas',()=>[S.admin&&auto(),box(h('b',{},'Identitas'),fld('Wilayah *','wilayah',{opts:PREF,ph:'Pilih wilayah'}),fld('Nomor Anggota','kode'),fld('Nama Lengkap *','nama'),fld('Nama Panggilan','panggilan'),fld('Jenis Kelamin','kelamin',{opts:['Laki-laki','Perempuan']}),fld('Tanggal Lahir','lahir',{type:'date'}),fld('Umur','umur'),fld('Status','status',{opts:STATUS}),fld('Peran','peran',{opts:PERAN}),fld('Pernikahan','nikah',{opts:['Belum menikah','Menikah','Cerai']}),fld('MT','mt'),fld('Nama Orang Tua','ortu'),fld('No. HP Orang Tua','hp_ortu',{ph:'+62xxxxxxxxxx'}),h('div',{class:'fl'},fld('Bulan Kedatangan','bln',{opts:BLN}),fld('Tahun','thn',{opts:yr})),fld('Mulai Tinggal di Jepang','mulai_jp',{ph:'Contoh: April 2022'}))]],
    ['Alamat Indonesia',()=>[box(h('b',{},'Alamat Indonesia'),fld('Provinsi','prov',{opts:PROV,ph:'Pilih provinsi'}),fld('Kabupaten/Kota','kab'),fld('Kecamatan','kec'),fld('Desa/Kelurahan','desa'),fld('Kelompok','kelompok'),fld('Daerah','daerah'),fld('Alamat Lengkap Indonesia (nama jalan, nomor rumah, gedung, RT/RW)','alamat_id',{area:1,ph:'Contoh: Jl. Kebon Sirih No. 10, RT 3/RW 5'}),fld('Nama Pengurus Daerah','pengurus'),fld('No. HP Pengurus Daerah','hp_pengurus',{ph:'+81xxxxxxxxxx'}))]],
