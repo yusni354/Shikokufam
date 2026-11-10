@@ -1,9 +1,13 @@
-const S={members:[],events:[],topics:[],cleaningDuties:[],view:'landing',openConversation:null,messageSignature:'',admin:false,mainAdmin:false,adminMenuOpen:false,uid:null,email:'',name:'',approvalStatus:'approved',pendingUsers:[],mapError:'',siteVisits:[],siteVisitsLoading:false,siteVisitsError:'',siteTrackingError:'',visitConsent:null,visitLocation:null,lastTrackedVisit:'',visitorMap:null,db:null,supabase:null,messageChannel:null,authLoading:true,unreadMessages:0};
+const S={members:[],events:[],topics:[],cleaningDuties:[],view:'landing',openConversation:null,messageSignature:'',admin:false,mainAdmin:false,adminMenuOpen:false,uid:null,email:'',name:'',approvalStatus:'approved',pendingUsers:[],mapError:'',activityScannerStop:null,activityFeedback:null,db:null,supabase:null,messageChannel:null,authLoading:true,unreadMessages:0};
 const $=s=>document.querySelector(s);
+try{
+  localStorage.removeItem('shikoku-family:visit-consent');
+  sessionStorage.removeItem('shikoku-family:visit-location-jp-postal-v1');
+}catch(error){console.warn('Cache lama peta kunjungan tidak dapat dihapus:',error)}
 function h(t,p,...k){const e=document.createElement(t);for(const a in p||{}){if(a==='onclick')e.onclick=p[a];else if(a==='class')e.className=p[a];else e.setAttribute(a,p[a])}k.flat().forEach(c=>{if(c!=null&&c!==false)e.append(c)});return e}
 const WILAYAH=[['Tokushima','#d95763'],['Takamatsu','#3985c6'],['Marugame','#e28b36'],['Zentsuji / Takuma','#8e68b5'],['Kochi','#24947e'],['Matsuyama','#d45e9f'],['Ehime','#6f9e3b'],['Niihama','#6073c4']];
-const ALL=[['landing','🏠 Home'],['dash','📊 Ringkasan'],['members','👥 Daftar Anggota'],['absen','📝 Absensi'],['piket','🧹 Jadwal Piket'],['peta','🗺️ Peta & Wilayah'],['forum','💬 Forum'],['import','📥 Import Database',1],['pesan','📨 Pesan Masuk']];
-const ADMIN_MENU=[['map-settings','🗺️ Pengaturan Peta'],['visitor-map','🌍 Peta Kunjungan Jepang'],['approvals','👥 Persetujuan Akun']];
+const ALL=[['landing','🏠 Home'],['dash','📊 Ringkasan'],['members','👥 Daftar Anggota'],['kegiatan','🎉 Kegiatan'],['piket','🧹 Jadwal Piket'],['peta','🗺️ Peta & Wilayah'],['forum','💬 Forum'],['pesan','📨 Pesan Masuk']];
+const ADMIN_MENU=[['map-settings','🗺️ Pengaturan Peta'],['approvals','👥 Persetujuan Akun']];
 function isAdminSettingsView(){return ADMIN_MENU.some(([view])=>view===S.view)}
 function syncAdminTheme(){
   document.body.classList.toggle('admin-dark',S.mainAdmin&&(S.adminMenuOpen||isAdminSettingsView()));
@@ -372,6 +376,28 @@ function replyBox(messageId){
   return h('div',{class:'reply-box'},menu,h('div',{class:'composer-row'},input,plus,send),picker.label);
 }
 function guard(){return S.db?null:h('p',{class:'warn'},'Penyimpanan belum tersedia.')}
+function eventParticipantCount(event){
+  return Array.isArray(event.peserta_anggota)?event.peserta_anggota.length:(event.hadir||[]).length;
+}
+function eventAttendanceCount(event){
+  return Array.isArray(event.hadir_anggota)?event.hadir_anggota.length:(event.hadir||[]).length;
+}
+function activityMemberIds(event,key){
+  return Array.isArray(event[key])?event[key].map(String):[];
+}
+async function updateActivityMember(eventId,memberId,action){
+  if(!S.admin)throw new Error('Hanya admin yang dapat mengelola peserta kegiatan.');
+  if(!S.db)throw new Error('Penyimpanan belum tersedia.');
+  const event=S.events.find(item=>String(item.id)===String(eventId));
+  if(!event)throw new Error('Kegiatan tidak ditemukan.');
+  const id=String(memberId),participants=new Set(activityMemberIds(event,'peserta_anggota')),attendees=new Set(activityMemberIds(event,'hadir_anggota'));
+  if(action==='add')participants.add(id);
+  else if(action==='present'){participants.add(id);attendees.add(id)}
+  else if(action==='absent'){participants.add(id);attendees.delete(id)}
+  else if(action==='remove'){participants.delete(id);attendees.delete(id)}
+  else throw new Error('Tindakan peserta tidak dikenal.');
+  await S.db.collection('events').doc(eventId).update({peserta_anggota:[...participants],hadir_anggota:[...attendees]});
+}
 
 function vHome(){
   const today=new Date(),todayKey=[today.getFullYear(),String(today.getMonth()+1).padStart(2,'0'),String(today.getDate()).padStart(2,'0')].join('-');
@@ -392,7 +418,7 @@ function vHome(){
   });
   if(memberGroups['Belum dipilih']?.length)regionCards.push(h('section',{class:'home-region-card home-region-unknown'},h('div',{class:'home-region-heading'},h('b',{},'Wilayah belum dipilih'),h('span',{},memberGroups['Belum dipilih'].length+' anggota')),
     ...memberGroups['Belum dipilih'].map(member=>h('button',{class:'home-region-member',onclick:()=>openMember(member,'landing')},h('span',{class:'member-avatar-placeholder'},(member.nama||'?').trim().slice(0,1).toUpperCase()),h('span',{},member.nama||'Nama belum diisi'),h('span',{class:'home-region-arrow'},'›')))));
-  const shortcuts=[['🧹','Jadwal Piket','piket'],['📝','Absensi','absen'],['💬','Forum','forum'],['🗺️','Peta','peta']];
+  const shortcuts=[['🧹','Jadwal Piket','piket'],['🎉','Kegiatan','kegiatan'],['💬','Forum','forum'],['🗺️','Peta','peta']];
   const dutyRows=upcomingDuties.flatMap(duty=>{
     const assignments=Array.isArray(duty.assignments)&&duty.assignments.length?duty.assignments:[{nama:duty.nama||'',tugas:duty.tugas||''}];
     return [h('div',{class:'home-duty'},
@@ -413,8 +439,8 @@ function vHome(){
     h('div',{class:'home-shortcuts'},...shortcuts.map(([icon,label,view])=>h('button',{class:'home-shortcut',onclick:()=>go(view)},h('span',{},icon),h('b',{},label),h('span',{class:'home-shortcut-arrow'},'›')))),
     h('div',{class:'home-section-heading'},h('h2',{},'Jadwal piket terdekat'),h('button',{class:'btn s',onclick:()=>go('piket')},'Lihat semua')),
     upcomingDuties.length?h('div',{class:'home-agenda'},...dutyRows):h('div',{class:'home-empty'},h('span',{},'🧹'),h('p',{},'Belum ada jadwal piket mendatang.')),
-    h('div',{class:'home-section-heading'},h('h2',{},'Kegiatan komunitas'),h('button',{class:'btn s',onclick:()=>go('absen')},'Buka absensi')),
-    recentEvents.length?h('div',{class:'home-events'},...recentEvents.map(event=>h('div',{class:'home-event'},h('span',{},'🎉'),h('div',{},h('b',{},event.judul||'Kegiatan komunitas'),h('small',{},(event.hadir||[]).length+' anggota akan hadir'))))):h('div',{class:'home-empty'},h('span',{},'🎉'),h('p',{},'Belum ada kegiatan komunitas.')),
+    h('div',{class:'home-section-heading'},h('h2',{},'Kegiatan komunitas'),h('button',{class:'btn s',onclick:()=>go('kegiatan')},'Lihat kegiatan')),
+    recentEvents.length?h('div',{class:'home-events'},...recentEvents.map(event=>h('div',{class:'home-event'},h('span',{},'🎉'),h('div',{},h('b',{},event.judul||'Kegiatan komunitas'),h('small',{},eventParticipantCount(event)+' peserta · '+eventAttendanceCount(event)+' hadir'))))):h('div',{class:'home-empty'},h('span',{},'🎉'),h('p',{},'Belum ada kegiatan komunitas.')),
     h('button',{class:'home-admin-link',onclick:askForm},'💬 Butuh bantuan? Hubungi Admin')
   ];
 }
@@ -427,10 +453,9 @@ function vDash(){
     h('div',{class:'card',style:'display:block'},h('small',{class:'warn'},'User ID'),h('br'),h('b',{},S.email||S.uid||'-')),
     h('div',{class:'stats'},...[['Anggota',S.members.length],['Kegiatan',S.events.length],['Wilayah',Object.keys(wilayah()).length]].map(x=>h('div',{},h('small',{},x[0]),h('b',{},String(x[1]))))),
     c('👥','Daftar Anggota','Kelola data anggota komunitas',S.members.length+' anggota','members'),
-    c('📋','Absensi','Kegiatan & kehadiran anggota',S.events.length+' kegiatan','absen'),
+    c('🎉','Kegiatan','Agenda, peserta, dan absensi anggota',S.events.length+' kegiatan','kegiatan'),
     c('🧹','Jadwal Piket','Jadwal kebersihan komunitas',S.cleaningDuties.length+' jadwal','piket'),
     c('💬','Forum','Diskusi & komentar anggota',S.topics.length+' topik','forum'),
-    S.admin&&c('📥','Import Database','Tambahkan data anggota','Impor CSV','import'),
     c('📨','Pesan Masuk','Pesan dan balasan admin',S.admin?((S.tanya?.length||0)+' pesan'):'Pesan saya','pesan'),
     c('🗺️','Peta & Wilayah','Sebaran anggota di Jepang',Object.keys(wilayah()).length+' wilayah','peta'),
     h('button',{class:'card',onclick:async()=>{await S.supabase.auth.signOut()}},h('span',{class:'e'},'🚪'),h('span',{style:'flex:1'},h('b',{},'Keluar'),h('small',{},'Akhiri sesi akun')),'›')];
@@ -482,15 +507,24 @@ function vMembers(){
     count,list
   ];
 }
+function memberCode(member){
+  return String(member.kode||'MEM-'+String(member.id||'00000').replace(/\D/g,'').slice(-5).padStart(5,'0'));
+}
+function memberBarcodeValue(member){
+  const code=memberCode(member);
+  return /^IJCCS-\d+$/i.test(code)
+    ?code.slice(code.lastIndexOf('-')+1).padStart(10,'0')
+    :String(Math.abs(Array.from(code).reduce((hash,char)=>Math.imul(hash,31)+char.charCodeAt(0)|0,7))).padStart(10,'0').slice(-10);
+}
 function detailCard(){
-  const member=S.detail,area=memberRegion(member),code=member.kode||'MEM-'+String(member.id||'00000').replace(/\D/g,'').slice(-5).padStart(5,'0'),sections=[
+  const member=S.detail,area=memberRegion(member),code=memberCode(member),sections=[
     ['Identitas & Keanggotaan',[['Nama lengkap',member.nama],['Nama panggilan',member.panggilan],['Nomor anggota',code],['Jenis kelamin',member.kelamin],['Tanggal lahir',member.lahir],['Umur',member.umur],['Status',member.status||'aktif'],['Peran',member.peran||'Anggota'],['Pernikahan',member.nikah],['MT',member.mt]]],
     ['Kontak & Keluarga',[['WhatsApp',member.wa],['Email',member.email],['Nama pengurus daerah',member.pengurus],['Nomor HP pengurus daerah',member.hp_pengurus],['Nama orang tua',member.ortu],['Nomor HP orang tua',member.hp_ortu],['Instagram',member.instagram],['TikTok',member.tiktok],['Facebook',member.facebook]]],
     ['Alamat Indonesia',[['Kelompok',member.kelompok],['Desa',member.desa],['Daerah',member.daerah],['Provinsi',member.prov],['Kabupaten/Kota',member.kab],['Kecamatan',member.kec],['Alamat',member.alamat_id]]],
     ['Alamat & Pekerjaan di Jepang',[['Wilayah',area],['Prefektur',member.pref],['Kota',member.kota],['Kecamatan',member.kec_jp],['Kode pos',member.kodepos],['Stasiun',member.stasiun],['Alamat',member.alamat_jp],['Mulai tinggal',member.mulai_jp],['Status visa',member.tinggal],['Bidang pekerjaan',member.bidang],['Perusahaan',member.perusahaan]]],
     ['Catatan',[['Catatan',member.catatan]]]
   ];
-  const barcodeText=/^IJCCS-\d+$/i.test(code)?code.slice(code.lastIndexOf('-')+1).padStart(10,'0'):String(Math.abs(Array.from(code).reduce((hash,char)=>Math.imul(hash,31)+char.charCodeAt(0)|0,7))).padStart(10,'0').slice(-10);
+  const barcodeText=memberBarcodeValue(member);
   const code39={'0':'nnnwwnwnn','1':'wnnwnnnnw','2':'nnwwnnnnw','3':'wnwwnnnnn','4':'nnnwwnnnw','5':'wnnwwnnnn','6':'nnwwwnnnn','7':'nnnwnnwnw','8':'wnnwnnwnn','9':'nnwwnnwnn','*':'nwnnwnwnn'};
   const barcode=h('svg',{class:'member-barcode',viewBox:'0 0 1 54',role:'img','aria-label':'Barcode anggota '+code});
   let x=0;
@@ -686,15 +720,162 @@ function memberFormCard(){
     h('div',{class:'member-editor-actions'},h('button',{class:'btn s',onclick:()=>{S.form=null;render()}},'Batal'),h('button',{class:'btn',onclick:saveForm},f.id?'Simpan perubahan':'Simpan anggota'))
   );
 }
-function vAbsen(){
-  const t=h('input',{placeholder:'Nama kegiatan'});
-  const list=S.events.map(e=>{const a=e.hadir||[],ya=a.includes(S.uid);
-    return h('div',{class:'card'},h('span',{style:'flex:1'},h('b',{},e.judul),h('small',{},a.length+' hadir')),
-      h('button',{class:'btn s',onclick:()=>S.db.collection('events').doc(e.id).update({hadir:ya?a.filter(x=>x!==S.uid):[...a,S.uid]}).catch(()=>alert('Tidak bisa menyimpan'))},ya?'Batal hadir':'Hadir'),
-      S.admin&&h('button',{class:'btn s',onclick:()=>{if(confirm('Hapus kegiatan?'))S.db.collection('events').doc(e.id).delete()}},'✕'))});
-  return [h('h1',{},'Absensi'),h('p',{class:'sub'},'Kegiatan & kehadiran'),guard(),
-    S.admin&&h('div',{class:'card',style:'display:block'},t,h('button',{class:'btn',onclick:async()=>{if(!t.value.trim())return;await S.db.collection('events').add({judul:t.value.trim(),hadir:[],at:Date.now()});t.value=''}},'Buat kegiatan')),
-    list.length?list:h('p',{class:'warn'},'Belum ada kegiatan.')];
+function activityCard(event){
+  const participants=activityMemberIds(event,'peserta_anggota'),attendees=new Set(activityMemberIds(event,'hadir_anggota'));
+  const registeredMembers=S.members.filter(member=>String(member.status||'aktif').toLowerCase()!=='nonaktif');
+  const participantRows=participants.map(id=>{
+    const member=S.members.find(item=>String(item.id)===id),present=attendees.has(id);
+    return h('div',{class:'activity-participant'},
+      h('div',{},h('b',{},member?.nama||'Anggota tidak ditemukan'),h('small',{},member?memberCode(member):'ID: '+id)),
+      S.admin&&h('div',{class:'activity-participant-actions'},
+        h('button',{class:'btn s',onclick:async()=>{
+          try{await updateActivityMember(event.id,id,present?'absent':'present')}catch(error){console.error(error);alert('Gagal memperbarui kehadiran: '+(error.message||'periksa koneksi'))}
+        }},present?'Batal hadir':'Tandai hadir'),
+        h('button',{class:'btn s',onclick:async()=>{
+          if(!confirm('Keluarkan '+(member?.nama||'anggota ini')+' dari kegiatan?'))return;
+          try{await updateActivityMember(event.id,id,'remove')}catch(error){console.error(error);alert('Gagal menghapus peserta: '+(error.message||'periksa koneksi'))}
+        }},'Hapus')));
+  });
+  const date=event.tanggal?new Date(event.tanggal+'T00:00:00'):null;
+  const dateLabel=date&&!Number.isNaN(date.getTime())?date.toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'}):'Tanggal belum ditentukan';
+  const legacyCount=Array.isArray(event.hadir_anggota)?0:(event.hadir||[]).length;
+  const feedback=S.activityFeedback&&String(S.activityFeedback.eventId)===String(event.id)?S.activityFeedback.message:'';
+  const content=[
+    h('div',{class:'activity-heading'},h('div',{},h('h2',{},event.judul||'Kegiatan komunitas'),h('p',{class:'activity-meta'},dateLabel+(event.waktu?' · '+event.waktu:'')),event.lokasi&&h('p',{class:'activity-meta'},'📍 '+event.lokasi)),S.admin&&h('button',{class:'btn s',onclick:async()=>{
+      if(!confirm('Hapus kegiatan "'+(event.judul||'ini')+'"?'))return;
+      try{await S.db.collection('events').doc(event.id).delete()}catch(error){console.error(error);alert('Gagal menghapus kegiatan: '+(error.message||'periksa koneksi'))}
+    }},'Hapus kegiatan')),
+    event.deskripsi&&h('p',{class:'activity-description'},event.deskripsi),
+    h('div',{class:'activity-counts'},h('b',{},participants.length+' peserta'),h('b',{},attendees.size+' hadir')),
+    legacyCount>0&&h('p',{class:'warn'},legacyCount+' catatan absensi lama belum terhubung dengan data anggota.'),
+    h('h3',{},'Daftar peserta'),
+    participantRows.length?h('div',{class:'activity-roster'},...participantRows):h('p',{class:'activity-empty'},'Belum ada anggota yang terdaftar untuk kegiatan ini.')
+  ];
+  if(S.admin){
+    const eligibleMembers=registeredMembers.filter(member=>!participants.includes(String(member.id)));
+    const memberSelect=h('select',{class:'activity-member-select'},h('option',{value:''},eligibleMembers.length?'Pilih anggota terdaftar':'Tidak ada anggota lain untuk ditambahkan'),...eligibleMembers.map(member=>h('option',{value:member.id},(member.nama||'Tanpa nama')+' · '+memberCode(member))));
+    const status=h('p',{class:'activity-feedback','aria-live':'polite'},feedback);
+    const addMember=async()=>{
+      if(!memberSelect.value){status.textContent='Pilih anggota yang akan ditambahkan.';return}
+      try{await updateActivityMember(event.id,memberSelect.value,'add')}catch(error){console.error(error);alert('Gagal menambahkan peserta: '+(error.message||'periksa koneksi'))}
+    };
+    const barcodeInput=h('input',{class:'activity-barcode-input',placeholder:'Pindai barcode kartu anggota',autocomplete:'off'});
+    const scanButton=h('button',{class:'btn s',type:'button'},'📷 Buka kamera');
+    const scannerVideo=h('video',{class:'activity-scanner-video',autoplay:'',muted:'',playsinline:'true',style:'display:none'});
+    const processBarcode=async value=>{
+      const code=String(value||'').trim().replace(/^\*|\*$/g,'').toUpperCase();
+      if(!code){status.textContent='Barcode kosong.';return}
+      const matches=registeredMembers.filter(member=>memberBarcodeValue(member)===code||memberCode(member).toUpperCase()===code);
+      if(matches.length===0){status.textContent='Barcode tidak cocok dengan anggota terdaftar.';return}
+      if(matches.length>1){status.textContent='Barcode cocok dengan beberapa anggota. Periksa nomor kartu terlebih dahulu.';return}
+      const member=matches[0];
+      if(attendees.has(String(member.id))){status.textContent=(member.nama||'Anggota')+' sudah tercatat hadir.';return}
+      try{
+        await updateActivityMember(event.id,member.id,'present');
+        S.activityFeedback={eventId:event.id,message:(member.nama||'Anggota')+' berhasil ditambahkan dan dicatat hadir.'};
+        render();
+      }catch(error){console.error(error);status.textContent='Gagal mencatat kehadiran: '+(error.message||'periksa koneksi')}
+    };
+    const submitBarcode=async()=>{
+      const value=barcodeInput.value;
+      barcodeInput.value='';
+      await processBarcode(value);
+    };
+    barcodeInput.onkeydown=event=>{if(event.key==='Enter'){event.preventDefault();submitBarcode()}};
+    scanButton.onclick=async()=>{
+      if(S.activityScannerStop){S.activityScannerStop();return}
+      if(!window.BarcodeDetector||typeof window.BarcodeDetector.getSupportedFormats!=='function'||!navigator.mediaDevices?.getUserMedia){
+        status.textContent='Pemindaian kamera tidak didukung. Gunakan scanner barcode USB/Bluetooth pada kolom di bawah.';
+        return;
+      }
+      let stream=null,active=false,frame=0,stopScanner=()=>{};
+      try{
+        const formats=await window.BarcodeDetector.getSupportedFormats();
+        if(!formats.includes('code_39')){
+          status.textContent='Browser ini belum mendukung barcode Code 39. Gunakan scanner barcode USB/Bluetooth.';
+          return;
+        }
+        const detector=new window.BarcodeDetector({formats:['code_39']});
+        stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'},audio:false});
+        active=true;
+        scannerVideo.srcObject=stream;scannerVideo.style.display='block';
+        scanButton.textContent='Berhenti memindai';
+        stopScanner=()=>{
+          active=false;
+          if(frame)cancelAnimationFrame(frame);
+          stream.getTracks().forEach(track=>track.stop());
+          scannerVideo.srcObject=null;scannerVideo.style.display='none';
+          scanButton.textContent='📷 Buka kamera';
+          if(S.activityScannerStop===stopScanner)S.activityScannerStop=null;
+        };
+        S.activityScannerStop=stopScanner;
+        await scannerVideo.play();
+        const detect=async()=>{
+          if(!active)return;
+          try{
+            const codes=await detector.detect(scannerVideo);
+            if(codes.length&&codes[0].rawValue){
+              const value=codes[0].rawValue;
+              stopScanner();
+              await processBarcode(value);
+              return;
+            }
+          }catch(error){
+            stopScanner();
+            console.error(error);
+            status.textContent='Gagal membaca barcode melalui kamera: '+(error.message||'coba lagi atau gunakan scanner USB/Bluetooth');
+            return;
+          }
+          if(active)frame=requestAnimationFrame(detect);
+        };
+        detect();
+      }catch(error){
+        stopScanner();
+        if(stream)stream.getTracks().forEach(track=>track.stop());
+        scannerVideo.srcObject=null;scannerVideo.style.display='none';
+        scanButton.textContent='📷 Buka kamera';
+        console.error(error);
+        status.textContent='Kamera tidak dapat dibuka: '+(error.message||'periksa izin kamera atau gunakan scanner USB/Bluetooth');
+      }
+    };
+    content.push(
+      h('h3',{},'Absensi peserta'),
+      h('p',{class:'activity-help'},'Tambahkan peserta dari daftar anggota, lalu tandai kehadiran secara manual atau pindai barcode kartu anggota.'),
+      h('div',{class:'activity-add-row'},memberSelect,h('button',{class:'btn s',onclick:addMember},'Tambah peserta')),
+      h('div',{class:'activity-scanner-row'},barcodeInput,h('button',{class:'btn s',onclick:submitBarcode},'Catat hadir')),
+      h('div',{class:'activity-scanner-row'},scanButton),
+      scannerVideo,status
+    );
+  }
+  return h('article',{class:'card activity-card'},...content);
+}
+function vKegiatan(){
+  const title=h('input',{placeholder:'Nama kegiatan',maxlength:'150'});
+  const date=h('input',{type:'date'});
+  const time=h('input',{type:'time'});
+  const location=h('input',{placeholder:'Lokasi kegiatan',maxlength:'180'});
+  const description=h('textarea',{placeholder:'Deskripsi atau informasi kegiatan',maxlength:'1000',rows:'3'});
+  const events=[...S.events].sort((a,b)=>(b.tanggal||'').localeCompare(a.tanggal||'')||(b.at||0)-(a.at||0));
+  const createForm=S.admin&&h('section',{class:'card activity-create'},h('h2',{},'Buat kegiatan'),
+    h('label',{class:'activity-field'},'Nama kegiatan *',title),
+    h('div',{class:'activity-create-grid'},h('label',{class:'activity-field'},'Tanggal *',date),h('label',{class:'activity-field'},'Waktu',time)),
+    h('label',{class:'activity-field'},'Lokasi',location),
+    h('label',{class:'activity-field'},'Deskripsi',description),
+    h('button',{class:'btn',onclick:async()=>{
+      const judul=title.value.trim();
+      if(!judul||!date.value){alert('Isi nama dan tanggal kegiatan.');return}
+      try{
+        await S.db.collection('events').add({judul,tanggal:date.value,waktu:time.value,lokasi:location.value.trim(),deskripsi:description.value.trim(),peserta_anggota:[],hadir_anggota:[],at:Date.now()});
+        title.value='';date.value='';time.value='';location.value='';description.value='';
+      }catch(error){console.error(error);alert('Gagal membuat kegiatan: '+(error.message||'periksa koneksi'))}
+    }},'Buat kegiatan'));
+  return [
+    h('h1',{},'Kegiatan'),
+    h('p',{class:'sub'},'Rencanakan kegiatan, daftarkan anggota, dan catat kehadiran.'),
+    guard(),
+    createForm,
+    events.length?h('div',{class:'activity-list'},...events.map(activityCard)):h('p',{class:'warn'},'Belum ada kegiatan.')
+  ];
 }
 function vPiket(){
   const form=S.dutyForm;
@@ -776,167 +957,6 @@ async function loadMapSettings(){
   if(error){console.error(error);S.mapError=error.message||'Konfigurasi peta tidak dapat dibaca';S.pengaturan=[];return}
   S.mapError='';
   S.pengaturan=data?[{id:'peta',mid:data.map_mid}]:[];
-}
-function visitTrackingAllowed(){
-  if(S.visitConsent===null){
-    try{S.visitConsent=localStorage.getItem('shikoku-family:visit-consent')||'accepted'}
-    catch(error){console.warn('Pilihan analitik pengunjung tidak dapat dibaca:',error);S.visitConsent='accepted'}
-  }
-  return S.visitConsent==='accepted';
-}
-async function trackSiteVisit(){
-  if(!S.supabase||!S.uid||S.admin||!visitTrackingAllowed())return;
-  const page='/'+String(S.view||'landing').replace(/[^a-z0-9_-]/gi,'').slice(0,80);
-  const visitKey=new Date().toISOString().slice(0,10)+'|'+page;
-  if(S.lastTrackedVisit===visitKey)return;
-  S.lastTrackedVisit=visitKey;
-  try{
-    if(!S.visitLocation){
-      try{S.visitLocation=JSON.parse(sessionStorage.getItem('shikoku-family:visit-location-jp-postal-v1')||'null')}catch(error){console.warn('Cache lokasi kunjungan tidak dapat dibaca:',error)}
-    }
-    if(!S.visitLocation){
-      const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),8000);
-      let response;
-      try{response=await fetch('https://ipwho.is/',{signal:controller.signal,referrerPolicy:'no-referrer'})}
-      finally{clearTimeout(timeout)}
-      if(!response.ok)throw new Error('Layanan lokasi mengembalikan HTTP '+response.status);
-      const result=await response.json();
-      if(result.success===false)throw new Error(result.message||'Lokasi perkiraan tidak tersedia');
-      if(String(result.country_code||'').toUpperCase()!=='JP')return;
-      const postalDigits=String(result.postal||'').replace(/\D/g,'');
-      if(postalDigits.length!==7)throw new Error('Kode pos perkiraan Jepang tidak tersedia');
-      if(!result.country||!result.city)throw new Error('Wilayah perkiraan tidak tersedia');
-      const latitude=Number(result.latitude),longitude=Number(result.longitude);
-      if(!Number.isFinite(latitude)||!Number.isFinite(longitude)||latitude<24||latitude>46.5||longitude<122||longitude>154)throw new Error('Koordinat wilayah Jepang tidak tersedia');
-      S.visitLocation={
-        country_code:'JP',
-        country_name:String(result.country),
-        region_name:String(result.region||''),
-        city_name:String(result.city),
-        postal_code:postalDigits.slice(0,3)+'-'+postalDigits.slice(3),
-        latitude:Math.round(latitude*10)/10,
-        longitude:Math.round(longitude*10)/10
-      };
-      try{sessionStorage.setItem('shikoku-family:visit-location-jp-postal-v1',JSON.stringify(S.visitLocation))}catch(error){console.warn('Cache lokasi kunjungan tidak dapat disimpan:',error)}
-    }
-    let referrer='direct';
-    if(document.referrer){try{referrer=new URL(document.referrer).hostname||'direct'}catch(error){console.warn('Domain rujukan tidak dapat dibaca:',error)}}
-    const {error}=await S.supabase.rpc('record_site_visit',{
-      p_country_code:S.visitLocation.country_code,
-      p_country_name:S.visitLocation.country_name,
-      p_region_name:S.visitLocation.region_name,
-      p_city_name:S.visitLocation.city_name,
-      p_postal_code:S.visitLocation.postal_code,
-      p_latitude:S.visitLocation.latitude,
-      p_longitude:S.visitLocation.longitude,
-      p_page_path:page,
-      p_referrer_host:referrer
-    });
-    if(error)throw error;
-  }catch(error){
-    S.siteTrackingError=error.message||'Kunjungan tidak dapat dicatat';
-    console.error('Pencatatan kunjungan gagal:',error);
-    showVisitTrackingError();
-  }
-}
-function showVisitTrackingError(){
-  if($('#visit-tracking-error'))return;
-  document.body.append(h('aside',{id:'visit-tracking-error',role:'status'},
-    h('span',{},'Perkiraan lokasi tidak tersedia; kunjungan ini tidak tercatat.'),
-    h('button',{class:'btn s',onclick:()=>$('#visit-tracking-error')?.remove()},'Tutup')));
-}
-function renderVisitorMap(locations){
-  const container=$('#visitor-map');
-  if(!container)return;
-  if(!window.L){container.textContent='Peta tidak dapat dimuat. Periksa koneksi internet lalu perbarui halaman.';return}
-  const bounds=L.latLngBounds([[24,122],[46.5,154]]);
-  S.visitorMap=L.map(container,{minZoom:4,maxZoom:18,maxBounds:bounds,maxBoundsViscosity:1,scrollWheelZoom:true});
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
-    maxZoom:19,
-    attribution:'&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a>'
-  }).addTo(S.visitorMap);
-  S.visitorMap.fitBounds(bounds,{padding:[6,6]});
-  locations.forEach(place=>{
-    if(place.latitude==null||place.longitude==null)return;
-    const latitude=Number(place.latitude),longitude=Number(place.longitude);
-    if(!Number.isFinite(latitude)||!Number.isFinite(longitude)||latitude<24||latitude>46.5||longitude<122||longitude>154)return;
-    L.circleMarker([latitude,longitude],{
-      radius:Math.min(16,6+Math.sqrt(place.visits)),
-      color:'#fff',
-      weight:2,
-      fillColor:'#d9455f',
-      fillOpacity:.9
-    }).bindTooltip(place.postal_code,{className:'visitor-map-marker-label'}).bindPopup('<b>'+place.postal_code+'</b><br>'+place.visits+' kunjungan').addTo(S.visitorMap);
-  });
-}
-async function loadSiteVisits(){
-  if(!S.mainAdmin||!S.supabase){S.siteVisitsError='Halaman ini membutuhkan akun admin utama dan koneksi Supabase.';return}
-  S.siteVisitsLoading=true;S.siteVisitsError='';render();
-  try{
-    const {data,error}=await S.supabase.from('site_visit_summaries').select('*').eq('country_code','JP').like('postal_code','___-____').order('visit_day',{ascending:false}).limit(1000);
-    if(error)throw error;
-    S.siteVisits=data||[];S.siteVisitsError='';
-  }catch(error){S.siteVisitsError=error.message||'Data kunjungan tidak dapat dibaca';console.error('Data kunjungan tidak dapat dibaca:',error)}
-  S.siteVisitsLoading=false;
-  if(S.view==='visitor-map')render();
-}
-async function clearSiteVisits(){
-  if(!S.mainAdmin||!S.supabase)return;
-  if(!confirm('Hapus seluruh ringkasan kunjungan yang tersimpan?'))return;
-  try{
-    const {error}=await S.supabase.from('site_visit_summaries').delete().neq('country_code','');
-    if(error)throw error;
-    S.siteVisits=[];S.siteVisitsError='';render();
-  }catch(error){S.siteVisitsError=error.message||'Ringkasan kunjungan tidak dapat dihapus';console.error('Ringkasan kunjungan tidak dapat dihapus:',error);render()}
-}
-function visitorPlaces(rows){
-  const locations=new Map();
-  rows.filter(row=>row.country_code==='JP'&&/^\d{3}-\d{4}$/.test(row.postal_code||'')).forEach(row=>{
-    const item=locations.get(row.postal_code)||{...row,visits:0,latitude:0,longitude:0,coordinates:0};
-    const count=Number(row.visits)||0;
-    item.visits+=count;
-    if(Number.isFinite(Number(row.latitude))&&Number.isFinite(Number(row.longitude))){
-      item.latitude+=Number(row.latitude)*count;
-      item.longitude+=Number(row.longitude)*count;
-      item.coordinates+=count;
-    }
-    locations.set(row.postal_code,item);
-  });
-  return [...locations.values()].map(item=>({
-    ...item,
-    latitude:item.coordinates?Math.round(item.latitude/item.coordinates*10)/10:null,
-    longitude:item.coordinates?Math.round(item.longitude/item.coordinates*10)/10:null
-  })).sort((a,b)=>b.visits-a.visits);
-}
-function vVisitorMap(){
-  if(!S.mainAdmin)return [h('p',{class:'warn'},'Halaman ini hanya dapat diakses admin utama.')];
-  const rows=S.siteVisits.filter(row=>row.country_code==='JP'&&/^\d{3}-\d{4}$/.test(row.postal_code||'')),places=visitorPlaces(rows);
-  const total=rows.reduce((sum,row)=>sum+(Number(row.visits)||0),0);
-  const table=rows.length?h('div',{class:'visitor-visit-list'},...rows.map(row=>
-    h('article',{class:'visitor-visit-row'},
-      h('div',{},h('b',{},row.postal_code),h('small',{},[row.city_name,row.region_name].filter(Boolean).join(' · '))),
-      h('div',{},h('span',{class:'tag'},row.visits+' kunjungan'),h('small',{},[row.page_path,row.referrer_host,row.visit_day].join(' · ')))))):
-    h('div',{class:'member-empty'},h('span',{},'🇯🇵'),h('b',{},'Belum ada data kunjungan'),h('p',{},'Data lokasi Jepang akan tampil setelah pengguna yang masuk mengunjungi situs.'));
-  return [
-    h('div',{class:'visitor-page-heading'},h('div',{},h('h1',{},'Peta Kunjungan Jepang'),h('p',{class:'sub'},'Pencatatan otomatis untuk pengguna non-admin yang masuk. Lokasi perkiraan Jepang dikelompokkan menurut kode pos; IP tidak disimpan oleh situs, tetapi layanan ipwho.is menerima IP untuk menentukan lokasi.')),
-      h('button',{class:'btn s',onclick:loadSiteVisits},'↻ Perbarui')),
-    S.siteVisitsError&&h('p',{class:'warn visitor-error'},S.siteVisitsError),
-    S.siteTrackingError&&h('p',{class:'warn visitor-error'},'Pencatatan kunjungan terakhir gagal: '+S.siteTrackingError),
-    S.siteVisitsLoading&&h('p',{class:'warn'},'Memuat ringkasan kunjungan...'),
-    h('div',{class:'stats visitor-stats'},...[
-      ['Kunjungan',total],['Wilayah kode pos',places.length]
-    ].map(([label,count])=>h('div',{},h('small',{},label),h('b',{},String(count)))),
-    ),
-    h('div',{class:'card visitor-map-card'},h('div',{id:'visitor-map',class:'visitor-japan-map',role:'application','aria-label':'Peta wilayah kode pos di Jepang'})),
-    h('h2',{class:'visitor-section-title'},'WILAYAH KODE POS'),
-    places.length?h('div',{class:'visitor-place-list'},...places.map(place=>
-      h('article',{class:'visitor-place-row'},h('span',{class:'visitor-place-dot'},'●'),
-        h('div',{},h('b',{},place.postal_code),h('small',{},[place.city_name,place.region_name].filter(Boolean).join(' · '))),
-        h('strong',{},place.visits+' kunjungan')))):
-      h('p',{class:'warn'},'Belum ada wilayah kode pos untuk ditampilkan di peta.'),
-    h('div',{class:'visitor-section-heading'},h('h2',{},'RIWAYAT RINGKAS'),h('button',{class:'btn s visitor-clear',onclick:clearSiteVisits},'Hapus data')),
-    table
-  ];
 }
 async function loadPendingUsers(){
   if(!S.supabase||!S.mainAdmin){S.pendingUsers=[];return}
@@ -1049,22 +1069,13 @@ function vPetaLegacy(){
     h('b',{style:'display:block;margin:6px 4px 10px'},'Sebaran per wilayah'),...sebaran()];
 }
 function sebaran(){const w=wilayah(),k=Object.keys(w);return k.length?k.map(n=>h('div',{class:'card',style:'display:block'},h('div',{class:'row'},h('b',{},'📍 '+n.toUpperCase()),h('span',{class:'tag'},w[n].length+' anggota')),h('small',{},w[n].map(x=>(x.nama||'').toUpperCase()).join(', ')))):[h('p',{class:'warn'},'Belum ada data wilayah.')]}
-function vImport(){
-  const ta=h('textarea',{rows:8,placeholder:'Satu baris satu anggota:\nnama,wilayah\nBudi,Ehime\nSiti,Kagawa'});
-  return [h('h1',{},'Import Database'),h('p',{class:'sub'},'Tempel data CSV (nama,wilayah)'),
-    h('div',{class:'card',style:'display:block'},ta,h('button',{class:'btn',onclick:async()=>{
-      const rows=ta.value.split('\n').map(r=>r.split(',').map(x=>x.trim())).filter(r=>r[0]);
-      for(const r of rows)await S.db.collection('members').add({nama:r[0].toUpperCase(),wilayah:(r[1]||'').toUpperCase(),at:Date.now()});
-      ta.value='';alert(rows.length+' anggota diimpor');go('members')}},'Import'))];
-}
-
-const V={landing:vHome,dash:vDash,members:vMembers,absen:vAbsen,piket:vPiket,peta:vPeta,forum:vForum,import:vImport,'map-settings':vPetaSettings,'visitor-map':vVisitorMap,approvals:vApprovals,pesan:vPesan};
+const V={landing:vHome,dash:vDash,members:vMembers,kegiatan:vKegiatan,piket:vPiket,peta:vPeta,forum:vForum,'map-settings':vPetaSettings,approvals:vApprovals,pesan:vPesan};
 function renderDrawer(){
   const d=$('#dr');
   if(S.adminMenuOpen){
     d.replaceChildren(
       h('p',{class:'sub',style:'padding:0 14px'},h('b',{style:'color:var(--ink)'},'PENGATURAN ADMIN'),h('br'),'Pengelolaan situs'),
-      ...ADMIN_MENU.map(([view,label])=>h('a',{class:S.view===view?'on':'',onclick:()=>{go(view);if(view==='visitor-map')loadSiteVisits()}},label)),
+      ...ADMIN_MENU.map(([view,label])=>h('a',{class:S.view===view?'on':'',onclick:()=>go(view)},label)),
       h('button',{class:'menu-logout',onclick:()=>go('landing')},'← Kembali ke menu utama')
     );
     return;
@@ -1075,7 +1086,7 @@ function renderDrawer(){
     h('button',{class:'menu-logout',onclick:async()=>{await S.supabase.auth.signOut()}},'🚪 Keluar'));
 }
 function render(){
-  if(S.visitorMap){S.visitorMap.remove();S.visitorMap=null}
+  if(S.activityScannerStop)S.activityScannerStop();
   if(!S.mainAdmin)S.adminMenuOpen=false;
   syncAdminTheme();
   if(S.authLoading){
@@ -1108,12 +1119,10 @@ function render(){
     approvalBadge.style.display=S.pendingUsers.length?'inline-grid':'none';
   }
   const current=ALL.find(x=>x[0]===S.view);
-  if(!V[S.view]||['map-settings','visitor-map','approvals'].includes(S.view)&&!S.mainAdmin||current?.[2]&&!S.admin)S.view='landing';
+  if(!V[S.view]||['map-settings','approvals'].includes(S.view)&&!S.mainAdmin||current?.[2]&&!S.admin)S.view='landing';
   $('#app').replaceChildren(...[].concat(V[S.view]()).filter(Boolean));
-  if(S.view==='visitor-map')renderVisitorMap(visitorPlaces(S.siteVisits));
-  trackSiteVisit();
   const tb=$('#tb');tb.style.display=S.form?'none':'flex';$('#pet').style.display=S.form?'none':'block';
-  tb.replaceChildren(...[['landing','🏠','Home'],['dash','📊','Ringkasan'],['members','👥','Anggota'],['absen','📝','Absensi'],['piket','🧹','Piket'],['forum','💬','Forum']].map(x=>h('a',{class:S.view===x[0]?'on':'',onclick:()=>go(x[0])},h('span',{},x[1]),x[2])));
+  tb.replaceChildren(...[['landing','🏠','Home'],['dash','📊','Ringkasan'],['members','👥','Anggota'],['kegiatan','🎉','Kegiatan'],['piket','🧹','Piket'],['forum','💬','Forum']].map(x=>h('a',{class:S.view===x[0]?'on':'',onclick:()=>go(x[0])},h('span',{},x[1]),x[2])));
 }
 function sub(name,key){
   S.db.collection(name).onSnapshot(s=>{
