@@ -40,7 +40,7 @@ function icon(name,size=20){
   for(const d of ICON_PATHS[name]||[]) {const path=document.createElementNS('http://www.w3.org/2000/svg','path');path.setAttribute('d',d);svg.append(path)}
   return svg;
 }
-const WILAYAH=[['Tokushima','#d95763'],['Takamatsu','#3985c6'],['Marugame','#e28b36'],['Zentsuji / Takuma','#8e68b5'],['Kochi','#24947e'],['Matsuyama','#d45e9f'],['Ehime','#6f9e3b'],['Niihama','#6073c4']];
+const WILAYAH=[['Tokushima','#d95763'],['Takamatsu','#3985c6'],['Marugame','#e28b36'],['Zentsuji / Takuma','#8e68b5'],['Kagawa','#3985c6'],['Kochi','#24947e'],['Matsuyama','#d45e9f'],['Ehime','#6f9e3b'],['Niihama','#6073c4'],['Okayama','#c87945']];
 const ALL=[['landing','Home','','','home'],['dash','Ringkasan','','','chart'],['members','Daftar Anggota','','','users'],['kegiatan','Kegiatan','','','calendar'],['piket','Jadwal Piket','','','brush'],['peta','Peta & Wilayah','','','map'],['forum','Forum','','','messages'],['pesan','Pesan Masuk','','','inbox']];
 const ADMIN_MENU=[['map-settings','Pengaturan Peta','map'],['approvals','Persetujuan Akun','users']];
 function isAdminSettingsView(){return ADMIN_MENU.some(([view])=>view===S.view)}
@@ -69,19 +69,7 @@ $('#st').onclick=()=>{
 function regionColor(value){return WILAYAH.find(([name])=>name===value)?.[1]||'#718096'}
 function memberRegion(member){
   const known=value=>WILAYAH.find(([name])=>name.toLowerCase()===String(value||'').trim().toLowerCase())?.[0];
-  const fromText=value=>{
-    const text=normalizeImportLabel(String(value||''));
-    if(text.includes('tokushima'))return 'Tokushima';
-    if(text.includes('takamatsu'))return 'Takamatsu';
-    if(text.includes('marugame'))return 'Marugame';
-    if(text.includes('zentsuji')||text.includes('takuma'))return 'Zentsuji / Takuma';
-    if(text.includes('kochi'))return 'Kochi';
-    if(text.includes('matsuyama'))return 'Matsuyama';
-    if(text.includes('niihama')||text.includes('nihama'))return 'Niihama';
-    return '';
-  };
-  return known(member.wilayah)||fromText(member.kota)||fromText(member.alamat_jp)||
-    (known(member.pref==='Kagawa'?'':member.pref))||'Belum dipilih';
+  return known(member.wilayah)||inferJapanLocation(member.alamat_jp,member.kota,member.kec_jp,member.kodepos,member.pref,member.wilayah)?.wilayah||'Belum dipilih';
 }
 function wilayah(){const m={};S.members.forEach(x=>{const w=memberRegion(x);(m[w]=m[w]||[]).push(x)});return m}
 function openMember(member,origin){S.detail=member;S.detailOrigin=origin;S.view='members';render()}
@@ -592,11 +580,93 @@ function detailCard(){
     S.admin&&h('div',{class:'member-detail-actions'},h('button',{class:'btn',onclick:()=>{S.form={...member};S.detail=null;S.detailOrigin=null;render()}},icon('edit',16),h('span',{},'Edit data anggota')))
   );
 }
-const PREF=['Ehime','Kagawa','Kochi','Tokushima','Hokkaido','Aomori','Iwate','Miyagi','Akita','Yamagata','Fukushima','Ibaraki','Tochigi','Gunma','Saitama','Chiba','Tokyo','Kanagawa','Niigata','Toyama','Ishikawa','Fukui','Yamanashi','Nagano','Gifu','Shizuoka','Aichi','Mie','Shiga','Kyoto','Osaka','Hyogo','Nara','Wakayama','Tottori','Shimane','Okayama','Hiroshima','Yamaguchi','Fukuoka','Saga','Nagasaki','Kumamoto','Oita','Miyazaki','Kagoshima','Okinawa'];
+const PREF=['Tokushima','Kagawa','Ehime','Kochi','Okayama'];
+const PREFECTURE_ALIASES=[
+  ['Tokushima',['tokushima','tokushima ken','徳島県','徳島']],
+  ['Kagawa',['kagawa','kagawa ken','香川県','香川']],
+  ['Ehime',['ehime','ehime ken','愛媛県','愛媛']],
+  ['Kochi',['kochi','kochi ken','高知県','高知']],
+  ['Okayama',['okayama','okayama ken','岡山県','岡山']]
+];
+const LOCALITY_ALIASES=[
+  ['Tokushima','Tokushima','Tokushima',['tokushima city','tokushima','徳島市']],
+  ['Tokushima','Tokushima','Tokushima',['naruto','鳴門市']],
+  ['Tokushima','Tokushima','Tokushima',['anan','阿南市']],
+  ['Tokushima','Tokushima','Tokushima',['komatsushima','小松島市']],
+  ['Tokushima','Tokushima','Tokushima',['yoshinogawa','吉野川市']],
+  ['Tokushima','Tokushima','Tokushima',['mima','美馬市']],
+  ['Tokushima','Tokushima','Tokushima',['miyoshi tokushima','三好市']],
+  ['Kagawa','Takamatsu','Takamatsu',['takamatsu','高松市']],
+  ['Kagawa','Marugame','Marugame',['marugame','丸亀市']],
+  ['Kagawa','Zentsuji / Takuma','Zentsuji / Takuma',['zentsuji','善通寺市']],
+  ['Kagawa','Zentsuji / Takuma','Zentsuji / Takuma',['takuma','詫間']],
+  ['Kagawa','Kagawa','Tadotsu',['tadotsu','多度津町']],
+  ['Kagawa','Kagawa','Sakaide',['sakaide','坂出市']],
+  ['Kagawa','Kagawa','Mitoyo',['mitoyo','三豊市']],
+  ['Kagawa','Kagawa','Kanonji',['kanonji','観音寺市']],
+  ['Kagawa','Kagawa','Sanuki',['sanuki','さぬき市']],
+  ['Kagawa','Kagawa','Higashikagawa',['higashikagawa','東かがわ市']],
+  ['Ehime','Matsuyama','Matsuyama',['matsuyama','松山市']],
+  ['Ehime','Niihama','Niihama',['niihama','nihama','新居浜市']],
+  ['Ehime','Ehime','Imabari',['imabari','今治市']],
+  ['Ehime','Ehime','Saijo',['saijo','西条市']],
+  ['Ehime','Ehime','Shikokuchuo',['shikokuchuo','四国中央市']],
+  ['Ehime','Ehime','Ozu',['ozu','大洲市']],
+  ['Ehime','Ehime','Uwajima',['uwajima','宇和島市']],
+  ['Kochi','Kochi','Kochi',['kochi city','kochi','高知市']],
+  ['Kochi','Kochi','Nankoku',['nankoku','南国市']],
+  ['Kochi','Kochi','Shimanto',['shimanto','四万十市']],
+  ['Kochi','Kochi','Aki',['aki kochi','安芸市']],
+  ['Kochi','Kochi','Susaki',['susaki','須崎市']],
+  ['Okayama','Okayama','Okayama',['okayama city','okayama','岡山市']],
+  ['Okayama','Okayama','Kurashiki',['kurashiki','倉敷市']],
+  ['Okayama','Okayama','Tsuyama',['tsuyama','津山市']],
+  ['Okayama','Okayama','Tamano',['tamano','玉野市']],
+  ['Okayama','Okayama','Soja',['soja','総社市']],
+  ['Okayama','Okayama','Bizen',['bizen','備前市']],
+  ['Okayama','Okayama','Setouchi',['setouchi','瀬戸内市']],
+  ['Okayama','Okayama','Kasaoka',['kasaoka','笠岡市']],
+  ['Okayama','Okayama','Ibara',['ibara','井原市']],
+  ['Okayama','Okayama','Akaiwa',['akaiwa','赤磐市']]
+];
+function inferJapanLocation(...values){
+  const raw=values.filter(value=>value!==null&&value!==undefined&&String(value).trim()).map(String).join(' ');
+  if(!raw)return null;
+  const normalized=normalizeImportLabel(raw);
+  const aliasLength=alias=>{
+    if(/[^\u0000-\u007f]/.test(alias))return raw.includes(alias)?alias.length:0;
+    const phrase=normalizeImportLabel(alias).split(' ').map(part=>part.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('\\s+');
+    return new RegExp('(?:^|\\s)'+phrase+'(?:$|\\s)').test(normalized)?phrase.length:0;
+  };
+  const hasAlias=alias=>{
+    return aliasLength(alias)>0;
+  };
+  const fromPref=PREFECTURE_ALIASES.find(([,aliases])=>aliases.some(hasAlias))?.[0];
+  const locality=LOCALITY_ALIASES
+    .filter(([pref,,,aliases])=>(!fromPref||fromPref===pref)&&aliases.some(hasAlias))
+    .sort((a,b)=>Math.max(...b[3].map(aliasLength))-Math.max(...a[3].map(aliasLength)))[0];
+  const postal=raw.match(/\b\d{3}[- ]?\d{4}\b/);
+  const postalPrefix=postal?.[0].replace(/\D/g,'').slice(0,2);
+  const fromPostal=postalPrefix==='70'||postalPrefix==='71'?'Okayama':
+    postalPrefix==='76'?'Kagawa':postalPrefix==='77'?'Tokushima':
+    postalPrefix==='78'?'Kochi':postalPrefix==='79'?'Ehime':'';
+  const pref=fromPref||locality?.[0]||fromPostal;
+  if(!pref)return null;
+  const matchingLocality=locality||null;
+  const wilayah=matchingLocality?.[1]||pref;
+  const kota=matchingLocality?.[2]||'';
+  return {pref,wilayah,kota};
+}
 const PROV=['Aceh','Sumatera Utara','Sumatera Barat','Riau','Kepulauan Riau','Jambi','Sumatera Selatan','Bangka Belitung','Bengkulu','Lampung','DKI Jakarta','Banten','Jawa Barat','Jawa Tengah','DI Yogyakarta','Jawa Timur','Bali','Nusa Tenggara Barat','Nusa Tenggara Timur','Kalimantan Barat','Kalimantan Tengah','Kalimantan Selatan','Kalimantan Timur','Kalimantan Utara','Sulawesi Utara','Gorontalo','Sulawesi Tengah','Sulawesi Barat','Sulawesi Selatan','Sulawesi Tenggara','Maluku','Maluku Utara','Papua','Papua Barat','Papua Barat Daya','Papua Selatan','Papua Tengah','Papua Pegunungan'];
 const BLN=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
 const TGL=['Technical Intern (Ginou Jisshu)','Specified Skilled Worker (Tokutei Ginou)','Engineer/Specialist','Pelajar','Permanent Resident','Dependent/Keluarga','Lainnya'];
 function normalizeImportLabel(value){return value.normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim()}
+function cleanMemberValue(value){return String(value||'').replace(/[()（）]/g,'').trim()}
+function cleanIndonesiaPlace(value,label){
+  const text=cleanMemberValue(value);
+  const prefix=new RegExp('^'+label+'(?:\\s*[:：-]\\s*|\\s+)','i');
+  return text.replace(prefix,'').trim();
+}
 function importDate(value){
   const match=value.trim().match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})$/);
   if(!match)return '';
@@ -607,6 +677,7 @@ function parseMemberPaste(text){
   const aliases=[
     [['nama lengkap'],'nama'],[['jenis kelamin'],'kelamin'],[['tgl bln thn lahir','tanggal lahir'],'lahir'],
     [['umur','usia'],'umur'],[['kelompok desa daerah di indonesia'],'wilayah_indonesia'],
+    [['kelompok'],'kelompok'],[['desa','desa kelurahan'],'desa'],[['daerah'],'daerah'],
     [['no hp pengurus daerah nama','no hp pengurus daerah'],'pengurus_contact'],
     [['status lajang menikah','status lajang menikah cerai'],'nikah'],[['mt iya bukan','mt'],'mt'],
     [['mulai tinggal di jepang'],'mulai_jp'],[['alamat tinggal di jepang'],'alamat_jp'],
@@ -617,8 +688,8 @@ function parseMemberPaste(text){
   let current='';
   text.split(/\r?\n/).forEach(line=>{
     const match=line.match(/^\s*(?:\d+\s*[.)]\s*)?([^:：]+?)\s*[:：]\s*(.*)$/);
-    if(match){current=normalizeImportLabel(match[1]);values[current]=match[2].trim()}
-    else if(current&&line.trim())values[current]+=' '+line.trim();
+    if(match){current=normalizeImportLabel(match[1]);values[current]=cleanMemberValue(match[2])}
+    else if(current&&line.trim())values[current]=cleanMemberValue(values[current]+' '+line);
   });
   const data={},recognized=[];
   aliases.forEach(([labels,key])=>{
@@ -634,12 +705,13 @@ function parseMemberPaste(text){
   if(data.lahir){const converted=importDate(data.lahir);if(converted)data.lahir=converted;else delete data.lahir}
   if(data.umur)data.umur=data.umur.match(/\d+/)?.[0]||data.umur;
   if(data.wilayah_indonesia){
-    const [kelompok,desa,daerah]=data.wilayah_indonesia.split(',').map(part=>part.trim());
-    if(kelompok)data.kelompok=kelompok;
-    if(desa)data.desa=desa;
-    if(daerah)data.daerah=daerah;
+    const [kelompok,desa,daerah]=data.wilayah_indonesia.split(',');
+    if(kelompok&&!data.kelompok)data.kelompok=kelompok;
+    if(desa&&!data.desa)data.desa=desa;
+    if(daerah&&!data.daerah)data.daerah=daerah;
     delete data.wilayah_indonesia;
   }
+  for(const key of ['kelompok','desa','daerah'])if(data[key])data[key]=cleanIndonesiaPlace(data[key],key);
   const splitContact=(value,nameKey,phoneKey)=>{
     if(!value)return;
     const phone=value.match(/\+?\d[\d\s().-]{6,}\d/);
@@ -664,13 +736,8 @@ function parseMemberPaste(text){
   if(data.mulai_jp)data.mulai_jp=data.mulai_jp.trim();
   if(data.alamat_jp){
     const address=data.alamat_jp.trim();
-    const normalizedAddress=normalizeImportLabel(address);
-    const cities=[['zentsuji','Zentsuji / Takuma','Kagawa'],['takuma','Zentsuji / Takuma','Kagawa'],['niihama','Niihama','Ehime'],['nihama','Niihama','Ehime'],['marugame','Marugame','Kagawa'],['takamatsu','Takamatsu','Kagawa'],['matsuyama','Matsuyama','Ehime'],['kochi','Kochi','Kochi'],['tokushima','Tokushima','Tokushima']];
-    const city=cities.find(([needle])=>normalizedAddress.includes(needle));
-    if(city){data.kota=city[1];data.pref=city[2];data.wilayah=city[1]}
-    else if(normalizedAddress.includes('ehime')){data.pref='Ehime';data.wilayah='Ehime'}
-    else if(normalizedAddress.includes('kochi')){data.pref='Kochi';data.wilayah='Kochi'}
-    else if(normalizedAddress.includes('tokushima')){data.pref='Tokushima';data.wilayah='Tokushima'}
+    const location=inferJapanLocation(address);
+    if(location){data.pref=location.pref;data.wilayah=location.wilayah;if(location.kota)data.kota=location.kota}
     data.alamat_jp=address;
   }
   if(data.tinggal){
@@ -706,12 +773,12 @@ function autoFill(txt){
   if(!txt.trim()){alert('Tempel data diri terlebih dahulu.');return}
   const {data,recognized}=parseMemberPaste(txt);
   if(!recognized.length){alert('Data belum dikenali. Pastikan setiap baris memakai format "Nama Kolom : Isi".');return}
-  Object.entries(data).forEach(([key,value])=>{if(value!==null&&value!==undefined&&value!=='')S.form[key]=String(value).toUpperCase()});
+  Object.entries(data).forEach(([key,value])=>{if(value!==null&&value!==undefined&&value!=='')S.form[key]=cleanMemberValue(value).toUpperCase()});
   render();
   const invalidDate=recognized.includes('lahir')&&!data.lahir;
   alert('Data berhasil dibaca ('+recognized.length+' kolom). Periksa kembali isian sebelum disimpan.'+
     (invalidDate?' Format tanggal lahir tidak dikenali; isi tanggal lahir secara manual.':'')+
-    (!S.form.wilayah?' Pilih Wilayah/prefektur di Jepang sebelum menyimpan.':''));
+    ((!S.form.pref||!S.form.wilayah)?' Prefektur/wilayah belum dapat dikenali dari alamat. Pilih wilayah di Shikoku atau Okayama dan lengkapi alamat Jepang.':''));
 }
 async function up(file,key,multi){
   if(!file)return;if(!S.assets){alert('Unggah foto hanya tersedia untuk admin');return}
@@ -720,8 +787,24 @@ function pick(label,acc,cap,cb){const i=h('input',{type:'file',accept:acc,style:
 async function saveForm(){
   const f=S.form;
   if(!(f.nama||'').trim()){alert('Nama lengkap wajib diisi.');return}
-  if(!f.wilayah){alert('Wilayah atau prefektur di Jepang wajib dipilih.');return}
-  const d={...f};delete d.id;Object.keys(d).forEach(key=>{if(typeof d[key]==='string'&&!['foto'].includes(key))d[key]=d[key].toUpperCase()});d.peran=d.peran||'ANGGOTA';d.status=d.status||'AKTIF';
+  const inferredLocation=inferJapanLocation(f.alamat_jp,f.kota,f.kec_jp,f.kodepos,f.pref,f.wilayah);
+  if(inferredLocation){
+    if(!f.pref)f.pref=inferredLocation.pref;
+    if(!f.wilayah)f.wilayah=inferredLocation.wilayah;
+    if(!f.kota&&inferredLocation.kota)f.kota=inferredLocation.kota;
+  }
+  if(!f.pref||!f.wilayah){
+    alert('Prefektur dan wilayah belum terisi. Lengkapi alamat Jepang yang mencantumkan prefektur, kota, atau kode pos di Shikoku/Okayama, atau pilih secara manual.');
+    return;
+  }
+  const allowedPref=PREF.find(pref=>pref.toLowerCase()===String(f.pref).trim().toLowerCase());
+  const allowedRegion=WILAYAH.some(([name])=>name.toLowerCase()===String(f.wilayah).trim().toLowerCase());
+  if(!allowedPref||!allowedRegion){
+    alert('Data anggota dibatasi untuk prefektur Shikoku dan Okayama. Periksa kembali prefektur dan wilayah.');
+    return;
+  }
+  f.pref=allowedPref;
+  const d={...f};delete d.id;Object.keys(d).forEach(key=>{if(typeof d[key]==='string'&&!['foto'].includes(key))d[key]=cleanMemberValue(d[key]).toUpperCase()});d.peran=d.peran||'ANGGOTA';d.status=d.status||'AKTIF';
   try{if(f.id)await S.db.collection('members').doc(f.id).set(d);else await S.db.collection('members').add({...d,at:Date.now()});S.form=null;render()}catch(e){console.error(e);alert('Tidak bisa menyimpan: '+(e.message||'periksa koneksi dan izin database'))}}
 function memberFormCard(){
   const f=S.form;
@@ -755,6 +838,7 @@ function memberFormCard(){
     box(h('div',{class:'member-section-heading'},h('div',{},h('b',{},'Asal di Indonesia'),h('small',{},'Wilayah, kelompok, dan alamat asal'))),
       fieldGrid(fld('Kelompok','kelompok'),fld('Desa / Kelurahan','desa'),fld('Daerah','daerah'),fld('Provinsi','prov',{opts:PROV,ph:'Pilih provinsi'}),fld('Kabupaten / Kota','kab'),fld('Kecamatan','kec'),fld('Alamat lengkap Indonesia','alamat_id',{area:1}))),
     box(h('div',{class:'member-section-heading'},h('div',{},h('b',{},'Alamat & pekerjaan di Jepang'),h('small',{},'Informasi tempat tinggal saat ini'))),
+      h('p',{class:'member-help'},'Prefektur dan wilayah dapat dikenali otomatis dari alamat atau kode pos. Cakupan dibatasi untuk Shikoku dan Okayama.'),
       fieldGrid(fld('Prefektur','pref',{opts:PREF,ph:'Pilih prefektur'}),fld('Kota','kota'),fld('Kecamatan (romaji)','kec_jp'),fld('Kode pos','kodepos',{inputmode:'numeric'}),fld('Stasiun terdekat','stasiun'),fld('Alamat jalan / gedung','alamat_jp',{area:1}),fld('Status visa','tinggal',{opts:TGL,ph:'Pilih status visa'}),fld('Bidang pekerjaan','bidang'),fld('Nama perusahaan','perusahaan'),fld('Nama pengurus daerah','pengurus'),fld('Nomor HP pengurus daerah','hp_pengurus',{type:'tel'}))),
     photoBox(),documentBox(),
     box(h('div',{class:'member-section-heading'},h('div',{},h('b',{},'Catatan tambahan'))),fld('Catatan','catatan',{area:1})),
