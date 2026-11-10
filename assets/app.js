@@ -1103,8 +1103,10 @@ function render(){
   renderDrawer();
   $('#sw').style.display=S.mainAdmin?'flex':'none';
   const approvalBadge=$('#ab');
-  approvalBadge.textContent=S.pendingUsers.length?String(S.pendingUsers.length):'';
-  approvalBadge.style.display=S.pendingUsers.length?'inline-grid':'none';
+  if(approvalBadge){
+    approvalBadge.textContent=S.pendingUsers.length?String(S.pendingUsers.length):'';
+    approvalBadge.style.display=S.pendingUsers.length?'inline-grid':'none';
+  }
   const current=ALL.find(x=>x[0]===S.view);
   if(!V[S.view]||['map-settings','visitor-map','approvals'].includes(S.view)&&!S.mainAdmin||current?.[2]&&!S.admin)S.view='landing';
   $('#app').replaceChildren(...[].concat(V[S.view]()).filter(Boolean));
