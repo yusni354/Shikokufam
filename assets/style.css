@@ -102,8 +102,19 @@ input[type=checkbox]{width:20px;height:20px;margin:0;flex:none;accent-color:var(
 .duty-date small{text-transform:uppercase;font-size:12px;font-weight:700;margin-top:3px}
 .duty-info{min-width:0;flex:1}
 .duty-info>small{display:block;color:var(--mut);font-size:12px;margin-bottom:4px}
-.duty-info>b{display:block;font-size:17px;overflow-wrap:anywhere}
-.duty-info p{margin:5px 0 0;color:#42615b;line-height:1.45;overflow-wrap:anywhere}
+.duty-assignments{display:grid;gap:7px}
+.duty-assignment{display:grid;grid-template-columns:minmax(90px,.8fr) minmax(0,1.2fr);gap:10px;align-items:start;padding:9px 11px;background:rgba(255,255,255,.8);border:1px solid #e1eee4;border-radius:13px}
+.duty-assignment b{font-size:14px;overflow-wrap:anywhere}
+.duty-assignment span{color:#42615b;font-size:14px;line-height:1.4;overflow-wrap:anywhere}
+.duty-form-heading{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-top:12px}
+.duty-form-heading small{color:var(--mut)}
+.duty-form-assignments{display:grid;gap:8px}
+.duty-form-assignment{display:flex;align-items:flex-start;gap:8px;padding:10px;background:#f4f8f2;border:1px solid var(--line);border-radius:16px}
+.duty-assignment-number{width:26px;height:26px;flex:none;display:grid;place-items:center;margin-top:24px;border-radius:50%;background:#dff4e8;color:#18845b;font-size:12px;font-weight:700}
+.duty-form-fields{flex:1;min-width:0}
+.duty-form-fields .lb:first-child{margin-top:0}
+.duty-remove{flex:none;margin-top:26px}
+.duty-add-person{margin-top:10px}
 .duty-actions{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
 .duty-empty{padding:30px 18px;text-align:center;background:var(--card);border:1px dashed #b9d8c6;border-radius:22px;color:var(--mut)}
 .duty-empty>span{display:block;font-size:36px;margin-bottom:8px}
