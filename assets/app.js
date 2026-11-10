@@ -564,8 +564,8 @@ const CODE39_PATTERNS={
 };
 function detailCard(){
   const member=S.detail,area=memberRegion(member),code=memberCode(member),sections=[
-    ['Identitas & Keanggotaan',[['Nama lengkap',member.nama],['Nama panggilan',member.panggilan],['Nomor anggota',code],['Jenis kelamin',member.kelamin],['Tanggal lahir',member.lahir],['Umur',member.umur],['Status',member.status||'aktif'],['Peran',member.peran||'Anggota'],['Pernikahan',member.nikah],['MT',member.mt]]],
-    ['Kontak & Keluarga',[['WhatsApp',member.wa],['Email',member.email],['Nama pengurus daerah',member.pengurus],['Nomor HP pengurus daerah',member.hp_pengurus],['Nama orang tua',member.ortu],['Nomor HP orang tua',member.hp_ortu],['Instagram',member.instagram],['TikTok',member.tiktok],['Facebook',member.facebook]]],
+    ['Identitas & Keanggotaan',[['Nama lengkap',member.nama],['Nomor HP / WhatsApp',member.wa],['Nama panggilan',member.panggilan],['Nomor anggota',code],['Jenis kelamin',member.kelamin],['Tanggal lahir',member.lahir],['Umur',member.umur],['Status',member.status||'aktif'],['Peran',member.peran||'Anggota'],['Pernikahan',member.nikah],['MT',member.mt]]],
+    ['Kontak & Keluarga',[['Email',member.email],['Nama pengurus daerah',member.pengurus],['Nomor HP pengurus daerah',member.hp_pengurus],['Nama orang tua',member.ortu],['Nomor HP orang tua',member.hp_ortu],['Instagram',member.instagram],['TikTok',member.tiktok],['Facebook',member.facebook]]],
     ['Alamat Indonesia',[['Kelompok',member.kelompok],['Desa',member.desa],['Daerah',member.daerah],['Provinsi',member.prov],['Kabupaten/Kota',member.kab],['Kecamatan',member.kec],['Alamat',member.alamat_id]]],
     ['Alamat & Pekerjaan di Jepang',[['Wilayah',area],['Prefektur',member.pref],['Kota',member.kota],['Kecamatan',member.kec_jp],['Kode pos',member.kodepos],['Stasiun',member.stasiun],['Alamat',member.alamat_jp],['Mulai tinggal',member.mulai_jp],['Status visa',member.tinggal],['Bidang pekerjaan',member.bidang],['Perusahaan',member.perusahaan]]],
     ['Catatan',[['Catatan',member.catatan]]]
@@ -593,7 +593,7 @@ function detailCard(){
         member.foto?h('img',{class:'member-id-photo',src:'/_blob/'+member.foto,alt:'Foto '+(member.nama||'anggota')}):h('div',{class:'member-id-photo member-avatar-placeholder'},(member.nama||'?').trim().slice(0,1).toUpperCase()),
         h('div',{class:'member-id-info'},h('small',{},'KARTU ANGGOTA'),h('h1',{},(member.nama||'Nama belum diisi').toUpperCase()),member.wa&&h('p',{class:'member-id-phone'},icon('phone',14),h('span',{},member.wa)),h('b',{},code.toUpperCase()),h('p',{},[member.kota,member.pref].filter(Boolean).join(' · ').toUpperCase()||area.toUpperCase()),h('span',{class:'ok'+((member.status||'aktif').toLowerCase()==='aktif'?'':' off')},(member.status||'aktif').toUpperCase()))),
       h('div',{class:'member-id-barcode'},h('b',{class:'member-barcode-label'},'BARCODE KEHADIRAN'),barcode,h('small',{},'ID anggota: '+code),h('small',{class:'member-barcode-help'},'Tunjukkan barcode ini untuk dipindai saat absensi kegiatan.'))),
-    ...sections.filter(([,rows])=>rows.some(([,value])=>value)).map(([title,rows])=>h('section',{class:'member-detail-section'},h('h3',{},title.toUpperCase()),h('div',{class:'member-detail-grid'},...rows.filter(([,value])=>value).map(([label,value])=>h('div',{class:'member-detail-item'},h('small',{},label.toUpperCase()),h('span',{},memberValue(label==='WhatsApp'?'wa':label==='Nomor HP pengurus daerah'?'hp_pengurus':label==='Nomor HP orang tua'?'hp_ortu':label.toLowerCase(),value))))))),
+    ...sections.filter(([,rows])=>rows.some(([,value])=>value)).map(([title,rows])=>h('section',{class:'member-detail-section'},h('h3',{},title.toUpperCase()),h('div',{class:'member-detail-grid'},...rows.filter(([,value])=>value).map(([label,value])=>h('div',{class:'member-detail-item'},h('small',{},label.toUpperCase()),h('span',{},memberValue(label==='Nomor HP / WhatsApp'?'wa':label==='Nomor HP pengurus daerah'?'hp_pengurus':label==='Nomor HP orang tua'?'hp_ortu':label.toLowerCase(),value))))))),
     (member.surat||[]).length>0&&h('section',{class:'member-detail-section'},h('h3',{},'Foto Surat Sambung'),...(member.surat||[]).map((id,index)=>h('a',{class:'member-file-link',href:'/_blob/'+id,target:'_blank',rel:'noopener'},icon('attachment',16),h('span',{},'Buka lampiran '+(index+1))))),
     S.admin&&h('div',{class:'member-detail-actions'},h('button',{class:'btn',onclick:()=>{S.form={...member};S.detail=null;S.detailOrigin=null;render()}},icon('edit',16),h('span',{},'Edit data anggota')))
   );
@@ -878,8 +878,16 @@ function memberFormCard(){
 function activityCard(event){
   const participants=activityMemberIds(event,'peserta_anggota'),attendees=new Set(activityMemberIds(event,'hadir_anggota'));
   const registeredMembers=S.members.filter(member=>String(member.status||'aktif').toLowerCase()!=='nonaktif');
-  const participantRows=participants.map(id=>{
-    const member=S.members.find(item=>String(item.id)===id),present=attendees.has(id);
+  const memberById=new Map(S.members.map(member=>[String(member.id),member]));
+  const participantsByRegion=new Map(WILAYAH.map(([region])=>[region,[]]));
+  const unassignedParticipants=[];
+  participants.forEach(id=>{
+    const member=memberById.get(id),region=member&&memberRegion(member);
+    if(participantsByRegion.has(region))participantsByRegion.get(region).push(id);
+    else unassignedParticipants.push(id);
+  });
+  const participantRow=id=>{
+    const member=memberById.get(id),present=attendees.has(id);
     return h('div',{class:'activity-participant'},
       h('div',{},h('b',{},member?.nama||'Anggota tidak ditemukan'),h('small',{},member?memberCode(member):'ID: '+id)),
       S.admin&&h('div',{class:'activity-participant-actions'},
@@ -890,11 +898,32 @@ function activityCard(event){
           if(!confirm('Keluarkan '+(member?.nama||'anggota ini')+' dari kegiatan?'))return;
           try{await updateActivityMember(event.id,id,'remove')}catch(error){console.error(error);alert('Gagal menghapus peserta: '+(error.message||'periksa koneksi'))}
         }},'Hapus')));
-  });
+  };
   const date=event.tanggal?new Date(event.tanggal+'T00:00:00'):null;
   const dateLabel=date&&!Number.isNaN(date.getTime())?date.toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'}):'Tanggal belum ditentukan';
   const legacyCount=Array.isArray(event.hadir_anggota)?0:(event.hadir||[]).length;
   const feedback=S.activityFeedback&&String(S.activityFeedback.eventId)===String(event.id)?S.activityFeedback.message:'';
+  const status=h('p',{class:'activity-feedback','aria-live':'polite'},feedback);
+  const regionSection=(region,ids)=>{
+    const presentCount=ids.filter(id=>attendees.has(id)).length;
+    const contents=[
+      h('div',{class:'activity-region-heading'},h('div',{},icon('map',17),h('h4',{},region)),h('span',{},ids.length+' peserta · '+presentCount+' hadir')),
+      ids.length?h('div',{class:'activity-roster'},...ids.map(participantRow)):h('p',{class:'activity-empty'},'Belum ada peserta di wilayah ini.')
+    ];
+    if(S.admin){
+      const eligible=registeredMembers.filter(member=>memberRegion(member)===region&&!participants.includes(String(member.id)));
+      const select=h('select',{class:'activity-member-select'},h('option',{value:''},eligible.length?'Pilih anggota wilayah ini':'Tidak ada anggota lain di wilayah ini'),...eligible.map(member=>h('option',{value:member.id},(member.nama||'Tanpa nama')+' · '+memberCode(member))));
+      const addButton=h('button',{class:'btn s',onclick:async()=>{
+        if(!select.value){status.textContent='Pilih anggota dari wilayah '+region+'.';return}
+        try{await updateActivityMember(event.id,select.value,'add')}catch(error){console.error(error);alert('Gagal menambahkan peserta: '+(error.message||'periksa koneksi'))}
+      }},'Tambah peserta');
+      addButton.disabled=!eligible.length;
+      contents.push(h('div',{class:'activity-add-row'},select,addButton));
+    }
+    return h('section',{class:'activity-region-section'},...contents);
+  };
+  const regionSections=WILAYAH.map(([region])=>regionSection(region,participantsByRegion.get(region)));
+  if(unassignedParticipants.length)regionSections.push(regionSection('Wilayah belum ditentukan',unassignedParticipants));
   const content=[
     h('div',{class:'activity-heading'},h('div',{},h('h2',{},event.judul||'Kegiatan komunitas'),h('p',{class:'activity-meta'},icon('calendar',15),h('span',{},dateLabel+(event.waktu?' · '+event.waktu:''))),event.lokasi&&h('p',{class:'activity-meta'},icon('pin',15),h('span',{},event.lokasi))),S.admin&&h('button',{class:'btn s',onclick:async()=>{
       if(!confirm('Hapus kegiatan "'+(event.judul||'ini')+'"?'))return;
@@ -903,17 +932,11 @@ function activityCard(event){
     event.deskripsi&&h('p',{class:'activity-description'},event.deskripsi),
     h('div',{class:'activity-counts'},h('b',{},participants.length+' peserta'),h('b',{},attendees.size+' hadir')),
     legacyCount>0&&h('p',{class:'warn'},legacyCount+' catatan absensi lama belum terhubung dengan data anggota.'),
-    h('h3',{},'Daftar peserta'),
-    participantRows.length?h('div',{class:'activity-roster'},...participantRows):h('p',{class:'activity-empty'},'Belum ada anggota yang terdaftar untuk kegiatan ini.')
+    h('h3',{},'Absensi per wilayah'),
+    h('p',{class:'activity-help'},'Peserta dikelompokkan sesuai wilayah pada profil anggota.'),
+    h('div',{class:'activity-region-list'},...regionSections)
   ];
   if(S.admin){
-    const eligibleMembers=registeredMembers.filter(member=>!participants.includes(String(member.id)));
-    const memberSelect=h('select',{class:'activity-member-select'},h('option',{value:''},eligibleMembers.length?'Pilih anggota terdaftar':'Tidak ada anggota lain untuk ditambahkan'),...eligibleMembers.map(member=>h('option',{value:member.id},(member.nama||'Tanpa nama')+' · '+memberCode(member))));
-    const status=h('p',{class:'activity-feedback','aria-live':'polite'},feedback);
-    const addMember=async()=>{
-      if(!memberSelect.value){status.textContent='Pilih anggota yang akan ditambahkan.';return}
-      try{await updateActivityMember(event.id,memberSelect.value,'add')}catch(error){console.error(error);alert('Gagal menambahkan peserta: '+(error.message||'periksa koneksi'))}
-    };
     const barcodeInput=h('input',{class:'activity-barcode-input',placeholder:'Pindai barcode kartu anggota',autocomplete:'off'});
     const scanButton=h('button',{class:'btn s',type:'button'},icon('camera',16),h('span',{},'Buka kamera'));
     const scannerVideo=h('video',{class:'activity-scanner-video',autoplay:'',muted:'',playsinline:'true',style:'display:none'});
@@ -994,9 +1017,8 @@ function activityCard(event){
       }
     };
     content.push(
-      h('h3',{},'Absensi peserta'),
-      h('p',{class:'activity-help'},'Tambahkan peserta dari daftar anggota, lalu tandai kehadiran secara manual atau pindai barcode kartu anggota.'),
-      h('div',{class:'activity-add-row'},memberSelect,h('button',{class:'btn s',onclick:addMember},'Tambah peserta')),
+      h('h3',{},'Pemindaian barcode'),
+      h('p',{class:'activity-help'},'Barcode akan mencatat kehadiran dan menempatkan anggota di bagian wilayah profilnya.'),
       h('div',{class:'activity-scanner-row'},barcodeInput,h('button',{class:'btn s',onclick:submitBarcode},'Catat hadir')),
       h('div',{class:'activity-scanner-row'},scanButton),
       scannerVideo,status
