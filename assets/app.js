@@ -29,6 +29,39 @@ function memberRegion(member){
 }
 function wilayah(){const m={};S.members.forEach(x=>{const w=memberRegion(x);(m[w]=m[w]||[]).push(x)});return m}
 function openMember(member,origin){S.detail=member;S.detailOrigin=origin;S.view='members';render()}
+function whatsappUrl(value){
+  const raw=String(value||'').trim();
+  let number=raw.replace(/\D/g,'');
+  if(raw.startsWith('00'))number=number.slice(2);
+  else if(!raw.startsWith('+')&&number.startsWith('0'))number='62'+number.slice(1);
+  else if(!raw.startsWith('+')&&!number.startsWith('62')&&!number.startsWith('81'))number='62'+number;
+  return number.length>=8&&number.length<=15?'https://wa.me/'+number:'';
+}
+function socialUrl(platform,value){
+  const raw=String(value||'').trim();
+  if(!raw)return '';
+  if(/^https?:\/\//i.test(raw)){
+    try{
+      const url=new URL(raw);
+      const hosts={facebook:['facebook.com','www.facebook.com','m.facebook.com'],instagram:['instagram.com','www.instagram.com'],tiktok:['tiktok.com','www.tiktok.com','vm.tiktok.com']};
+      if(url.protocol==='http:')url.protocol='https:';
+      return url.protocol==='https:'&&hosts[platform]?.includes(url.hostname.toLowerCase())?url.href:'';
+    }catch(error){return ''}
+  }
+  const handle=raw.replace(/^@/,'').trim();
+  if(!handle)return '';
+  if(platform==='facebook')return /\s/.test(handle)?'https://www.facebook.com/search/top/?q='+encodeURIComponent(handle):'https://www.facebook.com/'+encodeURIComponent(handle);
+  if(platform==='instagram')return 'https://www.instagram.com/'+encodeURIComponent(handle.toLowerCase())+'/';
+  return 'https://www.tiktok.com/@'+encodeURIComponent(handle.toLowerCase());
+}
+function memberValue(key,value){
+  if(value==null||value==='')return '';
+  const phones=['wa','hp_pengurus','hp_ortu'];
+  const platforms={facebook:'facebook',instagram:'instagram',tiktok:'tiktok'};
+  const href=phones.includes(key)?whatsappUrl(value):platforms[key]?socialUrl(platforms[key],value):'';
+  const text=String(value).toUpperCase();
+  return href?h('a',{class:'member-contact-link',href,target:'_blank',rel:'noopener noreferrer'},text):text;
+}
 function createLocalDb(){
   const listeners={};
   const key=name=>'shikoku-family:'+name;
@@ -388,16 +421,16 @@ function vMembers(){
     const rows=S.members.filter(member=>
       (!query||[member.nama,member.panggilan,member.wa,member.kota,member.wilayah,member.pref,member.kode].some(value=>String(value||'').toLowerCase().includes(query)))&&
       (!S.memberRegion||memberRegion(member)===S.memberRegion)&&
-      (!S.memberStatus||(member.status||'aktif')===S.memberStatus)
+      (!S.memberStatus||(member.status||'aktif').toLowerCase()===S.memberStatus)
     ).sort((a,b)=>(a.nama||'').localeCompare(b.nama||'','id'));
     count.textContent='Menampilkan '+rows.length+' dari '+S.members.length+' anggota';
     list.replaceChildren(...(rows.length?rows.map((member,index)=>{
       const code=member.kode||'MEM-'+String(index+1).padStart(5,'0'),area=memberRegion(member),location=[member.kota,member.pref].filter(Boolean).join(', ');
       return h('article',{class:'member-card',style:'--region-color:'+regionColor(area)},
         member.foto?h('img',{class:'member-avatar',src:'/_blob/'+member.foto,alt:'Foto '+(member.nama||'anggota')}):h('div',{class:'member-avatar member-avatar-placeholder'},(member.nama||'?').trim().slice(0,1).toUpperCase()),
-        h('div',{class:'member-card-info'},h('div',{class:'member-name-line'},h('b',{},member.nama||'Nama belum diisi'),h('span',{class:'member-region-tag'},area),h('span',{class:'ok'+((member.status||'aktif')==='aktif'?'':' off')},member.status||'aktif')),
-          h('small',{},[code,location].filter(Boolean).join(' · ')),
-          h('small',{},member.wa||member.email||'Kontak belum diisi')),
+        h('div',{class:'member-card-info'},h('div',{class:'member-name-line'},h('b',{},(member.nama||'Nama belum diisi').toUpperCase()),h('span',{class:'member-region-tag'},area.toUpperCase()),h('span',{class:'ok'+((member.status||'aktif').toLowerCase()==='aktif'?'':' off')},(member.status||'aktif').toUpperCase())),
+          h('small',{},[code,location].filter(Boolean).join(' · ').toUpperCase()),
+          h('small',{},member.wa?memberValue('wa',member.wa):member.email||'Kontak belum diisi')),
         h('div',{class:'member-card-actions'},
           h('button',{class:'btn s',onclick:()=>openMember(member,'members')},'Lihat kartu ID'),
           S.admin&&h('button',{class:'btn s',onclick:()=>{S.form={...member};S.detail=null;render()}},'✎ Edit'),
@@ -448,9 +481,9 @@ function detailCard(){
       h('div',{class:'member-id-banner'},h('span',{},'SHIKOKU FAMILY'),h('span',{class:'member-region-tag'},area)),
       h('div',{class:'member-id-main'},
         member.foto?h('img',{class:'member-id-photo',src:'/_blob/'+member.foto,alt:'Foto '+(member.nama||'anggota')}):h('div',{class:'member-id-photo member-avatar-placeholder'},(member.nama||'?').trim().slice(0,1).toUpperCase()),
-        h('div',{class:'member-id-info'},h('small',{},'KARTU ANGGOTA'),h('h1',{},member.nama||'Nama belum diisi'),h('b',{},code),h('p',{},[member.kota,member.pref].filter(Boolean).join(' · ')||area),h('span',{class:'ok'+((member.status||'aktif')==='aktif'?'':' off')},member.status||'aktif'))),
+        h('div',{class:'member-id-info'},h('small',{},'KARTU ANGGOTA'),h('h1',{},(member.nama||'Nama belum diisi').toUpperCase()),h('b',{},code.toUpperCase()),h('p',{},[member.kota,member.pref].filter(Boolean).join(' · ').toUpperCase()||area.toUpperCase()),h('span',{class:'ok'+((member.status||'aktif').toLowerCase()==='aktif'?'':' off')},(member.status||'aktif').toUpperCase()))),
       h('div',{class:'member-id-barcode'},barcode,h('small',{},code))),
-    ...sections.filter(([,rows])=>rows.some(([,value])=>value)).map(([title,rows])=>h('section',{class:'member-detail-section'},h('h3',{},title),h('div',{class:'member-detail-grid'},...rows.filter(([,value])=>value).map(([label,value])=>h('div',{class:'member-detail-item'},h('small',{},label),h('span',{},value)))))),
+    ...sections.filter(([,rows])=>rows.some(([,value])=>value)).map(([title,rows])=>h('section',{class:'member-detail-section'},h('h3',{},title.toUpperCase()),h('div',{class:'member-detail-grid'},...rows.filter(([,value])=>value).map(([label,value])=>h('div',{class:'member-detail-item'},h('small',{},label.toUpperCase()),h('span',{},memberValue(label==='WhatsApp'?'wa':label==='Nomor HP pengurus daerah'?'hp_pengurus':label==='Nomor HP orang tua'?'hp_ortu':label.toLowerCase(),value))))))),
     (member.surat||[]).length>0&&h('section',{class:'member-detail-section'},h('h3',{},'Foto Surat Sambung'),...(member.surat||[]).map((id,index)=>h('a',{class:'member-file-link',href:'/_blob/'+id,target:'_blank',rel:'noopener'},'📎 Buka lampiran '+(index+1)))),
     S.admin&&h('div',{class:'member-detail-actions'},h('button',{class:'btn',onclick:()=>{S.form={...member};S.detail=null;S.detailOrigin=null;render()}},'✎ Edit data anggota'))
   );
@@ -548,7 +581,20 @@ function fld(l,k,o){o=o||{};const f=S.form;let e;
   if(o.opts)e=h('select',{},h('option',{value:''},o.ph||'Pilih'),...o.opts.map(x=>h('option',{value:x},x)));
   else if(o.area)e=h('textarea',{rows:3,placeholder:o.ph||''});
   else e=h('input',{placeholder:o.ph||'',type:o.type||'text'});
-  if(o.opts&&f[k]&&!o.opts.includes(f[k]))e.append(h('option',{value:f[k]},f[k]));e.value=f[k]||'';e.oninput=e.onchange=()=>{f[k]=e.value};
+  if(o.opts){
+    const option=o.opts.find(value=>value.toUpperCase()===String(f[k]||'').toUpperCase());
+    if(f[k]&&!option)e.append(h('option',{value:String(f[k]).toUpperCase()},String(f[k]).toUpperCase()));
+    e.value=option||String(f[k]||'').toUpperCase();
+    e.onchange=()=>{f[k]=e.value.toUpperCase()};
+  }else{
+    e.value=String(f[k]||'').toUpperCase();
+    e.oninput=()=>{
+      const start=e.selectionStart;
+      e.value=e.value.toUpperCase();
+      f[k]=e.value;
+      if(start!==null&&typeof e.setSelectionRange==='function'&&(['text','search','tel','url','password'].includes(e.type)||e.tagName==='TEXTAREA'))e.setSelectionRange(start,start);
+    };
+  }
   return h('label',{class:'lb'},l,e)}
 const box=(...k)=>h('div',{class:'card',style:'display:block'},...k);
 function autoFill(txt){
@@ -556,7 +602,7 @@ function autoFill(txt){
   if(!txt.trim()){alert('Tempel data diri terlebih dahulu.');return}
   const {data,recognized}=parseMemberPaste(txt);
   if(!recognized.length){alert('Data belum dikenali. Pastikan setiap baris memakai format "Nama Kolom : Isi".');return}
-  Object.entries(data).forEach(([key,value])=>{if(value!==null&&value!==undefined&&value!=='')S.form[key]=String(value)});
+  Object.entries(data).forEach(([key,value])=>{if(value!==null&&value!==undefined&&value!=='')S.form[key]=String(value).toUpperCase()});
   render();
   const invalidDate=recognized.includes('lahir')&&!data.lahir;
   alert('Data berhasil dibaca ('+recognized.length+' kolom). Periksa kembali isian sebelum disimpan.'+
@@ -571,7 +617,7 @@ async function saveForm(){
   const f=S.form;
   if(!(f.nama||'').trim()){alert('Nama lengkap wajib diisi.');return}
   if(!f.wilayah){alert('Wilayah atau prefektur di Jepang wajib dipilih.');return}
-  const d={...f};delete d.id;d.peran=d.peran||'Anggota';d.status=d.status||'aktif';
+  const d={...f};delete d.id;Object.keys(d).forEach(key=>{if(typeof d[key]==='string'&&!['foto'].includes(key))d[key]=d[key].toUpperCase()});d.peran=d.peran||'ANGGOTA';d.status=d.status||'AKTIF';
   try{if(f.id)await S.db.collection('members').doc(f.id).set(d);else await S.db.collection('members').add({...d,at:Date.now()});S.form=null;render()}catch(e){console.error(e);alert('Tidak bisa menyimpan: '+(e.message||'periksa koneksi dan izin database'))}}
 function memberFormCard(){
   const f=S.form;
@@ -711,7 +757,7 @@ async function loadPendingUsers(){
 function csvEsc(v){v=String(v==null?'':v);return(v.includes(',')||v.includes('"')||v.includes(String.fromCharCode(10)))?'"'+v.split('"').join('""')+'"':v}
 async function exportMyMaps(det){
   const dl=await claude.use('downloads');if(!dl){alert('Fitur unduh belum tersedia');return}
-  const rows=[['Nama','Wilayah','Alamat','Status','Kode']].concat(S.members.map((m,i)=>[m.panggilan||m.nama,m.wilayah||m.pref||'',alamatJp(m,det),m.status||'aktif',m.kode||'MEM-'+String(i+1).padStart(5,'0')]).filter(r=>r[2]&&r[2]!=='Japan'));
+  const rows=[['Nama','Wilayah','Alamat','Status','Kode']].concat(S.members.map((m,i)=>[m.panggilan||m.nama,m.wilayah||m.pref||'',alamatJp(m,det),m.status||'aktif',m.kode||'MEM-'+String(i+1).padStart(5,'0')]).filter(r=>r[2]&&r[2]!=='Japan').map(row=>row.map(value=>String(value).toUpperCase())));
   try{await dl.save({filename:'anggota-untuk-my-maps.csv',data:String.fromCharCode(65279)+rows.map(r=>r.map(csvEsc).join(',')).join(String.fromCharCode(10))})}catch(e){alert('Gagal mengunduh: '+(e.message||e.code||''))}}
 async function saveMid(inp){
   const u=inp.value.trim(),mm=(u.match(/[?&;]mid=([^&#"'\s<>]+)/i)||[])[1]||(/^[A-Za-z0-9_-]{10,}$/.test(u)?u:'');
@@ -812,13 +858,13 @@ function vPetaLegacy(){
     ...(pins.length?pins.map(p=>h('div',{class:'card'},h('span',{style:'flex:1;min-width:0'},h('b',{},p.nama),h('small',{},p.alamat||'')),h('button',{class:'btn s',onclick:()=>{const[x,y]=px(p.lng,p.lat);S.vb=[x-90,y-100,180,200];S.sp=p.id;render()}},'Lihat'),S.admin&&h('button',{class:'btn s',onclick:()=>{if(confirm('Hapus pin ini?'))S.db.collection('pin').doc(p.id).delete()}},'\u2715'))):[h('p',{class:'warn'},'Belum ada pin.')]),
     h('b',{style:'display:block;margin:6px 4px 10px'},'Sebaran per wilayah'),...sebaran()];
 }
-function sebaran(){const w=wilayah(),k=Object.keys(w);return k.length?k.map(n=>h('div',{class:'card',style:'display:block'},h('div',{class:'row'},h('b',{},'📍 '+n),h('span',{class:'tag'},w[n].length+' anggota')),h('small',{},w[n].map(x=>x.nama).join(', ')))):[h('p',{class:'warn'},'Belum ada data wilayah.')]}
+function sebaran(){const w=wilayah(),k=Object.keys(w);return k.length?k.map(n=>h('div',{class:'card',style:'display:block'},h('div',{class:'row'},h('b',{},'📍 '+n.toUpperCase()),h('span',{class:'tag'},w[n].length+' anggota')),h('small',{},w[n].map(x=>(x.nama||'').toUpperCase()).join(', ')))):[h('p',{class:'warn'},'Belum ada data wilayah.')]}
 function vImport(){
   const ta=h('textarea',{rows:8,placeholder:'Satu baris satu anggota:\nnama,wilayah\nBudi,Ehime\nSiti,Kagawa'});
   return [h('h1',{},'Import Database'),h('p',{class:'sub'},'Tempel data CSV (nama,wilayah)'),
     h('div',{class:'card',style:'display:block'},ta,h('button',{class:'btn',onclick:async()=>{
       const rows=ta.value.split('\n').map(r=>r.split(',').map(x=>x.trim())).filter(r=>r[0]);
-      for(const r of rows)await S.db.collection('members').add({nama:r[0],wilayah:r[1]||'',at:Date.now()});
+      for(const r of rows)await S.db.collection('members').add({nama:r[0].toUpperCase(),wilayah:(r[1]||'').toUpperCase(),at:Date.now()});
       ta.value='';alert(rows.length+' anggota diimpor');go('members')}},'Import'))];
 }
 

@@ -95,6 +95,9 @@ input[type=checkbox]{width:20px;height:20px;margin:0;flex:none;accent-color:var(
 .member-detail-item{min-width:0}
 .member-detail-item small,.member-detail-item span{display:block;overflow-wrap:anywhere}
 .member-detail-item small{margin-bottom:3px;color:var(--mut);font-size:12px}
+.member-contact-link{color:var(--acc);font-weight:700;text-decoration:none}
+.member-contact-link:hover{text-decoration:underline}
+.member-editor input:not([type=date]):not([type=number]):not([type=file]),.member-editor textarea,.member-editor select{text-transform:uppercase}
 .member-file-link{display:block;margin:7px 0;color:var(--acc);font-weight:600}
 .member-detail-actions{display:flex;justify-content:flex-end;padding-top:12px}
 .member-editor{max-width:680px;margin:0 auto}
@@ -117,13 +120,14 @@ input[type=checkbox]{width:20px;height:20px;margin:0;flex:none;accent-color:var(
 .home-region-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .home-region-card{min-width:0;padding:12px;background:var(--card);border:1px solid var(--line);border-top:4px solid var(--region-color,#718096);border-radius:18px;box-shadow:0 4px 14px rgba(47,134,184,.07)}
 .home-region-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;color:var(--region-color,#718096)}
+.home-region-heading>b,.home-region-heading>span,.member-region-tag{text-transform:uppercase}
 .home-region-heading>b{font-size:14px}
 .home-region-heading>span{flex:none;padding:3px 7px;border-radius:999px;background:color-mix(in srgb,var(--region-color,#718096) 13%,white);font-size:11px;font-weight:700}
 .home-region-members{display:grid;gap:5px}
 .home-region-member{display:flex;align-items:center;gap:8px;width:100%;padding:6px;border:0;border-radius:12px;background:transparent;color:var(--ink);text-align:left}
 .home-region-member:hover{background:var(--bg)}
 .home-region-member>img,.home-region-member>.member-avatar-placeholder{width:34px;height:34px;flex:none;object-fit:cover;border-radius:11px;font-size:15px}
-.home-region-member>span:nth-child(2){min-width:0;flex:1;overflow-wrap:anywhere;font-size:13px;font-weight:600}
+.home-region-member>span:nth-child(2){min-width:0;flex:1;overflow-wrap:anywhere;font-size:13px;font-weight:600;text-transform:uppercase}
 .home-region-arrow{font-size:18px;color:var(--mut)}
 .home-region-empty{margin:0;padding:8px 3px;color:var(--mut);font-size:12px}
 .home-region-unknown{--region-color:#718096}
