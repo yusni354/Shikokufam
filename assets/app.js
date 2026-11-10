@@ -1,4 +1,4 @@
-const S={members:[],events:[],topics:[],cleaningDuties:[],view:'landing',openConversation:null,messageSignature:'',admin:false,mainAdmin:false,adminMenuOpen:false,uid:null,email:'',name:'',approvalStatus:'approved',pendingUsers:[],mapError:'',storageErrors:{},storageImporting:false,memberMediaUrls:new Map(),memberMediaPending:new Set(),memberMediaFailed:new Set(),legacyMediaPaths:new Map(),memberMediaError:'',memberUploadState:null,activityScannerStop:null,activityFeedback:null,db:null,legacyDb:null,supabase:null,messageChannel:null,authLoading:true,unreadMessages:0};
+const S={members:[],events:[],topics:[],cleaningDuties:[],view:'landing',openConversation:null,messageSignature:'',admin:false,mainAdmin:false,adminMenuOpen:false,uid:null,email:'',name:'',approvalStatus:'approved',pendingUsers:[],mapError:'',storageErrors:{},storageImporting:false,memberMediaUrls:new Map(),memberMediaPending:new Set(),memberMediaFailed:new Set(),legacyMediaPaths:new Map(),memberMediaError:'',memberUploadState:null,memberBarcodePending:new Set(),memberBarcodeError:'',activityScannerStop:null,activityFeedback:null,db:null,legacyDb:null,supabase:null,messageChannel:null,authLoading:true,unreadMessages:0};
 const $=s=>document.querySelector(s);
 try{
   localStorage.removeItem('shikoku-family:visit-consent');
@@ -778,19 +778,12 @@ function vMembers(){
 function memberCode(member){
   return String(member.kode||'MEM-'+String(member.id||'00000').replace(/\D/g,'').slice(-5).padStart(5,'0'));
 }
-function memberBarcodeValue(member){
-  const id=String(member.id||'');
-  if(!id)return '';
-  const bytes=new TextEncoder().encode(id);
-  let numeric=BigInt(0);
-  for(const byte of bytes)numeric=numeric*BigInt(256)+BigInt(byte);
-  return 'SF'+bytes.length.toString(36).toUpperCase()+'-'+numeric.toString(36).toUpperCase();
+function createMemberBarcode(){
+  return 'SF'+crypto.randomUUID().replace(/-/g,'').slice(0,16).toUpperCase();
 }
-function legacyMemberBarcodeValue(member){
-  const code=memberCode(member);
-  return /^IJCCS-\d+$/i.test(code)
-    ?code.slice(code.lastIndexOf('-')+1).padStart(10,'0')
-    :String(Math.abs(Array.from(code).reduce((hash,char)=>Math.imul(hash,31)+char.charCodeAt(0)|0,7))).padStart(10,'0').slice(-10);
+function memberBarcodeValue(member){
+  const value=String(member.barcode||'').trim().toUpperCase();
+  return /^[A-Z0-9-]+$/.test(value)?value:'';
 }
 const CODE39_PATTERNS={
   '0':'nnnwwnwnn','1':'wnnwnnnnw','2':'nnwwnnnnw','3':'wnwwnnnnn','4':'nnnwwnnnw',
@@ -811,10 +804,10 @@ function detailCard(){
     ['Catatan',[['Catatan',member.catatan]]]
   ];
   const barcodeText=memberBarcodeValue(member);
-  const barcode=h('svg',{class:'member-barcode',viewBox:'0 0 1 54',role:'img','aria-label':'Barcode anggota '+code});
+  const barcode=h('svg',{class:'member-barcode',viewBox:'0 0 1 54',role:'img','aria-label':'Barcode unik anggota'});
   const quietZone=20;
   let x=quietZone;
-  for(const char of '*'+barcodeText+'*'){
+  for(const char of barcodeText?'*'+barcodeText+'*':''){
     CODE39_PATTERNS[char].split('').forEach((width,index)=>{
       const size=width==='w'?5:2;
       if(index%2===0)barcode.append(h('rect',{x,y:2,width:size,height:50,fill:'currentColor'}));
@@ -832,7 +825,7 @@ function detailCard(){
       h('div',{class:'member-id-main'},
         member.foto?h('img',{class:'member-id-photo',...memberMediaAttributes(member.foto,'src'),alt:'Foto '+(member.nama||'anggota')}):h('div',{class:'member-id-photo member-avatar-placeholder'},(member.nama||'?').trim().slice(0,1).toUpperCase()),
         h('div',{class:'member-id-info'},h('small',{},'KARTU ANGGOTA'),h('h1',{},(member.nama||'Nama belum diisi').toUpperCase()),member.wa&&h('p',{class:'member-id-phone'},icon('phone',14),h('span',{},member.wa)),h('b',{},code.toUpperCase()),h('p',{},[member.kota,member.pref].filter(Boolean).join(' · ').toUpperCase()||area.toUpperCase()),h('span',{class:'ok'+((member.status||'aktif').toLowerCase()==='aktif'?'':' off')},(member.status||'aktif').toUpperCase()))),
-      h('div',{class:'member-id-barcode'},h('b',{class:'member-barcode-label'},'BARCODE KEHADIRAN'),barcode,h('small',{},'ID anggota: '+code),h('small',{class:'member-barcode-help'},'Tunjukkan barcode ini untuk dipindai saat absensi kegiatan.'))),
+      h('div',{class:'member-id-barcode'},h('b',{class:'member-barcode-label'},'BARCODE KEHADIRAN'),barcode,barcodeText?h('small',{class:'member-barcode-help'},'Kode batang unik, terpisah dari nomor ID. Tunjukkan untuk dipindai saat absensi kegiatan.'):h('small',{class:'member-barcode-help'},'Barcode akan tersedia setelah admin memperbarui data anggota.'))),
     ...sections.filter(([,rows])=>rows.some(([,value])=>value)).map(([title,rows])=>h('section',{class:'member-detail-section'},h('h3',{},title.toUpperCase()),h('div',{class:'member-detail-grid'},...rows.filter(([,value])=>value).map(([label,value])=>h('div',{class:'member-detail-item'},h('small',{},label.toUpperCase()),h('span',{},memberValue(label==='Nomor HP / WhatsApp'?'wa':label==='Nomor HP pengurus daerah'?'hp_pengurus':label==='Nomor HP orang tua'?'hp_ortu':label.toLowerCase(),value))))))),
     (member.surat||[]).length>0&&h('section',{class:'member-detail-section'},h('h3',{},'Foto Surat Sambung'),...(member.surat||[]).map((id,index)=>h('a',{class:'member-file-link',...memberMediaAttributes(id,'href'),target:'_blank',rel:'noopener'},icon('attachment',16),h('span',{},'Buka lampiran '+(index+1))))),
     S.admin&&h('div',{class:'member-detail-actions'},h('button',{class:'btn',onclick:()=>{S.form={...member};S.detail=null;S.detailOrigin=null;render()}},icon('edit',16),h('span',{},'Edit data anggota')))
@@ -1102,6 +1095,7 @@ async function saveForm(){
   }
   f.pref=allowedPref;
   const d={...f};delete d.id;Object.keys(d).forEach(key=>{if(typeof d[key]==='string'&&!['foto'].includes(key))d[key]=cleanMemberValue(d[key]).toUpperCase()});d.peran=d.peran||'ANGGOTA';d.status=d.status||'AKTIF';
+  if(!memberBarcodeValue(d))d.barcode=createMemberBarcode();
   try{if(f.id)await S.db.collection('members').doc(f.id).set(d);else await S.db.collection('members').add({...d,at:Date.now()});S.form=null;S.memberUploadState=null;render()}catch(e){console.error(e);alert('Tidak bisa menyimpan: '+(e.message||'periksa koneksi dan izin database'))}}
 function memberFormCard(){
   const f=S.form;
@@ -1211,7 +1205,7 @@ function activityCard(event){
     const processBarcode=async value=>{
       const code=String(value||'').trim().replace(/^\*|\*$/g,'').toUpperCase();
       if(!code){status.textContent='Barcode kosong.';return}
-      const matches=registeredMembers.filter(member=>memberBarcodeValue(member)===code||legacyMemberBarcodeValue(member)===code||memberCode(member).toUpperCase()===code);
+      const matches=registeredMembers.filter(member=>memberBarcodeValue(member)===code);
       if(matches.length===0){status.textContent='Barcode tidak cocok dengan anggota terdaftar.';return}
       if(matches.length>1){status.textContent='Barcode cocok dengan beberapa anggota. Periksa nomor kartu terlebih dahulu.';return}
       const member=matches[0];
@@ -1579,6 +1573,7 @@ function render(){
   const storageErrors=Object.values(S.storageErrors||{});
   if(storageErrors.length)content.push(h('p',{class:'warn storage-warning'},'Database bersama tidak dapat dibaca: '+storageErrors.join(' · ')+' Jalankan pembaruan skema Supabase, lalu muat ulang aplikasi.'));
   if(S.memberMediaError)content.push(h('p',{class:'warn storage-warning'},'Media anggota: '+S.memberMediaError));
+  if(S.memberBarcodeError)content.push(h('p',{class:'warn storage-warning'},S.memberBarcodeError));
   const legacyMediaCount=legacyMemberMediaCount();
   if(S.admin&&S.supabase&&legacyMediaCount)content.push(h('section',{class:'card storage-import'},h('div',{},h('b',{},'Pindahkan media anggota lama'),h('small',{},legacyMediaCount+' foto atau lampiran masih tersimpan di lokasi lama. File akan dipindahkan ke Supabase privat.')) ,h('button',{class:'btn s',onclick:migrateExistingMemberMedia},'Pindahkan media')));
   if(S.admin&&S.supabase&&!S.storageImporting){
@@ -1600,12 +1595,38 @@ function sub(name,key){
     const next=s.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(a.at||0)-(b.at||0));
     const previous=JSON.stringify(S[key]||[]);
     S[key]=next;
+    if(key==='members')void ensureMemberBarcodes(next);
     if(JSON.stringify(next)!==previous||hadError)render();
   },error=>{
     console.error('Koleksi Supabase '+name+' gagal dimuat:',error);
     S.storageErrors[name]=error.message||'Koneksi gagal';
     render();
   });
+}
+async function ensureMemberBarcodes(members){
+  if(!S.admin||!S.db)return;
+  const missing=members.filter(member=>member.id&&!memberBarcodeValue(member)&&!S.memberBarcodePending.has(String(member.id)));
+  if(!missing.length)return;
+  let changed=false;
+  let failed=false;
+  for(const member of missing){
+    const id=String(member.id);
+    S.memberBarcodePending.add(id);
+    const barcode=createMemberBarcode();
+    try{
+      await S.db.collection('members').doc(id).update({barcode});
+      S.members=S.members.map(current=>String(current.id)===id?{...current,barcode}:current);
+      changed=true;
+    }catch(error){
+      failed=true;
+      S.memberBarcodeError='Barcode untuk '+(member.nama||id)+' gagal disimpan: '+(error.message||'periksa izin database');
+      console.error('Gagal membuat barcode unik anggota:',error);
+    }finally{
+      S.memberBarcodePending.delete(id);
+    }
+  }
+  if(changed&&!failed)S.memberBarcodeError='';
+  if(changed||S.memberBarcodeError)render();
 }
 let dataUnsubscribers=[];
 function stopDataSubscriptions(){
