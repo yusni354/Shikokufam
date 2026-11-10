@@ -1,8 +1,8 @@
-const S={members:[],events:[],topics:[],view:'landing',openConversation:null,messageSignature:'',admin:false,mainAdmin:false,uid:null,email:'',name:'',approvalStatus:'approved',pendingUsers:[],mapError:'',db:null,supabase:null,messageChannel:null,authLoading:true,unreadMessages:0};
+const S={members:[],events:[],topics:[],cleaningDuties:[],view:'landing',openConversation:null,messageSignature:'',admin:false,mainAdmin:false,uid:null,email:'',name:'',approvalStatus:'approved',pendingUsers:[],mapError:'',db:null,supabase:null,messageChannel:null,authLoading:true,unreadMessages:0};
 const $=s=>document.querySelector(s);
 function h(t,p,...k){const e=document.createElement(t);for(const a in p||{}){if(a==='onclick')e.onclick=p[a];else if(a==='class')e.className=p[a];else e.setAttribute(a,p[a])}k.flat().forEach(c=>{if(c!=null&&c!==false)e.append(c)});return e}
-const ALL=[['landing','🗺️ Beranda'],['dash','🏠 Dashboard'],['members','👥 Data Anggota'],['absen','📝 Absensi'],['forum','💬 Forum'],['import','📥 Import Database',1],['pesan','📨 Pesan Masuk']];
-function go(v){S.view=v;S.form=S.detail=null;if(v==='pesan'&&S.admin)S.openConversation=null;document.body.classList.remove('open');render();if(v==='pesan'&&!S.admin)markMessagesRead()}
+const ALL=[['landing','🗺️ Beranda'],['dash','🏠 Dashboard'],['members','👥 Data Anggota'],['absen','📝 Absensi'],['piket','🧹 Jadwal Piket'],['forum','💬 Forum'],['import','📥 Import Database',1],['pesan','📨 Pesan Masuk']];
+function go(v){S.view=v;S.form=S.detail=S.dutyForm=null;if(v==='pesan'&&S.admin)S.openConversation=null;document.body.classList.remove('open');render();if(v==='pesan'&&!S.admin)markMessagesRead()}
 $('#mn').onclick=()=>document.body.classList.add('open');
 $('#ov').onclick=()=>document.body.classList.remove('open');
 $('#st').onclick=()=>$('#sp').classList.toggle('open');
@@ -340,6 +340,7 @@ function vDash(){
     h('div',{class:'stats'},...[['Anggota',S.members.length],['Kegiatan',S.events.length],['Wilayah',Object.keys(wilayah()).length]].map(x=>h('div',{},h('small',{},x[0]),h('b',{},String(x[1]))))),
     c('🗄️','Database','Kelola data anggota komunitas',S.members.length+' anggota','members'),
     c('📋','Absensi','Kegiatan & kehadiran anggota',S.events.length+' kegiatan','absen'),
+    c('🧹','Jadwal Piket','Jadwal kebersihan komunitas',S.cleaningDuties.length+' jadwal','piket'),
     c('💬','Forum','Diskusi & komentar anggota',S.topics.length+' topik','forum'),
     S.admin&&c('📥','Import Database','Tambahkan data anggota','Impor CSV','import'),
     c('📨','Pesan Masuk','Pesan dan balasan admin',S.admin?((S.tanya?.length||0)+' pesan'):'Pesan saya','pesan'),
@@ -434,6 +435,49 @@ function vAbsen(){
   return [h('h1',{},'Absensi'),h('p',{class:'sub'},'Kegiatan & kehadiran'),guard(),
     S.admin&&h('div',{class:'card',style:'display:block'},t,h('button',{class:'btn',onclick:async()=>{if(!t.value.trim())return;await S.db.collection('events').add({judul:t.value.trim(),hadir:[],at:Date.now()});t.value=''}},'Buat kegiatan')),
     list.length?list:h('p',{class:'warn'},'Belum ada kegiatan.')];
+}
+function vPiket(){
+  const form=S.dutyForm;
+  const edit=form&&form.id;
+  const dateLabel=value=>value?new Date(value+'T00:00:00').toLocaleDateString('id-ID',{day:'numeric',month:'long',year:'numeric'}):'Tanggal belum diatur';
+  const cards=[...S.cleaningDuties].sort((a,b)=>(a.tanggal||'').localeCompare(b.tanggal||'')).map(duty=>{
+    const date=duty.tanggal?new Date(duty.tanggal+'T00:00:00') : null;
+    return h('article',{class:'duty-card'},
+      h('div',{class:'duty-date'},date&&h('b',{},String(date.getDate()).padStart(2,'0')),h('small',{},date?date.toLocaleDateString('id-ID',{month:'short'}):'—')),
+      h('div',{class:'duty-info'},h('small',{},dateLabel(duty.tanggal)),h('b',{},duty.nama),h('p',{},duty.tugas)),
+      S.admin&&h('div',{class:'duty-actions'},
+        h('button',{class:'btn s',title:'Edit jadwal',onclick:()=>{S.dutyForm={...duty};render()}},'✎ Edit'),
+        h('button',{class:'btn s',title:'Hapus jadwal',onclick:async()=>{
+          if(!confirm('Hapus jadwal piket '+duty.nama+'?'))return;
+          try{await S.db.collection('cleaning_duties').doc(duty.id).delete()}catch(error){console.error(error);alert('Gagal menghapus jadwal: '+(error.message||'periksa koneksi'))}
+        }},'Hapus')));
+  });
+  let editor=null;
+  if(S.admin&&form){
+    const name=h('input',{placeholder:'Nama yang bertugas',maxlength:'120'}),task=h('textarea',{placeholder:'Contoh: menyapu ruang bersama dan membuang sampah',rows:3,maxlength:'1000'}),date=h('input',{type:'date'});
+    name.value=form.nama||'';task.value=form.tugas||'';date.value=form.tanggal||'';
+    name.oninput=()=>{form.nama=name.value};task.oninput=()=>{form.tugas=task.value};date.oninput=()=>{form.tanggal=date.value};
+    editor=box(h('b',{},edit?'Edit jadwal piket':'Tambah jadwal piket'),
+      h('label',{class:'lb'},'Tanggal *',date),
+      h('label',{class:'lb'},'Nama *',name),
+      h('label',{class:'lb'},'Tugas kebersihan *',task),
+      h('div',{class:'fl'},
+        h('button',{class:'btn',onclick:async()=>{
+          const nama=(form.nama||'').trim(),tugas=(form.tugas||'').trim();
+          if(!form.tanggal||!nama||!tugas){alert('Tanggal, nama, dan tugas wajib diisi.');return}
+          const data={tanggal:form.tanggal,nama,tugas,at:Date.now()};
+          try{
+            if(form.id)await S.db.collection('cleaning_duties').doc(form.id).update(data);
+            else await S.db.collection('cleaning_duties').add(data);
+            S.dutyForm=null;render();
+          }catch(error){console.error(error);alert('Gagal menyimpan jadwal: '+(error.message||'periksa koneksi'))}
+        }},edit?'Simpan perubahan':'Tambah jadwal'),
+        h('button',{class:'btn s',onclick:()=>{S.dutyForm=null;render()}},'Batal')));
+  }
+  return [h('div',{class:'duty-heading'},h('div',{},h('h1',{},'Jadwal Piket'),h('p',{class:'sub'},'Bersama menjaga kebersihan tempat kita berkumpul.')),h('span',{class:'duty-count'},S.cleaningDuties.length+' jadwal')),
+    S.admin&&!form&&h('button',{class:'btn duty-add',onclick:()=>{const today=new Date();S.dutyForm={tanggal:[today.getFullYear(),String(today.getMonth()+1).padStart(2,'0'),String(today.getDate()).padStart(2,'0')].join('-')};render()}},'+ Tambah jadwal'),
+    editor,
+    cards.length?h('div',{class:'duty-list'},...cards):h('div',{class:'duty-empty'},h('span',{},'🧹'),h('b',{},'Belum ada jadwal piket'),h('p',{},S.admin?'Tambahkan jadwal pertama untuk mulai mengatur tugas kebersihan.':'Jadwal piket yang akan datang akan tampil di sini.'))];
 }
 function vForum(){
   const t=h('input',{placeholder:'Judul topik'}),b=h('textarea',{placeholder:'Isi diskusi',rows:3});
@@ -573,7 +617,7 @@ function vImport(){
       ta.value='';alert(rows.length+' anggota diimpor');go('members')}},'Import'))];
 }
 
-const V={landing:vPeta,dash:vDash,members:vMembers,absen:vAbsen,forum:vForum,import:vImport,'map-settings':vPetaSettings,approvals:vApprovals,pesan:vPesan};
+const V={landing:vPeta,dash:vDash,members:vMembers,absen:vAbsen,piket:vPiket,forum:vForum,import:vImport,'map-settings':vPetaSettings,approvals:vApprovals,pesan:vPesan};
 function render(){
   if(S.authLoading){
     $('#dr').replaceChildren();
@@ -609,7 +653,7 @@ function render(){
   if(!V[S.view]||['map-settings','approvals'].includes(S.view)&&!S.mainAdmin||current?.[2]&&!S.admin)S.view='landing';
   $('#app').replaceChildren(...[].concat(V[S.view]()).filter(Boolean));
   const tb=$('#tb');tb.style.display=S.form?'none':'flex';$('#pet').style.display=S.form?'none':'block';
-  tb.replaceChildren(...[['landing','🗺️','Beranda'],['dash','🏠','Ringkasan'],['members','👥','Anggota'],['absen','📝','Absensi'],['forum','💬','Forum']].map(x=>h('a',{class:S.view===x[0]?'on':'',onclick:()=>go(x[0])},h('span',{},x[1]),x[2])));
+  tb.replaceChildren(...[['landing','🗺️','Beranda'],['dash','🏠','Ringkasan'],['members','👥','Anggota'],['absen','📝','Absensi'],['piket','🧹','Piket'],['forum','💬','Forum']].map(x=>h('a',{class:S.view===x[0]?'on':'',onclick:()=>go(x[0])},h('span',{},x[1]),x[2])));
 }
 function sub(name,key){
   S.db.collection(name).onSnapshot(s=>{
@@ -650,7 +694,7 @@ render();
     S.supabase.auth.onAuthStateChange((_event,next)=>{applySession(next)});
     setInterval(()=>{if(S.uid)loadMessages();if(S.mainAdmin)loadPendingUsers()},30000);
   }else S.authLoading=false;
-  sub('members','members');sub('events','events');sub('topics','topics');if(!S.supabase)sub('pengaturan','pengaturan');sub('pin','pins');
+  sub('members','members');sub('events','events');sub('topics','topics');sub('cleaning_duties','cleaningDuties');if(!S.supabase)sub('pengaturan','pengaturan');sub('pin','pins');
   render();
 })();
 
