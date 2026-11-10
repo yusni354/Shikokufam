@@ -1,15 +1,28 @@
-const S={members:[],events:[],topics:[],cleaningDuties:[],view:'landing',openConversation:null,messageSignature:'',admin:false,mainAdmin:false,uid:null,email:'',name:'',approvalStatus:'approved',pendingUsers:[],mapError:'',siteVisits:[],siteVisitsLoading:false,siteVisitsError:'',siteTrackingError:'',visitConsent:null,visitLocation:null,lastTrackedVisit:'',db:null,supabase:null,messageChannel:null,authLoading:true,unreadMessages:0};
+const S={members:[],events:[],topics:[],cleaningDuties:[],view:'landing',openConversation:null,messageSignature:'',admin:false,mainAdmin:false,adminMenuOpen:false,uid:null,email:'',name:'',approvalStatus:'approved',pendingUsers:[],mapError:'',siteVisits:[],siteVisitsLoading:false,siteVisitsError:'',siteTrackingError:'',visitConsent:null,visitLocation:null,lastTrackedVisit:'',visitorMap:null,db:null,supabase:null,messageChannel:null,authLoading:true,unreadMessages:0};
 const $=s=>document.querySelector(s);
 function h(t,p,...k){const e=document.createElement(t);for(const a in p||{}){if(a==='onclick')e.onclick=p[a];else if(a==='class')e.className=p[a];else e.setAttribute(a,p[a])}k.flat().forEach(c=>{if(c!=null&&c!==false)e.append(c)});return e}
 const WILAYAH=[['Tokushima','#d95763'],['Takamatsu','#3985c6'],['Marugame','#e28b36'],['Zentsuji / Takuma','#8e68b5'],['Kochi','#24947e'],['Matsuyama','#d45e9f'],['Ehime','#6f9e3b'],['Niihama','#6073c4']];
 const ALL=[['landing','🏠 Home'],['dash','📊 Ringkasan'],['members','👥 Daftar Anggota'],['absen','📝 Absensi'],['piket','🧹 Jadwal Piket'],['peta','🗺️ Peta & Wilayah'],['forum','💬 Forum'],['import','📥 Import Database',1],['pesan','📨 Pesan Masuk']];
-function go(v){S.view=v;S.form=S.detail=S.dutyForm=null;S.detailOrigin=null;if(v==='pesan'&&S.admin)S.openConversation=null;document.body.classList.remove('open');render();if(v==='pesan'&&!S.admin)markMessagesRead()}
+const ADMIN_MENU=[['map-settings','🗺️ Pengaturan Peta'],['visitor-map','🌍 Peta Kunjungan Jepang'],['approvals','👥 Persetujuan Akun']];
+function isAdminSettingsView(){return ADMIN_MENU.some(([view])=>view===S.view)}
+function syncAdminTheme(){
+  document.body.classList.toggle('admin-dark',S.mainAdmin&&(S.adminMenuOpen||isAdminSettingsView()));
+  $('#st').setAttribute('aria-expanded',String(S.adminMenuOpen));
+}
+function go(v){S.view=v;S.adminMenuOpen=false;S.form=S.detail=S.dutyForm=null;S.detailOrigin=null;if(v==='pesan'&&S.admin)S.openConversation=null;document.body.classList.remove('open');syncAdminTheme();render();if(v==='pesan'&&!S.admin)markMessagesRead()}
 $('#mn').onclick=()=>document.body.classList.add('open');
-$('#ov').onclick=()=>document.body.classList.remove('open');
-$('#st').onclick=()=>$('#sp').classList.toggle('open');
-$('#mp').onclick=()=>{$('#sp').classList.remove('open');go('map-settings')};
-$('#ap').onclick=()=>{$('#sp').classList.remove('open');go('approvals')};
-$('#va').onclick=()=>{$('#sp').classList.remove('open');go('visitor-map');loadSiteVisits()};
+$('#ov').onclick=()=>{
+  document.body.classList.remove('open');
+  if(S.adminMenuOpen){S.adminMenuOpen=false;render()}else syncAdminTheme();
+};
+$('#st').onclick=()=>{
+  if(!S.mainAdmin)return;
+  S.adminMenuOpen=!S.adminMenuOpen;
+  document.body.classList.toggle('open',S.adminMenuOpen);
+  $('#st').setAttribute('aria-expanded',String(S.adminMenuOpen));
+  syncAdminTheme();
+  render();
+};
 
 function regionColor(value){return WILAYAH.find(([name])=>name===value)?.[1]||'#718096'}
 function memberRegion(member){
@@ -749,43 +762,22 @@ async function loadMapSettings(){
   S.mapError='';
   S.pengaturan=data?[{id:'peta',mid:data.map_mid}]:[];
 }
-function renderVisitConsent(){
-  if(!S.supabase||S.admin)return;
+function visitTrackingAllowed(){
   if(S.visitConsent===null){
-    try{S.visitConsent=localStorage.getItem('shikoku-family:visit-consent')||'pending'}
-    catch(error){console.warn('Pilihan analitik pengunjung tidak dapat dibaca:',error);S.visitConsent='pending'}
+    try{S.visitConsent=localStorage.getItem('shikoku-family:visit-consent')||'accepted'}
+    catch(error){console.warn('Pilihan analitik pengunjung tidak dapat dibaca:',error);S.visitConsent='accepted'}
   }
-  if(S.visitConsent==='accepted'){trackSiteVisit();return}
-  if(S.visitConsent!=='pending'||$('#visit-consent'))return;
-  const choose=async value=>{
-    S.visitConsent=value;
-    try{localStorage.setItem('shikoku-family:visit-consent',value)}
-    catch(error){console.warn('Pilihan analitik pengunjung tidak dapat disimpan:',error)}
-    const panel=$('#visit-consent');if(panel)panel.remove();
-    if(value==='accepted')await trackSiteVisit();
-  };
-  document.body.append(h('aside',{id:'visit-consent','aria-label':'Pilihan privasi kunjungan'},
-    h('b',{},'Bantu kami melihat asal kunjungan?'),
-    h('p',{},'Jika Anda setuju, kami mencatat perkiraan kota/negara, halaman yang dibuka, dan domain rujukan secara agregat. Alamat IP tidak disimpan, tetapi layanan geolokasi eksternal yang digunakan dapat melihat IP saat menentukan perkiraan lokasi.'),
-    h('div',{class:'visit-consent-actions'},
-      h('button',{class:'btn s',onclick:()=>choose('declined')},'Tidak, terima kasih'),
-      h('button',{class:'btn',onclick:()=>choose('accepted')},'Izinkan'))));
-}
-function showVisitTrackingError(){
-  if($('#visit-tracking-error'))return;
-  document.body.append(h('aside',{id:'visit-tracking-error',role:'status'},
-    h('span',{},'Perkiraan lokasi tidak tersedia; kunjungan ini tidak tercatat.'),
-    h('button',{class:'btn s',onclick:()=>$('#visit-tracking-error')?.remove()},'Tutup')));
+  return S.visitConsent==='accepted';
 }
 async function trackSiteVisit(){
-  if(!S.supabase||!S.visitConsent||S.visitConsent!=='accepted'||S.admin)return;
+  if(!S.supabase||!S.uid||S.admin||!visitTrackingAllowed())return;
   const page='/'+String(S.view||'landing').replace(/[^a-z0-9_-]/gi,'').slice(0,80);
   const visitKey=new Date().toISOString().slice(0,10)+'|'+page;
   if(S.lastTrackedVisit===visitKey)return;
   S.lastTrackedVisit=visitKey;
   try{
     if(!S.visitLocation){
-      try{S.visitLocation=JSON.parse(sessionStorage.getItem('shikoku-family:visit-location')||'null')}catch(error){console.warn('Cache lokasi kunjungan tidak dapat dibaca:',error)}
+      try{S.visitLocation=JSON.parse(sessionStorage.getItem('shikoku-family:visit-location-jp-postal-v1')||'null')}catch(error){console.warn('Cache lokasi kunjungan tidak dapat dibaca:',error)}
     }
     if(!S.visitLocation){
       const controller=new AbortController(),timeout=setTimeout(()=>controller.abort(),8000);
@@ -794,16 +786,23 @@ async function trackSiteVisit(){
       finally{clearTimeout(timeout)}
       if(!response.ok)throw new Error('Layanan lokasi mengembalikan HTTP '+response.status);
       const result=await response.json();
-      if(result.success===false||!result.country_code||!result.country||!result.city)throw new Error(result.message||'Lokasi perkiraan tidak tersedia');
+      if(result.success===false)throw new Error(result.message||'Lokasi perkiraan tidak tersedia');
+      if(String(result.country_code||'').toUpperCase()!=='JP')return;
+      const postalDigits=String(result.postal||'').replace(/\D/g,'');
+      if(postalDigits.length!==7)throw new Error('Kode pos perkiraan Jepang tidak tersedia');
+      if(!result.country||!result.city)throw new Error('Wilayah perkiraan tidak tersedia');
+      const latitude=Number(result.latitude),longitude=Number(result.longitude);
+      if(!Number.isFinite(latitude)||!Number.isFinite(longitude)||latitude<24||latitude>46.5||longitude<122||longitude>154)throw new Error('Koordinat wilayah Jepang tidak tersedia');
       S.visitLocation={
-        country_code:String(result.country_code).toUpperCase(),
+        country_code:'JP',
         country_name:String(result.country),
         region_name:String(result.region||''),
         city_name:String(result.city),
-        latitude:result.latitude!=null&&Number.isFinite(Number(result.latitude))?Math.round(Number(result.latitude)*10)/10:null,
-        longitude:result.longitude!=null&&Number.isFinite(Number(result.longitude))?Math.round(Number(result.longitude)*10)/10:null
+        postal_code:postalDigits.slice(0,3)+'-'+postalDigits.slice(3),
+        latitude:Math.round(latitude*10)/10,
+        longitude:Math.round(longitude*10)/10
       };
-      try{sessionStorage.setItem('shikoku-family:visit-location',JSON.stringify(S.visitLocation))}catch(error){console.warn('Cache lokasi kunjungan tidak dapat disimpan:',error)}
+      try{sessionStorage.setItem('shikoku-family:visit-location-jp-postal-v1',JSON.stringify(S.visitLocation))}catch(error){console.warn('Cache lokasi kunjungan tidak dapat disimpan:',error)}
     }
     let referrer='direct';
     if(document.referrer){try{referrer=new URL(document.referrer).hostname||'direct'}catch(error){console.warn('Domain rujukan tidak dapat dibaca:',error)}}
@@ -812,6 +811,7 @@ async function trackSiteVisit(){
       p_country_name:S.visitLocation.country_name,
       p_region_name:S.visitLocation.region_name,
       p_city_name:S.visitLocation.city_name,
+      p_postal_code:S.visitLocation.postal_code,
       p_latitude:S.visitLocation.latitude,
       p_longitude:S.visitLocation.longitude,
       p_page_path:page,
@@ -824,11 +824,41 @@ async function trackSiteVisit(){
     showVisitTrackingError();
   }
 }
+function showVisitTrackingError(){
+  if($('#visit-tracking-error'))return;
+  document.body.append(h('aside',{id:'visit-tracking-error',role:'status'},
+    h('span',{},'Perkiraan lokasi tidak tersedia; kunjungan ini tidak tercatat.'),
+    h('button',{class:'btn s',onclick:()=>$('#visit-tracking-error')?.remove()},'Tutup')));
+}
+function renderVisitorMap(locations){
+  const container=$('#visitor-map');
+  if(!container)return;
+  if(!window.L){container.textContent='Peta tidak dapat dimuat. Periksa koneksi internet lalu perbarui halaman.';return}
+  const bounds=L.latLngBounds([[24,122],[46.5,154]]);
+  S.visitorMap=L.map(container,{minZoom:4,maxZoom:18,maxBounds:bounds,maxBoundsViscosity:1,scrollWheelZoom:true});
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+    maxZoom:19,
+    attribution:'&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a>'
+  }).addTo(S.visitorMap);
+  S.visitorMap.fitBounds(bounds,{padding:[6,6]});
+  locations.forEach(place=>{
+    if(place.latitude==null||place.longitude==null)return;
+    const latitude=Number(place.latitude),longitude=Number(place.longitude);
+    if(!Number.isFinite(latitude)||!Number.isFinite(longitude)||latitude<24||latitude>46.5||longitude<122||longitude>154)return;
+    L.circleMarker([latitude,longitude],{
+      radius:Math.min(16,6+Math.sqrt(place.visits)),
+      color:'#fff',
+      weight:2,
+      fillColor:'#d9455f',
+      fillOpacity:.9
+    }).bindTooltip(place.postal_code,{className:'visitor-map-marker-label'}).bindPopup('<b>'+place.postal_code+'</b><br>'+place.visits+' kunjungan').addTo(S.visitorMap);
+  });
+}
 async function loadSiteVisits(){
   if(!S.mainAdmin||!S.supabase){S.siteVisitsError='Halaman ini membutuhkan akun admin utama dan koneksi Supabase.';return}
   S.siteVisitsLoading=true;S.siteVisitsError='';render();
   try{
-    const {data,error}=await S.supabase.from('site_visit_summaries').select('*').order('visit_day',{ascending:false}).limit(1000);
+    const {data,error}=await S.supabase.from('site_visit_summaries').select('*').eq('country_code','JP').like('postal_code','___-____').order('visit_day',{ascending:false}).limit(1000);
     if(error)throw error;
     S.siteVisits=data||[];S.siteVisitsError='';
   }catch(error){S.siteVisitsError=error.message||'Data kunjungan tidak dapat dibaca';console.error('Data kunjungan tidak dapat dibaca:',error)}
@@ -844,65 +874,51 @@ async function clearSiteVisits(){
     S.siteVisits=[];S.siteVisitsError='';render();
   }catch(error){S.siteVisitsError=error.message||'Ringkasan kunjungan tidak dapat dihapus';console.error('Ringkasan kunjungan tidak dapat dihapus:',error);render()}
 }
-function visitorMapSvg(locations){
-  const point=(longitude,latitude)=>[(longitude+180)*800/360,(90-latitude)*400/180];
-  const polygon=points=>'M'+points.map(([longitude,latitude])=>point(longitude,latitude).join(',')).join('L')+'Z';
-  const continents=[
-    [[-168,70],[-150,72],[-135,62],[-125,55],[-130,48],[-123,40],[-117,32],[-108,23],[-98,18],[-90,20],[-83,25],[-80,32],[-73,40],[-60,48],[-62,55],[-80,60],[-98,70],[-120,74],[-145,72]],
-    [[-52,60],[-42,60],[-28,72],[-38,82],[-52,80],[-60,70]],
-    [[-80,12],[-70,8],[-60,-3],[-52,-10],[-45,-23],[-52,-34],[-65,-55],[-73,-45],[-77,-20]],
-    [[-12,72],[15,72],[35,62],[58,58],[80,63],[100,58],[120,52],[145,58],[165,50],[155,40],[135,35],[125,22],[110,8],[100,5],[90,20],[75,8],[60,25],[45,32],[35,40],[25,35],[15,38],[5,45],[-5,50]],
-    [[-18,35],[5,37],[30,31],[42,12],[48,-12],[35,-35],[18,-35],[8,-25],[-2,-5],[-10,10]],
-    [[112,-11],[130,-10],[145,-18],[153,-28],[145,-39],[130,-35],[115,-25]],
-    [[47,-13],[51,-16],[50,-25],[46,-24]]
-  ];
-  const svg=sv('svg',{class:'visitor-world-map',viewBox:'0 0 800 400',role:'img','aria-label':'Peta perkiraan asal pengunjung'});
-  for(let longitude=-180;longitude<=180;longitude+=60){const [x]=point(longitude,0);svg.append(sv('path',{d:'M'+x+' 0V400',class:'visitor-map-grid'}))}
-  for(let latitude=-60;latitude<=60;latitude+=30){const [,y]=point(0,latitude);svg.append(sv('path',{d:'M0 '+y+'H800',class:'visitor-map-grid'}))}
-  continents.forEach(points=>svg.append(sv('path',{d:polygon(points),class:'visitor-continent'})));
-  locations.filter(item=>item.latitude!=null&&item.longitude!=null&&Number.isFinite(Number(item.latitude))&&Number.isFinite(Number(item.longitude))).forEach(item=>{
-    const [cx,cy]=point(Number(item.longitude),Number(item.latitude)),radius=Math.min(15,5+Math.sqrt(item.visits));
-    const marker=sv('g',{class:'visitor-map-marker'});
-    marker.append(sv('title',{},item.city_name+', '+item.country_name+': '+item.visits+' kunjungan'));
-    marker.append(sv('circle',{cx,cy,r:radius}));
-    if(item.visits>1)marker.append(sv('text',{x:cx,y:cy+3},String(item.visits)));
-    svg.append(marker);
+function visitorPlaces(rows){
+  const locations=new Map();
+  rows.filter(row=>row.country_code==='JP'&&/^\d{3}-\d{4}$/.test(row.postal_code||'')).forEach(row=>{
+    const item=locations.get(row.postal_code)||{...row,visits:0,latitude:0,longitude:0,coordinates:0};
+    const count=Number(row.visits)||0;
+    item.visits+=count;
+    if(Number.isFinite(Number(row.latitude))&&Number.isFinite(Number(row.longitude))){
+      item.latitude+=Number(row.latitude)*count;
+      item.longitude+=Number(row.longitude)*count;
+      item.coordinates+=count;
+    }
+    locations.set(row.postal_code,item);
   });
-  return svg;
+  return [...locations.values()].map(item=>({
+    ...item,
+    latitude:item.coordinates?Math.round(item.latitude/item.coordinates*10)/10:null,
+    longitude:item.coordinates?Math.round(item.longitude/item.coordinates*10)/10:null
+  })).sort((a,b)=>b.visits-a.visits);
 }
 function vVisitorMap(){
   if(!S.mainAdmin)return [h('p',{class:'warn'},'Halaman ini hanya dapat diakses admin utama.')];
-  const rows=S.siteVisits,locations=new Map();
-  rows.forEach(row=>{
-    const key=[row.country_code,row.region_name,row.city_name,row.latitude,row.longitude].join('|');
-    const item=locations.get(key)||{...row,visits:0};
-    item.visits+=Number(row.visits)||0;locations.set(key,item);
-  });
-  const places=[...locations.values()].sort((a,b)=>b.visits-a.visits);
+  const rows=S.siteVisits.filter(row=>row.country_code==='JP'&&/^\d{3}-\d{4}$/.test(row.postal_code||'')),places=visitorPlaces(rows);
   const total=rows.reduce((sum,row)=>sum+(Number(row.visits)||0),0);
-  const countries=new Set(rows.map(row=>row.country_code)).size;
   const table=rows.length?h('div',{class:'visitor-visit-list'},...rows.map(row=>
     h('article',{class:'visitor-visit-row'},
-      h('div',{},h('b',{},[row.city_name,row.country_name].filter(Boolean).join(', ')),h('small',{},[row.region_name,row.country_code].filter(Boolean).join(' · '))),
+      h('div',{},h('b',{},row.postal_code),h('small',{},[row.city_name,row.region_name].filter(Boolean).join(' · '))),
       h('div',{},h('span',{class:'tag'},row.visits+' kunjungan'),h('small',{},[row.page_path,row.referrer_host,row.visit_day].join(' · ')))))):
-    h('div',{class:'member-empty'},h('span',{},'🌍'),h('b',{},'Belum ada data kunjungan'),h('p',{},'Data akan tampil setelah pengunjung menyetujui pencatatan lokasi perkiraan.'));
+    h('div',{class:'member-empty'},h('span',{},'🇯🇵'),h('b',{},'Belum ada data kunjungan'),h('p',{},'Data lokasi Jepang akan tampil setelah pengguna yang masuk mengunjungi situs.'));
   return [
-    h('div',{class:'visitor-page-heading'},h('div',{},h('h1',{},'Peta Asal Pengunjung'),h('p',{class:'sub'},'Perkiraan lokasi dari kunjungan yang disetujui secara sukarela. Alamat IP tidak disimpan.')),
+    h('div',{class:'visitor-page-heading'},h('div',{},h('h1',{},'Peta Kunjungan Jepang'),h('p',{class:'sub'},'Pencatatan otomatis untuk pengguna non-admin yang masuk. Lokasi perkiraan Jepang dikelompokkan menurut kode pos; IP tidak disimpan oleh situs, tetapi layanan ipwho.is menerima IP untuk menentukan lokasi.')),
       h('button',{class:'btn s',onclick:loadSiteVisits},'↻ Perbarui')),
     S.siteVisitsError&&h('p',{class:'warn visitor-error'},S.siteVisitsError),
     S.siteTrackingError&&h('p',{class:'warn visitor-error'},'Pencatatan kunjungan terakhir gagal: '+S.siteTrackingError),
     S.siteVisitsLoading&&h('p',{class:'warn'},'Memuat ringkasan kunjungan...'),
     h('div',{class:'stats visitor-stats'},...[
-      ['Kunjungan',total],['Negara',countries],['Kota',places.length]
+      ['Kunjungan',total],['Wilayah kode pos',places.length]
     ].map(([label,count])=>h('div',{},h('small',{},label),h('b',{},String(count)))),
     ),
-    h('div',{class:'card visitor-map-card'},visitorMapSvg(places)),
-    h('h2',{class:'visitor-section-title'},'KOTA / NEGARA'),
+    h('div',{class:'card visitor-map-card'},h('div',{id:'visitor-map',class:'visitor-japan-map',role:'application','aria-label':'Peta wilayah kode pos di Jepang'})),
+    h('h2',{class:'visitor-section-title'},'WILAYAH KODE POS'),
     places.length?h('div',{class:'visitor-place-list'},...places.map(place=>
       h('article',{class:'visitor-place-row'},h('span',{class:'visitor-place-dot'},'●'),
-        h('div',{},h('b',{},[place.city_name,place.country_name].join(', ')),h('small',{},place.region_name||place.country_code)),
+        h('div',{},h('b',{},place.postal_code),h('small',{},[place.city_name,place.region_name].filter(Boolean).join(' · '))),
         h('strong',{},place.visits+' kunjungan')))):
-      h('p',{class:'warn'},'Belum ada lokasi untuk ditampilkan di peta.'),
+      h('p',{class:'warn'},'Belum ada wilayah kode pos untuk ditampilkan di peta.'),
     h('div',{class:'visitor-section-heading'},h('h2',{},'RIWAYAT RINGKAS'),h('button',{class:'btn s visitor-clear',onclick:clearSiteVisits},'Hapus data')),
     table
   ];
@@ -1028,8 +1044,25 @@ function vImport(){
 }
 
 const V={landing:vHome,dash:vDash,members:vMembers,absen:vAbsen,piket:vPiket,peta:vPeta,forum:vForum,import:vImport,'map-settings':vPetaSettings,'visitor-map':vVisitorMap,approvals:vApprovals,pesan:vPesan};
+function renderDrawer(){
+  const d=$('#dr');
+  if(S.adminMenuOpen){
+    d.replaceChildren(
+      h('p',{class:'sub',style:'padding:0 14px'},h('b',{style:'color:var(--ink)'},'PENGATURAN ADMIN'),h('br'),'Pengelolaan situs'),
+      ...ADMIN_MENU.map(([view,label])=>h('a',{class:S.view===view?'on':'',onclick:()=>{go(view);if(view==='visitor-map')loadSiteVisits()}},label)),
+      h('button',{class:'menu-logout',onclick:()=>go('landing')},'← Kembali ke menu utama')
+    );
+    return;
+  }
+  d.replaceChildren(h('p',{class:'sub',style:'padding:0 14px'},h('b',{style:'color:var(--ink)'},'KOMUNITAS ID-JP'),h('br'),'Database Anggota'),
+    ...ALL.filter(x=>!x[2]||(x[3]?S.mainAdmin:S.admin)).map(x=>h('a',{class:S.view===x[0]?'on':'',onclick:()=>go(x[0]),...(x[0]==='pesan'?{'data-message-nav':'true'}:{})},
+      x[1],x[0]==='pesan'&&S.unreadMessages>0&&h('span',{class:'nav-badge'},String(S.unreadMessages)))),
+    h('button',{class:'menu-logout',onclick:async()=>{await S.supabase.auth.signOut()}},'🚪 Keluar'));
+}
 function render(){
-  renderVisitConsent();
+  if(S.visitorMap){S.visitorMap.remove();S.visitorMap=null}
+  if(!S.mainAdmin)S.adminMenuOpen=false;
+  syncAdminTheme();
   if(S.authLoading){
     $('#dr').replaceChildren();
     $('#app').replaceChildren(h('p',{class:'warn',style:'text-align:center;padding:40px 16px'},'Memeriksa sesi login...'));
@@ -1052,10 +1085,7 @@ function render(){
     document.body.classList.remove('open');
     return;
   }
-  const d=$('#dr');d.replaceChildren(h('p',{class:'sub',style:'padding:0 14px'},h('b',{style:'color:var(--ink)'},'KOMUNITAS ID-JP'),h('br'),'Database Anggota'),
-    ...ALL.filter(x=>!x[2]||(x[3]?S.mainAdmin:S.admin)).map(x=>h('a',{class:S.view===x[0]?'on':'',onclick:()=>go(x[0]),...(x[0]==='pesan'?{'data-message-nav':'true'}:{})},
-      x[1],x[0]==='pesan'&&S.unreadMessages>0&&h('span',{class:'nav-badge'},String(S.unreadMessages)))),
-    h('button',{class:'menu-logout',onclick:async()=>{await S.supabase.auth.signOut()}},'🚪 Keluar'));
+  renderDrawer();
   $('#sw').style.display=S.mainAdmin?'flex':'none';
   const approvalBadge=$('#ab');
   approvalBadge.textContent=S.pendingUsers.length?String(S.pendingUsers.length):'';
@@ -1063,6 +1093,8 @@ function render(){
   const current=ALL.find(x=>x[0]===S.view);
   if(!V[S.view]||['map-settings','visitor-map','approvals'].includes(S.view)&&!S.mainAdmin||current?.[2]&&!S.admin)S.view='landing';
   $('#app').replaceChildren(...[].concat(V[S.view]()).filter(Boolean));
+  if(S.view==='visitor-map')renderVisitorMap(visitorPlaces(S.siteVisits));
+  trackSiteVisit();
   const tb=$('#tb');tb.style.display=S.form?'none':'flex';$('#pet').style.display=S.form?'none':'block';
   tb.replaceChildren(...[['landing','🏠','Home'],['dash','📊','Ringkasan'],['members','👥','Anggota'],['absen','📝','Absensi'],['piket','🧹','Piket'],['forum','💬','Forum']].map(x=>h('a',{class:S.view===x[0]?'on':'',onclick:()=>go(x[0])},h('span',{},x[1]),x[2])));
 }
