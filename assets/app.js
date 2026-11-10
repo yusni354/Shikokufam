@@ -246,7 +246,7 @@ function accountForm(){
       notice.textContent=!name.value.trim()?'Nama lengkap wajib diisi.':'Password minimal 6 karakter.';
       return;
     }
-    let result;
+    let result,approvedProfile=null;
     try{
       result=signup
         ?await S.supabase.auth.signUp({email:emailValue,password:password.value,options:{data:{name:name.value.trim()}}})
@@ -269,8 +269,12 @@ function accountForm(){
         notice.textContent='Akun berhasil dibuat dan menunggu persetujuan admin.';
         if(result.data.session)await S.supabase.auth.signOut();
       }else{
-        const {data:profile}=await S.supabase.from('profiles').select('approval_status').eq('id',result.data.user.id).maybeSingle();
-        if(profile?.approval_status==='pending'||profile?.approval_status==null){
+        const {data:profile,error:profileError}=await S.supabase.from('profiles').select('name,role,is_main_admin,approval_status').eq('id',result.data.user.id).maybeSingle();
+        if(profileError){
+          await S.supabase.auth.signOut();
+          notice.className='warn auth-error';
+          notice.textContent='Gagal memeriksa status persetujuan: '+profileError.message;
+        }else if(profile?.approval_status==='pending'||profile?.approval_status==null){
           await S.supabase.auth.signOut();
           notice.className='warn auth-error';
           notice.textContent='Akun Anda masih menunggu persetujuan admin.';
@@ -278,10 +282,21 @@ function accountForm(){
           await S.supabase.auth.signOut();
           notice.className='warn auth-error';
           notice.textContent='Pendaftaran akun Anda ditolak oleh admin.';
-        }else notice.textContent='Akun Anda telah disetujui. Login berhasil.';
+        }else{
+          approvedProfile=profile;
+          notice.textContent='Akun Anda telah disetujui. Login berhasil.';
+        }
       }
     }
-    if(!result.error&&!signup)await loadMessages();
+    if(!result.error&&!signup&&approvedProfile){
+      const user=result.data.user;
+      S.uid=user.id;S.email=user.email||emailValue;S.name=approvedProfile.name||S.email;
+      S.admin=approvedProfile.role==='admin';S.mainAdmin=S.admin&&approvedProfile.is_main_admin===true;
+      S.approvalStatus=approvedProfile.approval_status;S.authLoading=false;
+      render();
+      await loadMessages();
+      if(!S.messageChannel)await subscribeToMessages();
+    }
   }},signup?'Daftar':'Masuk'));
 }
 function loginForm(){
