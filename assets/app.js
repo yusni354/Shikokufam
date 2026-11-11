@@ -1,4 +1,4 @@
-const S={members:[],events:[],topics:[],cleaningDuties:[],view:'landing',openConversation:null,messageSignature:'',admin:false,mainAdmin:false,adminMenuOpen:false,uid:null,email:'',name:'',approvalStatus:'approved',pendingUsers:[],mapError:'',storageErrors:{},storageImporting:false,memberMediaUrls:new Map(),memberMediaPending:new Set(),memberMediaFailed:new Set(),legacyMediaPaths:new Map(),memberMediaError:'',memberUploadState:null,activityScannerStop:null,activityFeedback:null,db:null,legacyDb:null,supabase:null,messageChannel:null,authLoading:true,unreadMessages:0};
+const S={members:[],events:[],topics:[],cleaningDuties:[],view:'landing',openConversation:null,messageSignature:'',admin:false,mainAdmin:false,adminMenuOpen:false,uid:null,email:'',name:'',approvalStatus:'approved',avatarUrl:'',pendingUsers:[],mapError:'',storageErrors:{},storageImporting:false,memberMediaUrls:new Map(),memberMediaPending:new Set(),memberMediaFailed:new Set(),legacyMediaPaths:new Map(),memberMediaError:'',memberUploadState:null,activityScannerStop:null,activityFeedback:null,db:null,legacyDb:null,supabase:null,messageChannel:null,authLoading:true,unreadMessages:0};
 const $=s=>document.querySelector(s);
 try{
   localStorage.removeItem('shikoku-family:visit-consent');
@@ -1621,6 +1621,29 @@ render();
   if(window.supabase&&window.SUPABASE_CONFIG?.url&&window.SUPABASE_CONFIG?.anonKey){
     S.supabase=window.supabase.createClient(window.SUPABASE_CONFIG.url,window.SUPABASE_CONFIG.anonKey);
     S.db=createSupabaseDb(S.supabase);
+function updateUserHeader(){
+  const wrap=$('#user-profile'),img=$('#user-avatar-img'),ph=$('#user-avatar-placeholder'),nameEl=$('#user-name');
+  if(!wrap||!img||!ph||!nameEl)return;
+  const ok=S.uid&&S.authLoading===false&&S.approvalStatus==='approved'&&S.name;
+  if(!ok){wrap.style.display='none';return;}
+  wrap.style.display='flex';
+  nameEl.textContent=S.name;
+  const initial=(S.name||'?').trim().slice(0,1).toUpperCase()||'?';
+  if(S.avatarUrl){
+    img.style.display='block';ph.style.display='none';
+    if(S.supabase&&typeof S.avatarUrl==='string'&&S.avatarUrl.startsWith('members/')){
+      img.setAttribute('data-member-media',S.avatarUrl);img.removeAttribute('src');
+      S.supabase.storage.from('member-files').createSignedUrl(S.avatarUrl,3600).then(({data,error})=>{
+        if(!error&&data?.signedUrl)img.src=data.signedUrl;
+      }).catch(()=>{});
+    }else{
+      img.removeAttribute('data-member-media');img.src=S.avatarUrl;
+    }
+    img.alt='Foto profil '+S.name;
+  }else{
+    img.style.display='none';ph.style.display='grid';ph.textContent=initial;
+  }
+}
     const applySession=async session=>{
       if(!session?.user&&S.messageChannel){
         await S.supabase.removeChannel(S.messageChannel);
@@ -1631,8 +1654,8 @@ render();
       if(S.uid!==nextUid){S.members=[];S.events=[];S.topics=[];S.cleaningDuties=[];S.pins=[];S.storageErrors={};S.memberMediaUrls.clear();S.memberMediaPending.clear();S.memberMediaFailed.clear();S.legacyMediaPaths.clear();S.memberMediaError=''}
       S.uid=nextUid;S.email=session?.user?.email||'';S.admin=false;S.mainAdmin=false;S.approvalStatus='approved';
       if(session?.user){
-        const {data:profile}=await S.supabase.from('profiles').select('name,role,is_main_admin,approval_status').eq('id',session.user.id).maybeSingle();
-        S.admin=profile?.role==='admin';S.name=profile?.name||session.user.email||'';
+        const {data:profile}=await S.supabase.from('profiles').select('name,avatar_url,role,is_main_admin,approval_status').eq('id',session.user.id).maybeSingle();
+        S.admin=profile?.role==='admin';S.name=profile?.name||session.user.email||'';S.avatarUrl=profile?.avatar_url||'';
         S.mainAdmin=S.admin&&profile?.is_main_admin===true;
         S.approvalStatus=profile?.approval_status||'pending';
         await loadMessages();
@@ -1641,7 +1664,7 @@ render();
       await loadMapSettings();
       await loadPendingUsers();
       if(session?.user&&(S.approvalStatus==='approved'||S.admin))startDataSubscriptions();
-      S.authLoading=false;render();
+      updateUserHeader();S.authLoading=false;render();
     };
     const {data:{session}}=await S.supabase.auth.getSession();
     await applySession(session);

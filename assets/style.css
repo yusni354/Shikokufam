@@ -10,6 +10,11 @@ header b{letter-spacing:.45px;font-size:14px}
 .app-icon{display:inline-block;flex:none;vertical-align:middle}
 .settings-wrap{display:none;position:relative;margin-left:auto}
 .header-action{display:grid;place-items:center;width:40px;height:40px;padding:0;border:1px solid rgba(255,255,255,.55);border-radius:999px;background:rgba(255,255,255,.14);color:#fff}
+.user-profile{display:none;align-items:center;gap:8px;min-width:0}
+.user-avatar{width:32px;height:32px;border-radius:50%;object-fit:cover;background:rgba(255,255,255,.2);flex:none;border:1px solid rgba(255,255,255,.35)}
+.user-avatar.user-avatar-placeholder{background:linear-gradient(145deg,#dff2e7,#dceef8);color:#258a73;display:grid;place-items:center;font-weight:700;font-size:15px;border:none}
+.user-name{font-size:13px;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:rgba(255,255,255,.95);font-weight:600}
+body.admin-dark .user-avatar{background:rgba(255,255,255,.1);border-color:rgba(255,255,255,.25)}
 body.admin-dark{color-scheme:dark;--bg:#111820;--card:#1d2732;--ink:#edf2f7;--mut:#a7b3bf;--line:#34414d;--acc:#70c8eb;--g:linear-gradient(135deg,#263a4d,#192a3a)}
 body.admin-dark header{box-shadow:0 8px 22px rgba(0,0,0,.4)}
 body.admin-dark .logo{background:#e8eef3;color:#193248}
