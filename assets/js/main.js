@@ -15,8 +15,14 @@ import { startDataSubscriptions, stopDataSubscriptions, render } from './views.j
   } catch (e) {
     S.uid = 'u' + Math.random().toString(36).slice(2);
   }
-  try { S.assets = await claude.use('assets') } catch (e) { }
-  try { S.legacyDb = await claude.use('db') } catch (error) { console.warn('Database lama aplikasi tidak tersedia untuk impor:', error) }
+  // Initialize assets/legacyDb only in development environment; fallback to empty/local
+  try { S.assets = await (window as any).claude?.use?.('assets') } catch (e) { S.assets = undefined; }
+  try { S.legacyDb = await (window as any).claude?.use?.('db') } catch (error) { S.legacyDb = undefined; console.warn('Database lama aplikasi tidak tersedia untuk impor:', error) }
+
+  // Sync window.SUPABASE_CONFIG with ES module export for compatibility
+  if (typeof window.SUPABASE_CONFIG === 'undefined') {
+    window.SUPABASE_CONFIG = SUPABASE_CONFIG;
+  }
 
   if (window.supabase && window.SUPABASE_CONFIG?.url && window.SUPABASE_CONFIG?.anonKey) {
     S.supabase = window.supabase.createClient(window.SUPABASE_CONFIG.url, window.SUPABASE_CONFIG.anonKey);

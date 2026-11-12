@@ -46,6 +46,8 @@ export function syncAdminTheme() {
 }
 
 export function render() {
+  // Ensure default view on fresh load
+  if (S.authLoading || !S.uid) S.view = 'landing';
   if (S.activityScannerStop) S.activityScannerStop();
   if (!S.mainAdmin) S.adminMenuOpen = false;
   syncAdminTheme();
