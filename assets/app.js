@@ -125,7 +125,7 @@ function createLocalDb(){
   });
   return {collection};
 }
-const APP_DATA_COLLECTIONS=new Set(['members','events','topics','cleaning_duties','pin']);
+const APP_DATA_COLLECTIONS=new Set(['members','events','topics','cleaning_duties','pin','musyawarah']);
 function createSupabaseDb(client){
   const collection=name=>{
     if(!APP_DATA_COLLECTIONS.has(name))throw new Error('Koleksi aplikasi tidak dikenal: '+name);
@@ -1457,11 +1457,16 @@ function vMusyawarah(){
   }
   const list=S.musyawarah.slice().sort((a,b)=>new Date(b.tanggal||0)-new Date(a.tanggal||0)).map(x=>{
     const poinHtml=x.poin?Array.isArray(x.poin)?x.poin.map(p=>h('span',{class:'tag'},p)):[h('span',{class:'tag'},String(x.poin))]:[h('span',{class:'tag warn'},'-')];
-    return h('div',{class:'card',style:'display:block'},[
-      h('div',{class:'activity-heading'},h('div',{},h('b',{},x.nama_pemberi||'-'),h('p',{class:'activity-meta'},icon('calendar',15),h('span',{},new Date(x.tanggal).toLocaleDateString('id-ID')),h('span',{},' · '+x.status.toUpperCase()))),h('div',{class:'fl'},S.admin&&h('button',{class:'btn s',onclick:()=>hapus(x.id)},'\\u2715'))),
+    const tglStr=x.tanggal?new Date(x.tanggal).toLocaleDateString('id-ID'):'-';
+    const st=(x.status||'belum').toUpperCase();
+    return h('div',{class:'card',style:'display:block'},
+      h('div',{class:'activity-heading'},
+        h('div',{},h('b',{},x.nama_pemberi||'-'),h('p',{class:'activity-meta'},icon('calendar',15),h('span',{},tglStr),h('span',{},' · '+st))),
+        S.admin?h('div',{class:'fl'},h('button',{class:'btn s',onclick:()=>hapus(x.id)},'\u2715')):null
+      ),
       h('p',{class:'activity-description'},h('b',{},'Poin:'),...poinHtml),
-      x.catatan&&h('p',{class:'activity-description'},h('b',{},'Catatan:'),h('span',{},x.catatan))
-    ]);
+      x.catatan?h('p',{class:'activity-description'},h('b',{},'Catatan:'),h('span',{},x.catatan)):null
+    );
   });
   return [h('h1',{},'Musyawarah Komunitas'),h('p',{class:'sub'},'Catatan hasil musyawarah dan usulan anggota komunitas.'),guard(),
     h('div',{class:'card activity-create'},h('h2',{},'Usulan Baru'),h('label',{class:'activity-field'},'Tanggal usulan',tgl),h('label',{class:'activity-field'},'Nama pemberi usul',nama),h('label',{class:'activity-field'},'Poin yang dibahas',poin),h('label',{class:'activity-field'},'Status',status),h('label',{class:'activity-field'},'Catatan',catatan),h('button',{class:'btn',onclick:simpan},icon('plus',18),'Simpan')),
