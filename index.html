@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="description" content="Shikoku Family adalah komunitas Indonesia di Shikoku, Jepang untuk saling terhubung, berbagi informasi, dan bertumbuh bersama.">
-<meta name="theme-color" content="#2f86b8">
+<meta name="theme-color" content="#1e293b">
 <meta property="og:title" content="Shikoku Family | Komunitas Indonesia di Shikoku">
 <meta property="og:description" content="Terhubung, berbagi informasi, dan bertumbuh bersama di Shikoku.">
 <meta property="og:type" content="website">
@@ -13,7 +13,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="assets/css/style.css?v=20261110y">
 </head>
-<body class="bottom-nav-hidden">
+<body class="light-mode">
 
 <!-- ===== SIDEBAR KIRI ===== -->
 <nav id="sidebar">
@@ -81,8 +81,9 @@
     <div class="header-action">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a4 4 0 0 1-4 4H3.96a4 4 0 0 1-3.99-3.9L2 6a4 4 0 0 1 2-3.99A4.01 4.01 0 0 1 5.74 2.06l8.59 8.59a24.9 24.9 0 0 1 1.07 3.03L21 11.08z"></path></svg>
     </div>
-    <div class="header-action">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1" /><path d="M11 8L21 21l-4-8l-1 1l9 9l9-9l4 8V7a2 2 0 0 1 2-2z"></path></svg>
+    <div class="header-action" id="theme-toggle" aria-label="Toggle dark mode">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="moon-icon"><circle cx="12" cy="12" r="5"></circle><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"></path></svg>
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="sun-icon" style="display:none;"><path d="M12 2v4M12 20v4M4.93 4.93l2.83 2.83M19.07 19.07l2.83 2.83M1 12h2M21 12h2M4.93 19.07l2.83-2.83M19.07 4.93l2.83-2.83"></path></svg>
     </div>
   </div>
 </header>
@@ -223,6 +224,40 @@
   }
   window.addEventListener('resize', checkResize);
   checkResize();
+</script>
+
+<script>
+  const themeToggle = document.getElementById('theme-toggle');
+  const moonIcon = document.getElementById('moon-icon');
+  const sunIcon = document.getElementById('sun-icon');
+  const body = document.body;
+  
+  // Check for saved theme or system preference
+  const savedTheme = localStorage.getItem('theme');
+  const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  
+  if (savedTheme === 'dark' || (!savedTheme && systemPrefersDark)) {
+    body.classList.add('dark-mode');
+    body.classList.remove('light-mode');
+    moonIcon.style.display = 'none';
+    sunIcon.style.display = 'block';
+  }
+  
+  themeToggle.addEventListener('click', () => {
+    if (body.classList.contains('dark-mode')) {
+      body.classList.remove('dark-mode');
+      body.classList.add('light-mode');
+      localStorage.setItem('theme', 'light');
+      moonIcon.style.display = 'block';
+      sunIcon.style.display = 'none';
+    } else {
+      body.classList.add('dark-mode');
+      body.classList.remove('light-mode');
+      localStorage.setItem('theme', 'dark');
+      moonIcon.style.display = 'none';
+      sunIcon.style.display = 'block';
+    }
+  });
 </script>
 
 </body>
