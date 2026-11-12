@@ -1,4 +1,4 @@
-const S={members:[],events:[],topics:[],cleaningDuties:[],view:'landing',openConversation:null,messageSignature:'',admin:false,mainAdmin:false,adminMenuOpen:false,uid:null,email:'',name:'',approvalStatus:'approved',pendingUsers:[],mapError:'',storageErrors:{},storageImporting:false,memberMediaUrls:new Map(),memberMediaPending:new Set(),memberMediaFailed:new Set(),legacyMediaPaths:new Map(),memberMediaError:'',memberUploadState:null,activityScannerStop:null,activityFeedback:null,db:null,legacyDb:null,supabase:null,messageChannel:null,authLoading:true,unreadMessages:0};
+const S={members:[],events:[],topics:[],cleaningDuties:[],view:'landing',openConversation:null,messageSignature:'',admin:false,mainAdmin:false,adminMenuOpen:false,uid:null,email:'',name:'',approvalStatus:'approved',pendingUsers:[],mapError:'',storageErrors:{},memberMediaUrls:new Map(),memberMediaPending:new Set(),memberMediaFailed:new Set(),legacyMediaPaths:new Map(),memberMediaError:'',memberUploadState:null,activityScannerStop:null,activityFeedback:null,db:null,legacyDb:null,supabase:null,messageChannel:null,authLoading:true,unreadMessages:0};
 const $=s=>document.querySelector(s);
 try{
   localStorage.removeItem('shikoku-family:visit-consent');
@@ -277,71 +277,8 @@ function readLegacyCollection(name){
     }catch(error){finish(error)}
   });
 }
-async function legacyCollectionRows(name){
-  const [legacyRows,localRows]=await Promise.all([
-    readLegacyCollection(name),
-    Promise.resolve(readLocalCollection(name))
-  ]);
-  const byId=new Map(localRows.map(row=>[String(row.id),row]));
-  legacyRows.forEach(row=>byId.set(String(row.id),row));
-  return [...byId.values()];
-}
-function localDataSummary(){
-  const collections=['members','events','topics','cleaning_duties','pin'];
-  const rows=collections.reduce((total,name)=>total+readLocalCollection(name).length,0);
-  let map=0;
-  try{map=JSON.parse(localStorage.getItem('shikoku-family:pengaturan')||'[]').some(row=>row?.id==='peta'&&row.mid)?1:0}catch(error){console.error('Pengaturan lokal tidak dapat dibaca:',error)}
-  return {rows,map};
-}
-async function importLocalDataToSupabase(){
-  if(!S.supabase||!S.admin)throw new Error('Hanya admin yang dapat mengimpor data perangkat ini.');
-  if(S.storageImporting)return;
-  S.storageImporting=true;render();
-  let imported=0;
-  try{
-    const prepared=[];
-    for(const name of APP_DATA_COLLECTIONS){
-      let rows=await legacyCollectionRows(name);
-      if(name==='members'){
-        rows=await Promise.all(rows.map(async row=>{
-          const {changed,fields}=await migrateMemberMediaFields(row);
-          return changed?{...row,...fields}:row;
-        }));
-      }
-      prepared.push({name,rows});
-    }
-    const rowCount=prepared.reduce((total,item)=>total+item.rows.length,0);
-    const localSettings=(await legacyCollectionRows('pengaturan')).find(row=>row.id==='peta'&&row.mid);
-    if(!rowCount&&!localSettings)throw new Error('Tidak ditemukan data di database lama maupun penyimpanan browser perangkat ini. Pastikan aplikasi dibuka di perangkat dan browser yang berisi data lama.');
-    for(const {name,rows} of prepared){
-      for(let offset=0;offset<rows.length;offset+=100){
-        const batch=rows.slice(offset,offset+100).map(row=>{
-          const {id,...data}=row;
-          return {collection:name,id:String(id),data};
-        });
-        const {error}=await S.supabase.from('app_data').upsert(batch,{onConflict:'collection,id',ignoreDuplicates:true});
-        if(error)throw error;
-        imported+=batch.length;
-      }
-    }
-    if(localSettings){
-      const {error}=await S.supabase.from('map_settings').upsert(
-        {id:'main',map_mid:localSettings.mid,updated_at:new Date().toISOString()},
-        {onConflict:'id',ignoreDuplicates:true}
-      );
-      if(error)throw error;
-    }
-    S.storageImporting=false;
-    await loadMapSettings();
-    render();
-    alert('Impor data perangkat selesai ('+imported+' data ditemukan). Data lokal tetap tersimpan; data yang ID-nya sudah ada di Supabase tidak ditimpa. Muat ulang aplikasi di perangkat lain setelah memastikan akun sudah disetujui.');
-  }catch(error){
-    S.storageImporting=false;
-    console.error('Impor data lokal ke Supabase gagal:',error);
-    render();
-    alert('Impor data gagal: '+(error.message||'periksa koneksi, kebijakan akses, dan apakah skema Supabase terbaru sudah dijalankan.'));
-  }
-}
+
+
 function legacyMemberMediaCount(){
   return S.members.reduce((count,member)=>count+(member.foto&&!isPrivateMemberMedia(member.foto)?1:0)+(Array.isArray(member.surat)?member.surat.filter(file=>file&&!isPrivateMemberMedia(file)).length:0),0);
 }
@@ -1569,12 +1506,7 @@ function render(){
   if(S.memberMediaError)content.push(h('p',{class:'warn storage-warning'},'Media anggota: '+S.memberMediaError));
   const legacyMediaCount=legacyMemberMediaCount();
   if(S.admin&&S.supabase&&legacyMediaCount)content.push(h('section',{class:'card storage-import'},h('div',{},h('b',{},'Pindahkan media anggota lama'),h('small',{},legacyMediaCount+' foto atau lampiran masih tersimpan di lokasi lama. File akan dipindahkan ke Supabase privat.')) ,h('button',{class:'btn s',onclick:migrateExistingMemberMedia},'Pindahkan media')));
-  if(S.admin&&S.supabase&&!S.storageImporting){
-    const summary=localDataSummary();
-    const importButton=h('button',{class:'btn s',onclick:importLocalDataToSupabase},'Coba impor ulang');
-    content.push(h('section',{class:'card storage-import'},importButton));
-  }
-  if(S.storageImporting)content.push(h('p',{class:'warn'},'Sedang mengimpor data lokal ke database bersama...'));
+
   content.push(...[].concat(V[S.view]()).filter(Boolean));
   $('#app').replaceChildren(...content);
   hydrateMemberQrCodes();
