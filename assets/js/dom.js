@@ -1,5 +1,4 @@
 export const $ = s => document.querySelector(s);
-
 export function h(t, p, ...k) {
   const e = document.createElement(t);
   for (const a in p || {}) {
