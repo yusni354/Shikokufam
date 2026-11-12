@@ -1572,7 +1572,7 @@ function render(){
   if(S.admin&&S.supabase&&!S.storageImporting){
     const summary=localDataSummary();
     const importButton=h('button',{class:'btn s',onclick:importLocalDataToSupabase},'Coba impor ulang');
-    content.push(h('section',{class:'card storage-import'},h('div',{},h('b',{},'Impor / sinkronkan data lama'),h('small',{},summary.rows+' data terdeteksi di penyimpanan browser. Tombol ini juga memeriksa database lama aplikasi; ID yang sudah ada tidak ditimpa. Jalankan dari perangkat yang berisi data.')) ,importButton));
+    content.push(h('section',{class:'card storage-import'},importButton));
   }
   if(S.storageImporting)content.push(h('p',{class:'warn'},'Sedang mengimpor data lokal ke database bersama...'));
   content.push(...[].concat(V[S.view]()).filter(Boolean));
