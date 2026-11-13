@@ -130,6 +130,10 @@ input[type=checkbox]{width:20px;height:20px;margin:0;flex:none;accent-color:var(
 .member-section-heading b,.member-section-heading small{display:block}
 .member-section-heading small,.member-help{margin-top:4px;color:var(--mut);font-size:13px}
 .member-section-heading>span{font-size:23px}
+.drop-zone{border:2px dashed var(--line);border-radius:16px;padding:16px;text-align:center;background:var(--card);color:var(--mut);cursor:pointer;transition:border-color .2s,background .2s,color .2s}
+.drop-zone-active{border-color:var(--acc);background:#e3f1f8;color:var(--acc)}
+.drop-zone b{display:block;font-size:14px;font-weight:700;color:var(--ink);margin-bottom:2px}
+.drop-zone small{font-size:12px;color:var(--mut)}
 .member-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 12px}
 .member-form-grid .lb{min-width:0;margin-top:7px}
 .member-form-grid .lb:has(textarea){grid-column:1/-1}

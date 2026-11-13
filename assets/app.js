@@ -1006,6 +1006,21 @@ async function up(file,key,multi){
   }
 }
 function pick(label,acc,cap,cb){const i=h('input',{type:'file',accept:acc,style:'display:none'});if(cap)i.setAttribute('capture','environment');i.onchange=()=>cb(i.files[0]);return h('button',{class:'btn s',onclick:()=>i.click()},icon(cap?'camera':'attachment',16),h('span',{},label))}
+function dropZone(label,accept,key,multi){
+  const zone=h('div',{class:'drop-zone',role:'button',tabindex:0,'aria-label':label});
+  const input=h('input',{type:'file',accept,style:'display:none',multiple:multi});
+  const body=h('div',{class:'drop-zone-body'},h('b',{},label),h('small',{},'Seret file ke sini, atau klik untuk memilih'));
+  const active=flag=>zone.classList.toggle('drop-zone-active',flag);
+  const handle=files=>{Array.from(files||[]).forEach(file=>up(file,key,multi));input.value=''};
+  zone.ondragover=e=>{e.preventDefault();active(true)};
+  zone.ondragleave=()=>active(false);
+  zone.ondragend=()=>active(false);
+  zone.ondrop=e=>{e.preventDefault();active(false);handle(e.dataTransfer.files)};
+  zone.onclick=()=>input.click();
+  input.onchange=()=>handle(input.files);
+  zone.replaceChildren(body,input);
+  return zone;
+}
 async function saveForm(){
   const f=S.form;
   if(S.memberUploadState?.form===f&&S.memberUploadState.status==='uploading'){alert('Tunggu sampai unggah file selesai sebelum menyimpan profil.');return}
@@ -1046,10 +1061,12 @@ function memberFormCard(){
   const photoBox=()=>box(h('b',{},'Foto Setengah Badan (terbaru)'),
     f.foto&&h('img',{...memberMediaAttributes(f.foto,'src'),style:'width:88px;height:88px;border-radius:18px;object-fit:cover;display:block;margin:10px 0'}),
     S.memberUploadState?.form===f&&h('p',{class:'warn '+(S.memberUploadState.status==='error'?'storage-warning':'')},S.memberUploadState.message),
-    h('div',{class:'fl'},pick('Ambil foto','image/jpeg,image/png,image/webp',1,file=>up(file,'foto')),pick('Pilih foto','image/jpeg,image/png,image/webp',0,file=>up(file,'foto'))));
+    h('div',{class:'fl'},pick('Ambil foto','image/jpeg,image/png,image/webp',1,file=>up(file,'foto')),pick('Pilih foto','image/jpeg,image/png,image/webp',0,file=>up(file,'foto'))),
+    dropZone('Ganti foto setengah badan','image/jpeg,image/png,image/webp','foto',0))
   const documentBox=()=>box(h('b',{},'Foto Surat Sambung'),
     ...(f.surat||[]).map((id,index)=>h('div',{class:'member-file-row'},h('a',{...memberMediaAttributes(id,'href'),target:'_blank'},icon('attachment',16),h('span',{},'Lampiran '+(index+1))),h('button',{class:'btn s',onclick:()=>{f.surat=f.surat.filter(value=>value!==id);render()}},'Hapus'))),
     h('div',{class:'fl'},pick('Ambil / foto dokumen','image/*,application/pdf',1,file=>up(file,'surat',1)),pick('Pilih dokumen','image/*,application/pdf',0,file=>up(file,'surat',1))),
+    dropZone('Tambah foto atau PDF surat sambung','image/*,application/pdf','surat',1),
     h('small',{class:'member-help'},'Bisa menambahkan lebih dari satu foto atau PDF.'));
   return h('div',{class:'member-editor'},
     h('div',{class:'member-editor-heading'},h('button',{class:'btn s',onclick:()=>{S.form=null;render()}},'← Kembali'),
@@ -1500,7 +1517,7 @@ function render(){
     approvalBadge.style.display=S.pendingUsers.length?'inline-grid':'none';
   }
   const current=ALL.find(x=>x[0]===S.view);
-  if(!V[S.view]||['map-settings','approvals'].includes(S.view)&&!S.mainAdmin||current?.[2]&&!S.admin)S.view='landing';
+  if(!V[S.view]||(['map-settings','approvals'].includes(S.view)&&!S.mainAdmin))S.view='landing';
   const content=[];
   const storageErrors=Object.values(S.storageErrors||{});
   if(storageErrors.length)content.push(h('p',{class:'warn storage-warning'},'Database bersama tidak dapat dibaca: '+storageErrors.join(' · ')+' Jalankan pembaruan skema Supabase, lalu muat ulang aplikasi.'));
