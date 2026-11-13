@@ -1568,34 +1568,40 @@ render();
   try{S.assets=await claude.use('assets')}catch(e){}
   try{S.legacyDb=await claude.use('db')}catch(error){console.warn('Database lama aplikasi tidak tersedia untuk impor:',error)}
   if(window.supabase&&window.SUPABASE_CONFIG?.url&&window.SUPABASE_CONFIG?.anonKey){
-    S.supabase=window.supabase.createClient(window.SUPABASE_CONFIG.url,window.SUPABASE_CONFIG.anonKey);
-    S.db=createSupabaseDb(S.supabase);
-    const applySession=async session=>{
-      if(!session?.user&&S.messageChannel){
-        await S.supabase.removeChannel(S.messageChannel);
-        S.messageChannel=null;
-      }
-      stopDataSubscriptions();
-      const nextUid=session?.user?.id||null;
-      if(S.uid!==nextUid){S.members=[];S.events=[];S.topics=[];S.cleaningDuties=[];S.pins=[];S.storageErrors={};S.memberMediaUrls.clear();S.memberMediaPending.clear();S.memberMediaFailed.clear();S.legacyMediaPaths.clear();S.memberMediaError=''}
-      S.uid=nextUid;S.email=session?.user?.email||'';S.admin=false;S.mainAdmin=false;S.approvalStatus='approved';
-      if(session?.user){
-        const {data:profile}=await S.supabase.from('profiles').select('name,role,is_main_admin,approval_status').eq('id',session.user.id).maybeSingle();
-        S.admin=profile?.role==='admin';S.name=profile?.name||session.user.email||'';
-        S.mainAdmin=S.admin&&profile?.is_main_admin===true;
-        S.approvalStatus=profile?.approval_status||'pending';
-        await loadMessages();
-        await subscribeToMessages();
-      }
-      await loadMapSettings();
-      await loadPendingUsers();
-      if(session?.user&&(S.approvalStatus==='approved'||S.admin))startDataSubscriptions();
-      S.authLoading=false;render();
-    };
-    const {data:{session}}=await S.supabase.auth.getSession();
-    await applySession(session);
-    S.supabase.auth.onAuthStateChange((_event,next)=>{applySession(next)});
-    setInterval(()=>{if(S.uid)loadMessages();if(S.mainAdmin)loadPendingUsers()},30000);
+    try{
+      S.supabase=window.supabase.createClient(window.SUPABASE_CONFIG.url,window.SUPABASE_CONFIG.anonKey);
+      S.db=createSupabaseDb(S.supabase);
+      const applySession=async session=>{
+        if(!session?.user&&S.messageChannel){
+          await S.supabase.removeChannel(S.messageChannel);
+          S.messageChannel=null;
+        }
+        stopDataSubscriptions();
+        const nextUid=session?.user?.id||null;
+        if(S.uid!==nextUid){S.members=[];S.events=[];S.topics=[];S.cleaningDuties=[];S.pins=[];S.storageErrors={};S.memberMediaUrls.clear();S.memberMediaPending.clear();S.memberMediaFailed.clear();S.legacyMediaPaths.clear();S.memberMediaError=''}
+        S.uid=nextUid;S.email=session?.user?.email||'';S.admin=false;S.mainAdmin=false;S.approvalStatus='approved';
+        if(session?.user){
+          const {data:profile}=await S.supabase.from('profiles').select('name,role,is_main_admin,approval_status').eq('id',session.user.id).maybeSingle();
+          S.admin=profile?.role==='admin';S.name=profile?.name||session.user.email||'';
+          S.mainAdmin=S.admin&&profile?.is_main_admin===true;
+          S.approvalStatus=profile?.approval_status||'pending';
+          await loadMessages();
+          await subscribeToMessages();
+        }
+        await loadMapSettings();
+        await loadPendingUsers();
+        if(session?.user&&(S.approvalStatus==='approved'||S.admin))startDataSubscriptions();
+        S.authLoading=false;render();
+      };
+      const {data:{session}}=await S.supabase.auth.getSession();
+      await applySession(session);
+      S.supabase.auth.onAuthStateChange((_event,next)=>{applySession(next)});
+      setInterval(()=>{if(S.uid)loadMessages();if(S.mainAdmin)loadPendingUsers()},30000);
+    }catch(error){
+      console.error('Supabase gagal diinisialisasi, fallback ke penyimpanan lokal:',error);
+      S.db=createLocalDb();
+      S.authLoading=false;startDataSubscriptions();render();
+    }
   }else{
     S.db=S.legacyDb;
     if(!S.db)S.db=createLocalDb();
