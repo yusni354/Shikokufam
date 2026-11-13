@@ -4,7 +4,7 @@ try{
   localStorage.removeItem('shikoku-family:visit-consent');
   sessionStorage.removeItem('shikoku-family:visit-location-jp-postal-v1');
 }catch(error){console.warn('Cache lama peta kunjungan tidak dapat dihapus:',error)}
-function h(t,p,...k){const e=document.createElement(t);for(const a in p||{}){if(a==='onclick')e.onclick=p[a];else if(a==='class')e.className=p[a];else e.setAttribute(a,p[a])}k.flat().forEach(c=>{if(c!=null&&c!==false)e.append(c)});return e}
+function h(t,p,...k){const e=document.createElement(t);for(const a in p||{}){if(a.startsWith('on'))e[a.toLowerCase()]=p[a];else if(a==='class')e.className=p[a];else e.setAttribute(a,p[a])}k.flat().forEach(c=>{if(c!=null&&c!==false)e.append(c)});return e}
 const ICON_PATHS={
   menu:['M4 6h16','M4 12h16','M4 18h16'],
   home:['m3 10 9-7 9 7','M5 9v11h14V9','M9 20v-6h6v6'],

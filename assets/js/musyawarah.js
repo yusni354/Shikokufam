@@ -137,7 +137,7 @@ function musyawarahView() {
                   if (idx >= 0) agenda[idx].catatan = e.target.value;
                 } })
             ),
-            h('div', { style: 'flex:0.6;min-width:0;text-align:right', className: '' },
+            h('div', { style: 'flex:0.6;min-width:0;text-align:right', class: '' },
               h('span', { style: 'display:block;font-size:12px;color:var(--mut);margin-bottom:4px' }, 'Waktu: ' + (a.waktu || '-')),
               h('button', { class: 'btn s', onclick: () => {
                   const idx = agenda.findIndex(x => x.id === a.id);
@@ -242,7 +242,7 @@ function musyawarahView() {
               h('small', { style: 'color:var(--mut)' }, agName + ' · ' + (t.penanggungJawab || '-') + ' · ' + (t.tenggat ? fmtDate(t.tenggat) : '-')),
               h('small', { style: 'color:var(--mut);margin-top:4px' }, 'Status: ' + fmtStatus(t.status))
             ),
-            h('div', { style: 'flex:0 0 120px;text-align:right', className: '' },
+            h('div', { style: 'flex:0 0 120px;text-align:right', class: '' },
               h('button', { class: 'btn s', onclick: () => {
                   const idx = tindakLanjut.findIndex(x => x.id === t.id);
                   if (idx >= 0) tindakLanjut.splice(idx, 1);
@@ -289,8 +289,8 @@ function musyawarahView() {
             'Tanggal: ' + fmtDate(meeting.tanggal) + ' · ' + fmtTime(meeting.waktu_mulai || '-') + ' - ' + fmtTime(meeting.waktu_selesai || '-') + ' · ' + (meeting.lokasi || '-')
           )
         ),
-        h('div', { className: 'musyawarah-summary-actions' },
-          h('span', { className: 'tag', style: 'background:' + (meeting.status === 'berlangsung' ? '#fff3cd' : meeting.status === 'selesai' ? '#c8e6c9' : 'var(--line)') + ';color:' + (meeting.status === 'berlangsung' ? '#ff9800' : meeting.status === 'selesai' ? '#4caf50' : 'var(--mut)') }, fmtStatus(meeting.status))
+        h('div', { class: 'musyawarah-summary-actions' },
+          h('span', { class: 'tag', style: 'background:' + (meeting.status === 'berlangsung' ? '#fff3cd' : meeting.status === 'selesai' ? '#c8e6c9' : 'var(--line)') + ';color:' + (meeting.status === 'berlangsung' ? '#ff9800' : meeting.status === 'selesai' ? '#4caf50' : 'var(--mut)') }, fmtStatus(meeting.status))
         )
       ),
       h('div', { class: 'musyawarah-row' },
@@ -300,18 +300,18 @@ function musyawarahView() {
         h('b', {}, 'Notulis: '),
         h('span', {}, meeting.notulis || '-')
       ),
-      h3({ style: 'margin-top:8px' }, 'Daftar Peserta'),
+      h('h3', { style: 'margin-top:8px' }, 'Daftar Peserta'),
       h('div', { class: 'musyawarah-list' },
         (meeting.peserta || []).map(p => {
           const curr = peserta.find(x => x.id === p.id);
           const had = curr ? curr.kehadiran : (p.kehadiran || 'hadir');
           return h('div', { class: 'musyawarah-item' },
             h('span', {}, memberName(p.id)),
-            h('span', { className: 'tag', style: 'background:var(--line)' }, kehadiranLabel(had))
+            h('span', { class: 'tag', style: 'background:var(--line)' }, kehadiranLabel(had))
           );
         }) || [h('p', { class: 'warn' }, 'Belum ada peserta.')]
       ),
-      h3({ style: 'margin-top:8px' }, 'Agenda'),
+      h('h3', { style: 'margin-top:8px' }, 'Agenda'),
       h('div', { class: 'musyawarah-list' },
         (meeting.agenda || []).map(a =>
           h('div', { class: 'musyawarah-item' },
@@ -320,7 +320,7 @@ function musyawarahView() {
           )
         ) || [h('p', { class: 'warn' }, 'Belum ada agenda.')]
       ),
-      h3({ style: 'margin-top:8px' }, 'Keputusan'),
+      h('h3', { style: 'margin-top:8px' }, 'Keputusan'),
       h('div', { class: 'musyawarah-list' },
         (meeting.keputusan || []).map(k =>
           h('div', { class: 'musyawarah-item' },
@@ -329,7 +329,7 @@ function musyawarahView() {
           )
         ) || [h('p', { class: 'warn' }, 'Belum ada keputusan.')]
       ),
-      h3({ style: 'margin-top:8px' }, 'Tindak Lanjut'),
+      h('h3', { style: 'margin-top:8px' }, 'Tindak Lanjut'),
       h('div', { class: 'musyawarah-list' },
         (meeting.tindakLanjut || []).map(t =>
           h('div', { class: 'musyawarah-item' },
@@ -358,7 +358,7 @@ function musyawarahView() {
       h('div', { style: 'margin-bottom:12px' },
         h('input', { type: 'search', placeholder: 'Cari berdasarkan judul, tanggal, atau kata kunci...', value: searchQuery, oninput: (e) => { searchQuery = e.target.value; render(); } })
       ),
-      h2({ style: 'margin:0 0 8px' }, 'Riwayat Rapat'),
+      h('h2', { style: 'margin:0 0 8px' }, 'Riwayat Rapat'),
       filtered.length ? h('div', { class: 'musyawarah-riwayat-list' },
         ...filtered.map(m => {
           return h('div', { class: 'musyawarah-riwayat-item' },
@@ -368,7 +368,7 @@ function musyawarahView() {
                 fmtDate(m.tanggal) + ' · ' + fmtTime(m.waktu_mulai || '-') + ' - ' + fmtTime(m.waktu_selesai || '-') + ' · ' + fmtStatus(m.status)
               )
             ),
-            h('div', { className: 'musyawarah-riwayat-actions' },
+            h('div', { class: 'musyawarah-riwayat-actions' },
               h('button', { class: 'btn s', onclick: () => {
                   infoForm.id = m.id;
                   infoForm.judul = m.judul || '';
@@ -405,7 +405,7 @@ function musyawarahView() {
                   meeting = null;
                   render();
                 } }, 'Ubah'),
-              h('button', { class: 'btn s', style: { color: '#b45353' }, onclick: () => deleteMeeting(m.id) }, 'Hapus')
+              h('button', { class: 'btn s', style: 'color:#b45353', onclick: () => deleteMeeting(m.id) }, 'Hapus')
             )
           );
         })
@@ -455,7 +455,7 @@ function musyawarahView() {
         h('h1', {}, 'Musyawarah'),
         h('p', { class: 'sub' }, 'Catatan lengkap hasil musyawarah komunitas.')
       ),
-      h('div', { className: 'musyawarah-topbar-actions' },
+      h('div', { class: 'musyawarah-topbar-actions' },
         h('input', { type: 'search', placeholder: 'Cari rapat (judul/tanggal/kata kunci)', value: searchQuery, oninput: (e) => { searchQuery = e.target.value; render(); } }),
         h('button', { class: 'btn', onclick: () => {
             infoForm.id = null;
