@@ -23,7 +23,7 @@ function musyawarahView() {
   let activeTab = 'info';
   let searchQuery = '';
 
-  const allMeetings = [...S.musyawarah].sort((a, b) => (b.at || 0) - (a.at || 0));
+  let allMeetings = [...S.musyawarah].sort((a, b) => (b.at || 0) - (a.at || 0));
   const members = S.members || [];
 
   function findMeeting(id) { return allMeetings.find(m => m.id === id); }
@@ -414,6 +414,7 @@ function musyawarahView() {
   }
 
   function render() {
+    allMeetings = [...S.musyawarah].sort((a, b) => (b.at || 0) - (a.at || 0));
     let meeting = null;
     if (infoForm.id) {
       meeting = findMeeting(infoForm.id);
@@ -437,11 +438,6 @@ function musyawarahView() {
     }
 
     function getActiveTabContent() {
-      if (!meeting) {
-        return h('div', { class: 'musyawarah-form-section' },
-          h('p', { class: 'warn' }, 'Pilih rapat dari daftar atau klik "Rapat Baru" untuk membuat yang baru.')
-        );
-      }
       if (activeTab === 'info') return renderInfo();
       if (activeTab === 'peserta') return renderPeserta();
       if (activeTab === 'agenda') return renderAgenda();
@@ -468,7 +464,11 @@ function musyawarahView() {
             searchQuery = '';
             meeting = null;
             render();
-          } }, 'Rapat Baru')
+          } }, 'Rapat Baru'),
+        h('button', { class: 'btn', onclick: async () => {
+            const ok = await saveMeeting();
+            if (ok) { alert('Rapat disimpan.'); render(); }
+          } }, 'Simpan')
       )
     );
 
