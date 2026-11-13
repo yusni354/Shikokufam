@@ -455,6 +455,14 @@ function musyawarahView() {
         h('input', { type: 'search', placeholder: 'Cari rapat (judul/tanggal/kata kunci)', value: searchQuery, oninput: (e) => { searchQuery = e.target.value; render(); } }),
         h('button', { class: 'btn', onclick: () => {
             infoForm.id = null;
+            infoForm.judul = '';
+            infoForm.tanggal = '';
+            infoForm.waktu_mulai = '';
+            infoForm.waktu_selesai = '';
+            infoForm.lokasi = '';
+            infoForm.pemimpin = '';
+            infoForm.notulis = '';
+            infoForm.status = 'terjadwal';
             peserta.length = 0;
             agenda.length = 0;
             keputusan.length = 0;
