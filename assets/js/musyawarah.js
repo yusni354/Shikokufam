@@ -538,7 +538,7 @@ function musyawarahView() {
   }
 
   // Initial render
-  render();
+  return render();
 }
 
 // Expose globally
