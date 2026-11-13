@@ -1,4 +1,4 @@
-const S={members:[],events:[],topics:[],cleaningDuties:[],musyawarah:[],view:'landing',openConversation:null,messageSignature:'',admin:false,mainAdmin:false,adminMenuOpen:false,uid:null,email:'',name:'',approvalStatus:'approved',pendingUsers:[],mapError:'',storageErrors:{},memberMediaUrls:new Map(),memberMediaPending:new Set(),memberMediaFailed:new Set(),legacyMediaPaths:new Map(),memberMediaError:'',memberUploadState:null,activityScannerStop:null,activityFeedback:null,db:null,legacyDb:null,supabase:null,messageChannel:null,authLoading:true,unreadMessages:0};
+const S={members:[],events:[],topics:[],cleaningDuties:[],view:'landing',openConversation:null,messageSignature:'',admin:false,mainAdmin:false,adminMenuOpen:false,uid:null,email:'',name:'',approvalStatus:'approved',pendingUsers:[],mapError:'',storageErrors:{},memberMediaUrls:new Map(),memberMediaPending:new Set(),memberMediaFailed:new Set(),legacyMediaPaths:new Map(),memberMediaError:'',memberUploadState:null,activityScannerStop:null,activityFeedback:null,db:null,legacyDb:null,supabase:null,messageChannel:null,authLoading:true,unreadMessages:0};
 const $=s=>document.querySelector(s);
 try{
   localStorage.removeItem('shikoku-family:visit-consent');
@@ -33,7 +33,7 @@ const ICON_PATHS={
   scan:['M4 7V5a1 1 0 0 1 1-1h2','M17 4h2a1 1 0 0 1 1 1v2','M20 17v2a1 1 0 0 1-1 1h-2','M7 20H5a1 1 0 0 1-1-1v-2','M4 12h16'],
   sparkles:['m12 3 1.9 5.8L20 11l-6.1 2.2L12 19l-1.9-5.8L4 11l6.1-2.2L12 3Z','m19 14 1.2 2.8L23 18l-2.8 1.2L19 22l-1.2-2.8L15 18l2.8-1.2Z'],
   back:['m15 18-6-6 6-6','M9 12h12'],
-  musyawarah:['M12 2L3 7l9 9 9-9-9-9Z','M12 12h.01','M7 7l5 5-5 5'],
+  
   external:['M14 3h7v7','M10 14 21 3','M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5'],
 };
 function icon(name,size=20){
@@ -43,7 +43,7 @@ function icon(name,size=20){
   return svg;
 }
 const WILAYAH=[['Tokushima','#d95763'],['Takamatsu','#3985c6'],['Marugame','#e28b36'],['Zentsuji / Takuma','#8e68b5'],['Kagawa','#3985c6'],['Kochi','#24947e'],['Matsuyama','#d45e9f'],['Ehime','#6f9e3b'],['Niihama','#6073c4'],['Okayama','#c87945']];
-const ALL=[['landing','Home','','','home'],['dash','Ringkasan','','','chart'],['members','Daftar Anggota','','','users'],['kegiatan','Kegiatan','','','calendar'],['piket','Jadwal Piket','','','brush'],['peta','Peta & Wilayah','','','map'],['forum','Forum','','','messages'],['pesan','Pesan Masuk','','','inbox'],['musyawarah','Musyawarah','','','musyawarah']];
+const ALL=[['landing','Home','','','home'],['dash','Ringkasan','','','chart'],['members','Daftar Anggota','','','users'],['kegiatan','Kegiatan','','','calendar'],['piket','Jadwal Piket','','','brush'],['peta','Peta & Wilayah','','','map'],['forum','Forum','','','messages'],['pesan','Pesan Masuk','','','inbox']];
 const ADMIN_MENU=[['map-settings','Pengaturan Peta','map'],['approvals','Persetujuan Akun','users']];
 function isAdminSettingsView(){return ADMIN_MENU.some(([view])=>view===S.view)}
 function syncAdminTheme(){
@@ -125,7 +125,7 @@ function createLocalDb(){
   });
   return {collection};
 }
-const APP_DATA_COLLECTIONS=new Set(['members','events','topics','cleaning_duties','pin','musyawarah']);
+const APP_DATA_COLLECTIONS=new Set(['members','events','topics','cleaning_duties','pin']);
 function createSupabaseDb(client){
   const collection=name=>{
     if(!APP_DATA_COLLECTIONS.has(name))throw new Error('Koleksi aplikasi tidak dikenal: '+name);
@@ -1457,7 +1457,6 @@ function vPetaLegacy(){
     h('b',{style:'display:block;margin:6px 4px 10px'},'Sebaran per wilayah'),...sebaran()];
 }
 function sebaran(){const w=wilayah(),k=Object.keys(w);return k.length?k.map(n=>h('div',{class:'card',style:'display:block'},h('div',{class:'row'},h('b',{},icon('pin',16),h('span',{},n.toUpperCase())),h('span',{class:'tag'},w[n].length+' anggota')),h('small',{},w[n].map(x=>(x.nama||'').toUpperCase()).join(', ')))):[h('p',{class:'warn'},'Belum ada data wilayah.')]}
-const V={landing:vHome,dash:vDash,members:vMembers,kegiatan:vKegiatan,piket:vPiket,peta:vPeta,forum:vForum,'map-settings':vPetaSettings,approvals:vApprovals,pesan:vPesan,musyawarah:window.musyawarahView};
 function renderDrawer(){
   const d=$('#dr');
   if(S.adminMenuOpen){
@@ -1530,7 +1529,7 @@ function render(){
   hydrateMemberQrCodes();
   hydrateMemberMedia();
   const tb=$('#tb');tb.style.display=S.form?'none':'flex';$('#pet').style.display=S.form?'none':'block';
-  tb.replaceChildren(...[['landing','home','Home'],['dash','chart','Ringkasan'],['members','users','Anggota'],['kegiatan','calendar','Kegiatan'],['piket','brush','Piket'],['forum','messages','Forum'],['musyawarah','musyawarah','Musyawarah']].map(x=>h('a',{class:S.view===x[0]?'on':'',onclick:()=>go(x[0])},icon(x[1],19),h('span',{},x[2]))));
+  tb.replaceChildren(...[['landing','home','Home'],['dash','chart','Ringkasan'],['members','users','Anggota'],['kegiatan','calendar','Kegiatan'],['piket','brush','Piket'],['forum','messages','Forum']].map(x=>h('a',{class:S.view===x[0]?'on':'',onclick:()=>go(x[0])},icon(x[1],19),h('span',{},x[2]))));
 }
 function sub(name,key){
   return S.db.collection(name).onSnapshot(s=>{
@@ -1560,7 +1559,6 @@ function startDataSubscriptions(){
     sub('topics','topics'),
     sub('cleaning_duties','cleaningDuties'),
     sub('pin','pins'),
-    sub('musyawarah','musyawarah')
   ];
   if(!S.supabase)dataUnsubscribers.push(sub('pengaturan','pengaturan'));
 }
@@ -1579,7 +1577,7 @@ render();
       }
       stopDataSubscriptions();
       const nextUid=session?.user?.id||null;
-      if(S.uid!==nextUid){S.members=[];S.events=[];S.topics=[];S.cleaningDuties=[];S.musyawarah=[];S.pins=[];S.storageErrors={};S.memberMediaUrls.clear();S.memberMediaPending.clear();S.memberMediaFailed.clear();S.legacyMediaPaths.clear();S.memberMediaError=''}
+      if(S.uid!==nextUid){S.members=[];S.events=[];S.topics=[];S.cleaningDuties=[];S.pins=[];S.storageErrors={};S.memberMediaUrls.clear();S.memberMediaPending.clear();S.memberMediaFailed.clear();S.legacyMediaPaths.clear();S.memberMediaError=''}
       S.uid=nextUid;S.email=session?.user?.email||'';S.admin=false;S.mainAdmin=false;S.approvalStatus='approved';
       if(session?.user){
         const {data:profile}=await S.supabase.from('profiles').select('name,role,is_main_admin,approval_status').eq('id',session.user.id).maybeSingle();
