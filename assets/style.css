@@ -376,3 +376,40 @@ body.bottom-nav-hidden #pet{bottom:calc(10px + env(safe-area-inset-bottom,0px))}
 .activity-feedback{min-height:1.3em;color:var(--mut);font-size:14px}
 .activity-empty{color:var(--mut);margin:8px 0}
 @media(max-width:560px){.activity-create-grid{grid-template-columns:1fr;gap:0}.activity-heading{align-items:flex-start}.activity-region-list{grid-template-columns:1fr}.activity-participant{align-items:flex-start;flex-direction:column}.activity-participant-actions{width:100%;flex-wrap:wrap}.activity-add-row,.activity-scanner-row{align-items:stretch}.activity-add-row{flex-direction:column}.activity-region-section .activity-add-row{flex-direction:row}.activity-region-section .activity-add-row .btn{white-space:nowrap}.activity-scanner-row .btn{white-space:nowrap}}
+
+/* Musyawarah (meeting record) page */
+.musyawarah-topbar{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+.musyawarah-topbar h1{font-size:24px;margin:0}
+.musyawarah-topbar-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.musyawarah-search{width:100%;max-width:280px}
+.musyawarah-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;align-items:start}
+.musyawarah-form-side{display:flex;flex-direction:column;gap:12px}
+.musyawarah-summary-side{display:flex;flex-direction:column;gap:12px;overflow:auto}
+.musyawarah-tab-bar{display:flex;gap:4px;border:1px solid var(--line);border-radius:14px;padding:4px;background:var(--line)}
+.musyawarah-tab{padding:8px 12px;border:0;border-radius:10px;background:transparent;color:var(--mut);font-weight:600;cursor:pointer;flex:1;text-align:center;font-size:13px}
+.musyawarah-tab.on{background:var(--card);color:var(--acc);box-shadow:0 2px 8px rgba(23,50,77,.1)}
+.musyawarah-form-section{display:flex;flex-direction:column;gap:8px}
+.musyawarah-form-section h3{margin:0 0 4px;font-size:15px}
+.musyawarah-form-section .sub{margin:0 0 8px;color:var(--mut);font-size:13px}
+.musyawarah-summary-header{display:flex;justify-content:space-between;align-items:center;gap:12px;padding-bottom:10px;border-bottom:1px solid var(--line)}
+.musyawarah-summary-header h2{margin:0;font-size:20px}
+.musyawarah-summary-actions{display:flex;gap:6px;flex-wrap:wrap}
+.musyawarah-row{display:flex;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:14px;background:var(--card);flex-wrap:wrap}
+.musyawarah-list{display:flex;flex-direction:column;gap:8px}
+.musyawarah-item{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 12px;border:1px solid var(--line);border-radius:12px;background:var(--card);flex-wrap:wrap}
+.musyawarah-summary-empty{color:var(--mut);text-align:center;padding:30px 16px}
+.musyawarah-tag{display:inline-block;font-size:12px;background:var(--line);border-radius:8px;padding:2px 8px;margin-left:6px}
+.musyawarah-export{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.musyawarah-riwayat{display:flex;flex-direction:column;gap:12px}
+.musyawarah-riwayat input{margin-bottom:0}
+.musyawarah-riwayat h2{margin:0 0 8px}
+.musyawarah-riwayat-list{display:flex;flex-direction:column;gap:8px}
+.musyawarah-riwayat-item{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);border-radius:14px;background:var(--card);flex-wrap:wrap}
+.musyawarah-riwayat-actions{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.musyawarah-riwayat-actions .btn{margin:0}
+.musyawarah-summary-side::-webkit-scrollbar{width:6px}
+.musyawarah-summary-side::-webkit-scrollbar-track{background:var(--bg)}
+.musyawarah-summary-side::-webkit-scrollbar-thumb{background:var(--line);border-radius:3px}
+.musyawarah-summary-side::-webkit-scrollbar-thumb:hover{background:#d4c9b0}
+@media (max-width:900px){.musyawarah-grid{grid-template-columns:1fr}.musyawarah-form-side{flex:1;order:2}.musyawarah-summary-side{flex:1;order:1}}
+@media (max-width:560px){.musyawarah-form-side,.musyawarah-summary-side{flex:1;order:0}.musyawarah-tab{padding:6px 8px;font-size:12px}.musyawarah-topbar h1{font-size:20px}.musyawarah-topbar-actions .btn{font-size:13px}.musyawarah-item{padding:8px 10px}.musyawarah-riwayat-item{padding:8px 10px}.musyawarah-export{gap:6px}}

@@ -1440,40 +1440,7 @@ function vPetaLegacy(){
     h('b',{style:'display:block;margin:6px 4px 10px'},'Sebaran per wilayah'),...sebaran()];
 }
 function sebaran(){const w=wilayah(),k=Object.keys(w);return k.length?k.map(n=>h('div',{class:'card',style:'display:block'},h('div',{class:'row'},h('b',{},icon('pin',16),h('span',{},n.toUpperCase())),h('span',{class:'tag'},w[n].length+' anggota')),h('small',{},w[n].map(x=>(x.nama||'').toUpperCase()).join(', ')))):[h('p',{class:'warn'},'Belum ada data wilayah.')]}
-function vMusyawarah(){
-  const tgl=h('input',{type:'date'}),nama=h('input',{placeholder:'Nama pemberi usul'}),poin=h('textarea',{placeholder:'Poin yang dibahas (pisahkan dengan koma)',rows:3}),status=h('select',{}),catatan=h('textarea',{placeholder:'Catatan tambahan',rows:2});
-  status.replaceChildren(h('option',{value:'belum'},'Belum dilaksanakan'),h('option',{value:'selesai'},'Selesai'));
-  function simpan(){
-    if(!tgl.value||!nama.value.trim()||!poin.value.trim()){alert('Tanggal, nama pemberi usul, dan poin wajib diisi');return}
-    const poinList=poin.value.split(',').map(p=>p.trim()).filter(Boolean);
-    const data={tanggal:tgl.value,nama_pemberi:nama.value.trim(),poin:poinList,status:status.value,catatan:catatan.value.trim(),at:Date.now()};
-    (async()=>{
-      try{await S.db.collection('musyawarah').add(data);tgl.value='';nama.value='';poin.value='';status.value='belum';catatan.value=''}catch(e){alert('Gagal menyimpan musyawarah: '+(e.message||'periksa koneksi'))}
-    })();
-  }
-  function hapus(id){
-    if(!confirm('Hapus catatan musyawarah ini?'))return;
-    (async()=>{try{await S.db.collection('musyawarah').doc(id).delete()}catch(e){alert('Gagal menghapus: '+(e.message||'periksa koneksi'))}})();
-  }
-  const list=S.musyawarah.slice().sort((a,b)=>new Date(b.tanggal||0)-new Date(a.tanggal||0)).map(x=>{
-    const poinHtml=x.poin?Array.isArray(x.poin)?x.poin.map(p=>h('span',{class:'tag'},p)):[h('span',{class:'tag'},String(x.poin))]:[h('span',{class:'tag warn'},'-')];
-    const tglStr=x.tanggal?new Date(x.tanggal).toLocaleDateString('id-ID'):'-';
-    const st=(x.status||'belum').toUpperCase();
-    return h('div',{class:'card',style:'display:block'},
-      h('div',{class:'activity-heading'},
-        h('div',{},h('b',{},x.nama_pemberi||'-'),h('p',{class:'activity-meta'},icon('calendar',15),h('span',{},tglStr),h('span',{},' · '+st))),
-        S.admin?h('div',{class:'fl'},h('button',{class:'btn s',onclick:()=>hapus(x.id)},'\u2715')):null
-      ),
-      h('p',{class:'activity-description'},h('b',{},'Poin:'),...poinHtml),
-      x.catatan?h('p',{class:'activity-description'},h('b',{},'Catatan:'),h('span',{},x.catatan)):null
-    );
-  });
-  return [h('h1',{},'Musyawarah Komunitas'),h('p',{class:'sub'},'Catatan hasil musyawarah dan usulan anggota komunitas.'),guard(),
-    h('div',{class:'card activity-create'},h('h2',{},'Usulan Baru'),h('label',{class:'activity-field'},'Tanggal usulan',tgl),h('label',{class:'activity-field'},'Nama pemberi usul',nama),h('label',{class:'activity-field'},'Poin yang dibahas',poin),h('label',{class:'activity-field'},'Status',status),h('label',{class:'activity-field'},'Catatan',catatan),h('button',{class:'btn',onclick:simpan},icon('plus',18),'Simpan')),
-    h('h2',{},'Daftar Musyawarah'),
-    list.length?h('div',{class:'activity-list'},...list):h('p',{class:'activity-empty'},'Belum ada catatan musyawarah. Tambahkan usulan pertama di atas.')];
-}
-const V={landing:vHome,dash:vDash,members:vMembers,kegiatan:vKegiatan,piket:vPiket,peta:vPeta,forum:vForum,'map-settings':vPetaSettings,approvals:vApprovals,pesan:vPesan,musyawarah:vMusyawarah};
+const V={landing:vHome,dash:vDash,members:vMembers,kegiatan:vKegiatan,piket:vPiket,peta:vPeta,forum:vForum,'map-settings':vPetaSettings,approvals:vApprovals,pesan:vPesan,musyawarah:musyawarahView};
 function renderDrawer(){
   const d=$('#dr');
   if(S.adminMenuOpen){
