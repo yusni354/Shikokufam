@@ -12,4 +12,8 @@ export const S = {
 try {
   localStorage.removeItem('shikoku-family:visit-consent');
   sessionStorage.removeItem('shikoku-family:visit-location-jp-postal-v1');
+<<<<<<< HEAD
 } catch (e) { console.warn(e); }
+=======
+} catch (e) { console.warn(e); }
+>>>>>>> 31d1cb3bacd52cac8c712c9427905b1ca6826c39
