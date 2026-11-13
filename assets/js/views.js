@@ -21,7 +21,6 @@ export const V = {
   'map-settings': vPetaSettings,
   approvals: vApprovals,
   pesan: vPesan,
-  musyawarah: () => [h('h1', {}, 'Musyawarah Komunitas'), h('p', { class: 'sub' }, 'Catatan hasil musyawarah.')]
 };
 
 export function renderDrawer() {
@@ -103,7 +102,6 @@ export function render() {
   const tb = $('#tb');
   tb.style.display = S.form ? 'none' : 'flex';
   $('#pet').style.display = S.form ? 'none' : 'block';
-  tb.replaceChildren(...[['landing', 'home', 'Home'], ['dash', 'chart', 'Ringkasan'], ['members', 'users', 'Anggota'], ['kegiatan', 'calendar', 'Kegiatan'], ['piket', 'brush', 'Piket'], ['forum', 'messages', 'Forum'], ['musyawarah', 'musyawarah', 'Musyawarah']].map(x => h('a', { class: S.view === x[0] ? 'on' : '', onclick: () => go(x[0]) }, icon(x[1], 19), h('span', {}, x[2]))));
 }
 
 export function go(view) {
