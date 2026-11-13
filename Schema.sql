@@ -424,9 +424,32 @@ grant select, insert on public.message_replies to authenticated;
 
 alter table public.message_replies enable row level security;
 
+-- Member files policies
+drop policy if exists "Members can upload their own photo" on storage.objects;
+create policy "Members can upload their own photo"
+  on storage.objects for insert
+  to authenticated
+  with check (bucket_id = 'member-files');
+
+drop policy if exists "Anyone can read member files" on storage.objects;
+create policy "Anyone can read member files"
+  on storage.objects for select
+  to anon, authenticated
+  using (bucket_id = 'member-files');
+
+drop policy if exists "Owners can delete their member files" on storage.objects;
+create policy "Owners can delete their member files"
+  on storage.objects for delete
+  to authenticated
+  using (bucket_id = 'member-files' and (storage.foldername(name))[1] = (select auth.uid())::text);
+
 insert into storage.buckets (id, name, public)
 values ('message-attachments', 'message-attachments', true)
 on conflict (id) do update set public = true;
+
+insert into storage.buckets (id, name, public)
+values ('member-files', 'member-files', false)
+on conflict (id) do update set public = false;
 
 drop policy if exists "Message participants can upload attachments" on storage.objects;
 create policy "Message participants can upload attachments"
