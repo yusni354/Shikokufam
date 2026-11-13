@@ -90,7 +90,7 @@ export function render() {
     approvalBadge.style.display = S.pendingUsers.length ? 'inline-grid' : 'none';
   }
   const current = ALL.find(x => x[0] === S.view);
-  if (!V[S.view] || (['map-settings', 'approvals'].includes(S.view) && !S.mainAdmin) || (current && current[2] && !S.admin)) S.view = 'landing';
+  if (!V[S.view] || (['map-settings', 'approvals'].includes(S.view) && !S.mainAdmin) || (current && current[3] && !S.admin)) S.view = 'landing';
   const content = [];
   const storageErrors = Object.values(S.storageErrors || {});
   if (storageErrors.length) content.push(h('p', { class: 'warn storage-warning' }, 'Database bersama tidak dapat dibaca: ' + storageErrors.join(' · ') + ' Jalankan pembaruan skema Supabase, lalu muat ulang aplikasi.'));
