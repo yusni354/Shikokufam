@@ -1,0 +1,12 @@
+node_modules/
+npm-debug.log*
+.env
+.env.local
+.env.*.local
+supabase/.temp/
+dist/
+build/
+*.apk
+*.aab
+.DS_Store
+Thumbs.db

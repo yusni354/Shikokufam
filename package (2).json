@@ -1,0 +1,16 @@
+{
+  "name": "shikokufam",
+  "version": "2.0.0",
+  "description": "Shikoku Family - database anggota komunitas Indonesia di Shikoku, Jepang (situs statis + backend Supabase)",
+  "private": true,
+  "scripts": {
+    "config": "node scripts/make-config.mjs",
+    "start": "npx serve .",
+    "supabase:login": "supabase login",
+    "supabase:link": "supabase link --project-ref $SUPABASE_PROJECT_REF",
+    "supabase:push": "supabase db push"
+  },
+  "devDependencies": {
+    "supabase": "^3.1.0"
+  }
+}
