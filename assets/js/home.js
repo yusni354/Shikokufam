@@ -6,18 +6,13 @@ function vHome(){
   const memberGroups=wilayah();
   const regionCards=WILAYAH.map(([name,color])=>{
     const members=[...(memberGroups[name]||[])].sort((a,b)=>(a.nama||'').localeCompare(b.nama||'','id'));
-    return h('section',{class:'home-region-card',style:'--region-color:'+color},
-      h('div',{class:'home-region-heading'},h('b',{},name),h('span',{},members.length+' anggota')),
-      members.length
-        ?h('div',{class:'home-region-members'},...members.map(member=>
-          h('button',{class:'home-region-member',onclick:()=>openMember(member,'landing')},
-            member.foto?h('img',{...memberMediaAttributes(member.foto,'src'),alt:''}):h('span',{class:'member-avatar-placeholder'},(member.nama||'?').trim().slice(0,1).toUpperCase()),
-            h('span',{},member.nama||'Nama belum diisi'),h('span',{class:'home-region-arrow'},'›'))))
-        :h('p',{class:'home-region-empty'},'Belum ada anggota di wilayah ini.')
+    return h('section',{class:'home-region-card',style:'--region-color:'+color,onclick:()=>{S.memberRegion=name;S.memberQuery='';S.memberStatus='';go('members')}},
+      h('div',{class:'home-region-heading'},h('b',{},name),h('span',{},members.length+' anggota'))
     );
   });
-  if(memberGroups['Belum dipilih']?.length)regionCards.push(h('section',{class:'home-region-card home-region-unknown'},h('div',{class:'home-region-heading'},h('b',{},'Wilayah belum dipilih'),h('span',{},memberGroups['Belum dipilih'].length+' anggota')),
-    ...memberGroups['Belum dipilih'].map(member=>h('button',{class:'home-region-member',onclick:()=>openMember(member,'landing')},h('span',{class:'member-avatar-placeholder'},(member.nama||'?').trim().slice(0,1).toUpperCase()),h('span',{},member.nama||'Nama belum diisi'),h('span',{class:'home-region-arrow'},'›')))));
+  if(memberGroups['Belum dipilih']?.length)regionCards.push(h('section',{class:'home-region-card home-region-unknown',onclick:()=>{S.memberRegion='Belum dipilih';S.memberQuery='';S.memberStatus='';go('members')}},
+    h('div',{class:'home-region-heading'},h('b',{},'Wilayah belum dipilih'),h('span',{},memberGroups['Belum dipilih'].length+' anggota'))
+  ));
   const shortcuts=[['brush','Jadwal Piket','piket'],['calendar','Kegiatan','kegiatan'],['messages','Forum','forum'],['map','Peta','peta']];
   const dutyRows=upcomingDuties.flatMap(duty=>{
     const assignments=Array.isArray(duty.assignments)&&duty.assignments.length?duty.assignments:[{nama:duty.nama||'',tugas:duty.tugas||''}];
@@ -33,7 +28,7 @@ function vHome(){
     ),
     h('div',{class:'stats home-stats'},...[['Anggota',S.members.length],['Kegiatan',S.events.length],['Wilayah',Object.keys(wilayah()).length]].map(item=>h('div',{},h('small',{},item[0]),h('b',{},String(item[1]))))),
     h('div',{class:'home-section-heading'},h('h2',{},'Daftar anggota'),S.admin&&h('button',{class:'btn s',onclick:()=>go('members')},'+ Tambah')),
-    h('p',{class:'home-member-intro'},'Pilih nama anggota untuk membuka kartu identitas lengkap.'),
+    h('p',{class:'home-member-intro'},'Pilih wilayah untuk melihat anggota di wilayah tersebut.'),
     h('div',{class:'home-region-list'},...regionCards),
     h('div',{class:'home-section-heading'},h('h2',{},'Akses cepat'),h('small',{},'Yang sering dibuka')),
     h('div',{class:'home-shortcuts'},...shortcuts.map(([glyph,label,view])=>h('button',{class:'home-shortcut',onclick:()=>go(view)},h('span',{class:'home-shortcut-icon'},icon(glyph,22)),h('b',{},label),h('span',{class:'home-shortcut-arrow'},'›')))),

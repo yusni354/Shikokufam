@@ -31,6 +31,8 @@ const ICON_PATHS={
   back:['m15 18-6-6 6-6','M9 12h12'],
   
   external:['M14 3h7v7','M10 14 21 3','M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5'],
+  meeting:['M3 10h18v8H3z','M5 4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v2H5z','M7 12v2','M17 12v2'],
+  team:['M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2','M11 14a2 2 0 1 0-4 0 2 2 0 0 0 4 0Z','M19 14a2 2 0 1 0-4 0 2 2 0 0 0 4 0Z'],
 };
 function icon(name,size=20){
   const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
