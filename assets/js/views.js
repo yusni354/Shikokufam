@@ -83,7 +83,7 @@ function render(){
   hydrateMemberQrCodes();
   hydrateMemberMedia();
   const tb=$('#tb');tb.style.display=S.form?'none':'flex';$('#pet').style.display=S.form?'none':'block';
-  tb.replaceChildren(...[['landing','home','Home'],['dash','chart','Ringkasan'],['members','users','Anggota'],['kegiatan','calendar','Kegiatan'],['piket','brush','Piket'],['forum','messages','Forum'],['musyawarah','chat','Musyawarah'],['susunan','users','Susunan Kepengurusan'],['pesan','inbox','Pesan Masuk']].map(x=>h('a',{class:S.view===x[0]?'on':'',href:'#',onclick:navTo(x[0])},icon(x[1],19),h('span',{},x[2]))));
+  tb.replaceChildren(...[['landing','home','Home'],['dash','chart','Ringkasan'],['members','users','Anggota'],['kegiatan','calendar','Kegiatan'],['piket','brush','Piket'],['forum','messages','Forum'],['musyawarah','chat','musyawarah'],['susunan','users','kepengurusan'],['pesan','inbox','Pesan Masuk']].map(x=>h('a',{class:S.view===x[0]?'on':'',href:'#',onclick:navTo(x[0])},icon(x[1],19),h('span',{},x[2]))));
 }
 function sub(name,key){
   return S.db.collection(name).onSnapshot(s=>{
