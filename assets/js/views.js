@@ -8,6 +8,7 @@ const V={
   peta:vPeta,
   forum:vForum,
   pesan:vPesan,
+  musyawarah:musyawarahView,
   'map-settings':vPetaSettings,
   approvals:vApprovals
 };
