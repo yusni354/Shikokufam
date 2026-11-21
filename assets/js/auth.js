@@ -27,34 +27,49 @@ function applyLocalUser(user){
   S.admin=user.role==='admin';S.mainAdmin=S.admin&&user.is_main_admin===true;
   S.approvalStatus=user.approval_status||'pending';S.authLoading=false;
 }
-/* Mode lokal TIDAK lagi punya pintu masuk yang terlihat: tidak ada panel,
+/* Mode lokal TIDAK punya pintu masuk yang terlihat: tidak ada panel,
    tombol, atau petunjuk apa pun di halaman masuk. Satu-satunya jalan masuk
-   adalah ketukan 3x pada tulisan SHIKOKU FAMILY (lihat bagian bawah berkas
-   ini), dan itu pun hanya berlaku untuk sesi berjalan — tidak ada flag
-   persisten yang ditulis. Flag lama 'shikoku-family:force-local' yang
-   mungkin tertinggal di peramban tetap dibersihkan saat aplikasi dimuat
-   (lihat main.js) dan selalu diabaikan, supaya aplikasi selalu DIMUAT
-   online dan tidak ada peramban yang terjebak di data lokal. */
+   adalah ketukan 3x pada gambar gembok / tulisan SHIKOKU FAMILY (lihat
+   bagian bawah berkas ini). Sesudah masuk, id sesi lokal disimpan
+   (simpanSesiLokal) supaya muat ulang halaman memulihkan sesi dan halaman
+   terakhir — bukan kembali ke pintu masuk; tombol Keluar menghapusnya.
+   Flag lama 'shikoku-family:force-local' yang mungkin tertinggal di
+   peramban tetap dibersihkan saat aplikasi dimuat (lihat main.js) dan
+   selalu diabaikan, supaya tidak ada peramban yang terjebak di data lokal. */
 const FORCE_LOCAL_KEY='shikoku-family:force-local';
 function clearLegacyLocalFlag(){try{localStorage.removeItem(FORCE_LOCAL_KEY)}catch(e){}}
 function localModeForced(){return S.localMode===true}
+/* Id sesi lokal disimpan di DUA tempat: localStorage (bertahan antar
+   kunjungan) dan sessionStorage (cermin yang tetap terbaca saat muat ulang
+   di lingkungan yang memblokir localStorage tapi membiarkan sessionStorage,
+   mis. webview tertentu). Yang disimpan hanya id akun lokal, bukan kata sandi. */
+function simpanSesiLokal(id){
+  try{localStorage.setItem(LOCAL_SESSION_KEY,id)}catch(e){}
+  try{sessionStorage.setItem(LOCAL_SESSION_KEY,id)}catch(e){}
+}
+function hapusSesiLokal(){
+  try{localStorage.removeItem(LOCAL_SESSION_KEY)}catch(e){}
+  try{sessionStorage.removeItem(LOCAL_SESSION_KEY)}catch(e){}
+}
 function restoreLocalSession(){
-  try{
-    const id=localStorage.getItem(LOCAL_SESSION_KEY);
-    if(!id)return false;
-    const user=localUsers().find(item=>item.id===id);
-    if(!user)return false;
-    applyLocalUser(user);
-    return true;
-  }catch(e){return false}
+  let id=null;
+  try{id=localStorage.getItem(LOCAL_SESSION_KEY)}catch(e){}
+  if(!id){try{id=sessionStorage.getItem(LOCAL_SESSION_KEY)}catch(e){}}
+  if(!id)return false;
+  const user=localUsers().find(item=>item.id===id);
+  if(!user)return false;
+  applyLocalUser(user);
+  return true;
 }
 /* Keluar akun: bekerja untuk sesi Supabase maupun sesi lokal.
-   Keluar dari sesi lokal (ketukan 3x) memulihkan jalur online yang disimpan
-   di ingatan, jadi sesudah keluar aplikasi kembali ke halaman masuk online
-   seperti biasa — sesi lokal tidak pernah ditulis persisten. */
+   Keluar dari sesi lokal menghapus id sesi yang tersimpan, lalu memulihkan
+   jalur online yang disimpan di ingatan, jadi sesudah keluar aplikasi
+   kembali ke halaman masuk online seperti biasa. Bila sesi lokal ini
+   dipulihkan saat aplikasi dimuat (tidak ada klien online di ingatan),
+   aplikasi dimuat ulang ke pintu masuk online. */
 async function signOut(){
   if(S.localMode){
-    try{localStorage.removeItem(LOCAL_SESSION_KEY)}catch(e){}
+    hapusSesiLokal();
     if(typeof stopDataSubscriptions==='function')stopDataSubscriptions();
     S.messageChannel=null;
     const online=S._onlineClient||null;
@@ -70,14 +85,19 @@ async function signOut(){
       /* Memicu pendengar sesi di main.js: ia menggambar halaman masuk online */
       try{await online.auth.signOut()}catch(e){console.error('Gagal keluar dari sesi online:',e)}
     }else{
-      S.supabase=null;S.db=createLocalDb();
+      /* Sesi lokal ini dipulihkan saat aplikasi dimuat (bukan dari ketukan
+         3x sesi ini), jadi tidak ada klien online yang disimpan di ingatan:
+         muat ulang aplikasi supaya pintu masuk online tampil lagi. Id sesi
+         lokal sudah dihapus di atas, jadi muat ulang tidak memulihkannya. */
+      location.reload();
+      return;
     }
     S.authLoading=false;
     render();
     return;
   }
   if(S.supabase){await S.supabase.auth.signOut();return}
-  try{localStorage.removeItem(LOCAL_SESSION_KEY)}catch(e){}
+  hapusSesiLokal();
   S.uid=null;S.email='';S.name='';S.admin=false;S.mainAdmin=false;S.approvalStatus='approved';
   S.tanya=[];S.replies=[];S.messageSignature='';S.unreadMessages=0;S.openConversation=null;S.pendingUsers=[];
   S.view='landing';S.adminMenuOpen=false;document.body.classList.remove('open');
@@ -167,7 +187,7 @@ function accountForm(){
         if(first){
           /* Akun pertama langsung disetujui sebagai admin utama: langsung masuk
              supaya pemilik perangkat bisa langsung melihat isi aplikasi. */
-          try{localStorage.setItem(LOCAL_SESSION_KEY,newUser.id)}catch(e){}
+          simpanSesiLokal(newUser.id);
           applyLocalUser(newUser);
           notice.className='warn auth-success';
           notice.textContent='Akun admin utama berhasil dibuat. Login berhasil.';
@@ -197,7 +217,7 @@ function accountForm(){
         notice.textContent='Pendaftaran akun Anda ditolak oleh admin.';
         return;
       }
-      try{localStorage.setItem(LOCAL_SESSION_KEY,user.id)}catch(e){}
+      simpanSesiLokal(user.id);
       applyLocalUser(user);
       notice.className='warn auth-success';
       notice.textContent='Akun Anda telah disetujui. Login berhasil.';
@@ -262,9 +282,9 @@ function accountForm(){
 /* Jalan pintas ketuk 3x pada tulisan SHIKOKU FAMILY (header & hero halaman
    masuk): mengetuknya 3 kali berturut-turut dengan jeda singkat langsung
    masuk sebagai ADMIN UTAMA MODE LOKAL tanpa formulir. Tidak ada petunjuk
-   tertulis tentang jalan pintas ini di mana pun. Sesi lokal hanya hidup di
-   ingatan selama sesi berjalan: aplikasi tetap dimuat online, dan sesudah
-   Keluar atau muat ulang pengguna mengetuk 3x lagi bila ingin masuk lokal.
+   tertulis tentang jalan pintas ini di mana pun. Id sesi lokal disimpan di
+   perangkat, jadi muat ulang halaman memulihkan sesi dan halaman terakhir;
+   sesudah Keluar pengguna mengetuk 3x lagi bila ingin masuk lokal.
    Jalan pintas ini hanya membuka data lokal perangkat — ia TIDAK membuat
    atau memalsukan sesi Supabase. */
 const LOCAL_ADMIN_EMAIL='putro@shikoku.local';
@@ -315,8 +335,11 @@ async function enterLocalMainAdmin(){
     if(S.memberMediaPending)S.memberMediaPending.clear();
     if(S.memberMediaFailed)S.memberMediaFailed.clear();
     S.view='landing';S.adminMenuOpen=false;document.body.classList.remove('open');
-    /* Sesi lokal sengaja TIDAK disimpan ke localStorage: muat ulang selalu
-       kembali online. */
+    /* Id sesi lokal DISIMPAN: muat ulang halaman memulihkan sesi lokal ini
+       beserta halaman terakhir yang dibuka (lihat main.js), bukan kembali
+       ke pintu masuk — sesuai permintaan pemilik aplikasi. Tombol Keluar
+       tetap menghapusnya dan mengembalikan aplikasi ke pintu masuk online. */
+    simpanSesiLokal(user.id);
     applyLocalUser(user);
     S.authLoading=false;
     document.body.classList.remove('auth-locked','bottom-nav-hidden');
@@ -380,7 +403,7 @@ document.addEventListener(brandTapEventName,event=>{
    tanpa latar, tanpa teks tambahan, tanpa petunjuk apa pun.
    1-2 ketukan tidak melakukan apa-apa; ketukan ke-3 dalam jendela
    1,2 detik antar-ketukan memanggil jalur masuk yang SAMA dengan ketuk
-   3x tulisan (enterLocalMainAdmin): admin utama lokal khusus sesi.
+   3x tulisan (enterLocalMainAdmin): admin utama lokal perangkat ini.
    Didengar dua isyarat sekaligus — 'pointerdown' (paling awal & andal
    di webview HP) dan 'click' (cadangan bila hanya klik yang terkirim,
    mis. ketuk via .click()) — dengan penjaga anti-ganda: klik yang

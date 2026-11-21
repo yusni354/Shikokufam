@@ -13,6 +13,23 @@ render();
   try { localStorage.removeItem('shikoku-family:force-local'); } catch (e) {}
   const supabaseReady = Boolean(window.supabase && window.SUPABASE_CONFIG?.url && window.SUPABASE_CONFIG?.anonKey);
   const hasSupabase = supabaseReady;
+  // Sesi lokal (jalan pintas admin utama perangkat ini) yang masih tersimpan
+  // dipulihkan lebih dulu, sebelum jalur online disiapkan: muat ulang
+  // halaman TIDAK mengembalikan pengguna ke pintu masuk, dan render()
+  // membuka lagi halaman terakhir yang tersimpan. Tanpa pemulihan ini,
+  // sesi lokal hanya hidup di ingatan sehingga setiap muat ulang selalu
+  // berakhir di halaman masuk. Sesi Supabase tidak disentuh jalur ini —
+  // ia hanya berjalan bila id sesi lokal memang ada di perangkat.
+  if (restoreLocalSession()) {
+    S.localMode = true;
+    S.db = createLocalDb();
+    S.authLoading = false;
+    startDataSubscriptions();
+    try { await loadPendingUsers(); } catch (e) { console.error('Daftar persetujuan lokal gagal dimuat:', e); }
+    try { await loadMessages(); } catch (e) { console.error('Pesan lokal gagal dimuat:', e); }
+    render();
+    return;
+  }
   if (!hasSupabase) {
     // Tanpa Supabase: pakai penyimpanan lokal di perangkat (mode uji coba),
     // dengan sesi akun lokal agar alur masuk/persetujuan tetap berjalan penuh
