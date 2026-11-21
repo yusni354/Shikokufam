@@ -786,3 +786,79 @@ input,textarea,select{background:#f4f8fa;border-color:#bfcfdb}
 .managed-panel-foot{margin-top:8px;display:flex;justify-content:flex-end}
 .musy-root .musy-tools button.musy-del{min-width:17px;height:17px;font-size:9.5px;padding:0 2px;border-radius:6px}
 .musy-root .musy-ta button.x{padding:1px 6px;font-size:10px}
+
+/* ===== Kepengurusan: pemilih tampilan, bagan hierarki & tabel =====
+   Bagan memakai garis penghubung CSS murni: di desktop tingkat kedua
+   membentang menyamping ala bagan organisasi; di HP pohon mengalir ke
+   bawah bertumpuk dengan garis vertikal, tanpa geser menyamping. */
+.org-toggle{display:inline-flex;gap:4px;padding:4px;background:var(--card);border:1px solid var(--line);border-radius:999px;margin-bottom:14px;box-shadow:0 4px 14px rgba(47,134,184,.08)}
+.org-toggle-btn{border:0;background:transparent;padding:8px 24px;border-radius:999px;font-weight:700;font-size:14px;color:var(--mut);cursor:pointer;font-family:inherit}
+.org-toggle-btn.on{background:var(--g);color:#ffffff;box-shadow:0 4px 10px rgba(43,122,140,.25)}
+.org-tree{display:flex;flex-direction:column;align-items:center;padding:10px 0 6px;max-width:100%}
+.org-node{display:flex;flex-direction:column;align-items:center;gap:6px}
+.org-node-main{display:flex;flex-direction:column;align-items:center;gap:4px;width:172px;max-width:44vw;padding:14px 10px 12px;background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:0 4px 14px rgba(47,134,184,.1);color:var(--ink);font-family:inherit;text-align:center}
+button.org-node-main{cursor:pointer}
+button.org-node-main:hover{border-color:var(--acc)}
+.org-node-root .org-node-main{width:198px;background:linear-gradient(145deg,#eafaf3,#dceef8);border-color:#a9dcd2}
+.org-node-role{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--acc)}
+.org-node-name{font-size:14px;line-height:1.25;overflow-wrap:anywhere;text-transform:uppercase}
+.org-node-empty .org-node-name{color:var(--mut);text-transform:none;font-weight:600;font-size:13px}
+.org-avatar{width:46px;height:46px;flex:none;border-radius:15px;object-fit:cover}
+.org-avatar-ph{display:grid;place-items:center;background:linear-gradient(145deg,#dff2e7,#dceef8);color:#000000;font-size:19px;font-weight:700}
+.org-kids{display:flex;flex-wrap:wrap;justify-content:center;list-style:none;margin:0;padding:26px 0 0;position:relative;max-width:100%}
+.org-kids::before{content:'';position:absolute;top:0;left:50%;height:26px;border-left:2px solid #9db8c8}
+.org-kids>li{position:relative;padding:26px 10px 0;display:flex;justify-content:center}
+.org-kids>li::before,.org-kids>li::after{content:'';position:absolute;top:0;right:50%;width:50%;height:26px;border-top:2px solid #9db8c8}
+.org-kids>li::after{right:auto;left:50%;border-left:2px solid #9db8c8}
+.org-kids>li:only-child::before,.org-kids>li:only-child::after{display:none}
+.org-kids>li:only-child{padding-top:0}
+.org-kids>li:first-child::before,.org-kids>li:last-child::after{border-top:0}
+.org-kids>li:last-child::before{border-right:2px solid #9db8c8;border-radius:0 10px 0 0}
+.org-kids>li:first-child::after{border-radius:10px 0 0 0}
+.org-join{width:2px;height:24px;background:#9db8c8;flex:none}
+.org-group{display:flex;flex-direction:column;align-items:center;width:100%}
+.org-group-title{padding:7px 18px;border-radius:999px;background:#dcebf3;color:#000000;font-weight:700;font-size:13px;letter-spacing:.04em;text-transform:uppercase}
+.org-grid{position:relative;display:flex;flex-wrap:wrap;justify-content:center;width:100%}
+.org-grid::before{content:'';position:absolute;top:0;left:16px;right:16px;border-top:2px solid #9db8c8}
+.org-cell{position:relative;padding:18px 6px 12px}
+.org-cell::before{content:'';position:absolute;top:0;left:50%;height:18px;border-left:2px solid #9db8c8}
+.org-table-group{margin-bottom:18px}
+.org-group-heading{font-size:16px;margin:0 0 8px}
+.org-table{background:var(--card);border:1px solid var(--line);border-radius:18px;overflow:hidden;box-shadow:0 4px 14px rgba(47,134,184,.08)}
+.org-row{display:grid;grid-template-columns:1.1fr 1.7fr .9fr 1.2fr;gap:10px;align-items:center;padding:11px 14px;border-top:1px solid var(--line)}
+.org-table-admin .org-row{grid-template-columns:1.1fr 1.7fr .9fr 1.2fr auto}
+.org-row:first-child{border-top:0}
+.org-row-head{background:#eef4f7;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+.org-row-head span{color:#222222}
+.org-person{display:flex;align-items:center;gap:9px;background:none;border:0;padding:0;font:inherit;color:var(--ink);cursor:pointer;text-align:left;min-width:0}
+.org-person span{overflow-wrap:anywhere;font-weight:600}
+.org-mini{width:34px;height:34px;flex:none;border-radius:11px;object-fit:cover}
+span.org-mini{display:grid;place-items:center;font-size:14px}
+.org-empty-text{color:var(--mut);font-weight:600}
+.org-c-kontak a{color:var(--acc);font-weight:600;text-decoration:none}
+@media (max-width:720px){
+  .org-kids{flex-direction:column;align-items:center;padding-top:0}
+  .org-kids::before{display:none}
+  .org-kids>li{padding:24px 0 0}
+  .org-kids>li::before{display:none}
+  .org-kids>li::after{left:50%;right:auto;width:0;height:24px;border-top:0;border-left:2px solid #9db8c8;border-radius:0}
+  .org-kids>li:last-child::before{display:none}
+  .org-row-head{display:none}
+  .org-table .org-row,.org-table-admin .org-row{display:flex;flex-direction:column;align-items:flex-start;gap:5px;padding:13px 14px}
+  .org-c-aksi{align-self:flex-end}
+}
+
+/* ===== Kepengurusan: mode Atur Struktur, panel geser & seret ===== */
+.org-atur-bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+.org-atur-note{flex-basis:100%;margin:2px 0 0}
+.org-tools{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;max-width:230px}
+.org-c-aksi .org-tools{justify-content:flex-end;max-width:260px}
+.org-grip{cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;color:var(--mut);font-size:15px;line-height:1;letter-spacing:2px;padding:3px 12px;border-radius:8px}
+.org-grip:active{cursor:grabbing}
+.org-node.org-dragging{opacity:.45}
+.org-ghost{position:fixed;z-index:300;pointer-events:none;opacity:.88;margin:0;box-shadow:0 14px 34px rgba(31,58,80,.35)}
+.org-node-main.org-drop-ok{outline:3px solid var(--acc);outline-offset:2px}
+.org-node-main.org-drop-bad{outline:3px solid #d95763;outline-offset:2px}
+@media (max-width:720px){
+  .org-c-aksi .org-tools{justify-content:flex-start}
+}

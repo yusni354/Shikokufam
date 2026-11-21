@@ -394,18 +394,517 @@ function memberFormCard(){
   );
 }
 
-/* Halaman Kepengurusan: anggota dengan peran Pengurus dari data anggota */
+/* ===== Kepengurusan: POHON jabatan yang bisa diatur admin.
+   Susunan disimpan sebagai satu dokumen 'susunan_pengurus' di koleksi
+   'pengaturan' (pola yang sama dengan pesan sambutan dan daftar pilihan
+   dropdown). Format baru (versi 2): {versi:2, simpul:[{id, nama, induk,
+   urutan, pemegang}]} — setiap jabatan adalah simpul pohon: 'induk' id
+   simpul di atasnya (null untuk jabatan puncak), 'urutan' urutan antar
+   saudara, 'pemegang' id anggota dari daftar anggota (boleh kosong).
+   Tingkat hierarki dihitung dari kedalaman pohon, bukan kolom terpisah.
+   Format lama {pemegang:{kunci:uidAnggota}} dimigrasikan otomatis saat
+   dibaca: jabatan bawaan menjadi simpul awal dan semua pemegang yang
+   sudah ditetapkan dipertahankan pada jabatan yang sama.
+   Hanya admin yang bisa mengubah struktur (mode 'Atur Struktur');
+   anggota biasa hanya melihat Bagan dan Tabel seperti sebelumnya. ===== */
+function susunanBawaan(pemegangSumber){
+  const ambil=id=>(pemegangSumber&&pemegangSumber[id])||'';
+  const nodes=[
+    {id:'ketua',nama:'Ketua',induk:null,urutan:0,pemegang:ambil('ketua')},
+    {id:'wakil-ketua',nama:'Wakil Ketua',induk:'ketua',urutan:0,pemegang:ambil('wakil-ketua')},
+    {id:'sekretaris',nama:'Sekretaris',induk:'ketua',urutan:1,pemegang:ambil('sekretaris')},
+    {id:'bendahara',nama:'Bendahara',induk:'ketua',urutan:2,pemegang:ambil('bendahara')},
+    {id:'koord-wilayah',nama:'Koordinator Wilayah',induk:'ketua',urutan:3,pemegang:ambil('koord-wilayah')}
+  ];
+  wilayahEfektif().forEach(([name],i)=>{
+    const id='koord-'+name;
+    nodes.push({id,nama:'Koordinator '+name,induk:'koord-wilayah',urutan:i,pemegang:ambil(id),wilayah:name});
+  });
+  return nodes;
+}
+/* Rapikan pohon dari data tersimpan: buang simpul rusak, pastikan tepat
+   satu akar (induk null), putus putaran dengan menaikkan simpul ke akar,
+   dan nomor ulang urutan antar saudara. Mengembalikan null bila kosong. */
+function susunanBersih(raw){
+  if(!Array.isArray(raw))return null;
+  const nodes=[],seen=new Set();
+  raw.forEach(item=>{
+    if(!item||typeof item!=='object')return;
+    const id=String(item.id||'').trim(),nama=String(item.nama||'').trim();
+    if(!id||!nama||seen.has(id))return;
+    seen.add(id);
+    const node={id,nama,induk:item.induk==null||item.induk===''?null:String(item.induk),urutan:Number.isFinite(Number(item.urutan))?Number(item.urutan):0,pemegang:item.pemegang?String(item.pemegang):''};
+    if(item.wilayah)node.wilayah=String(item.wilayah);
+    nodes.push(node);
+  });
+  if(!nodes.length)return null;
+  const byId=new Map(nodes.map(n=>[n.id,n]));
+  let roots=nodes.filter(n=>n.induk===null||!byId.has(n.induk));
+  if(!roots.length){nodes[0].induk=null;roots=[nodes[0]]}
+  const root=roots[0];
+  roots.slice(1).forEach(n=>{n.induk=root.id});
+  nodes.forEach(n=>{
+    const visited=new Set([n.id]);let cur=n;
+    while(cur.induk!==null){
+      const parent=byId.get(cur.induk);
+      if(!parent)break;
+      if(visited.has(parent.id)){n.induk=root.id;break}
+      visited.add(parent.id);cur=parent;
+    }
+  });
+  const groups={};
+  nodes.forEach(n=>{const k=n.induk||'';(groups[k]=groups[k]||[]).push(n)});
+  Object.values(groups).forEach(list=>{list.sort((a,b)=>a.urutan-b.urutan);list.forEach((n,i)=>{n.urutan=i})});
+  return nodes;
+}
+/* Pohon yang dipakai halaman: hasil langganan bila sudah tiba; sebelum
+   itu pohon bawaan dengan pemegang format lama (bila ada). */
+function susunanSimpul(){
+  if(Array.isArray(S.susunanSimpul)&&S.susunanSimpul.length)return S.susunanSimpul;
+  return susunanBawaan(S.susunanPemegang||{});
+}
+function susunanCari(nodes,id){return nodes.find(n=>n.id===id)||null}
+function susunanAkar(nodes){return nodes.find(n=>n.induk===null)||nodes[0]||null}
+function susunanAnak(nodes,id){return nodes.filter(n=>n.induk===id).sort((a,b)=>a.urutan-b.urutan)}
+function susunanKeturunan(nodes,id){
+  const set=new Set([id]);let berubah=true;
+  while(berubah){berubah=false;nodes.forEach(n=>{if(n.induk&&set.has(n.induk)&&!set.has(n.id)){set.add(n.id);berubah=true}})}
+  return set;
+}
+function susunanKedalaman(nodes,node){
+  let depth=0,cur=node;const guard=new Set();
+  while(cur&&cur.induk!==null&&!guard.has(cur.id)){guard.add(cur.id);cur=susunanCari(nodes,cur.induk);depth++}
+  return depth;
+}
+function pemegangJabatan(node){
+  return node&&node.pemegang?S.members.find(member=>member.id===node.pemegang)||null:null;
+}
+async function simpanSusunan(nodes){
+  const bersih=susunanBersih(nodes)||[];
+  S.susunanSimpul=bersih;
+  const map={};bersih.forEach(n=>{if(n.pemegang)map[n.id]=n.pemegang});
+  S.susunanPemegang=map;
+  if(S.db)await S.db.collection('pengaturan').doc('susunan_pengurus').set({versi:2,simpul:bersih,at:Date.now()});
+}
+function subscribeSusunan(){
+  if(!S.db)return ()=>{};
+  try{
+    return S.db.collection('pengaturan').onSnapshot(snap=>{
+      const doc=(snap.docs||[]).find(d=>d.id==='susunan_pengurus');
+      const data=doc&&typeof doc.data==='function'?doc.data():null;
+      let next=(data&&Array.isArray(data.simpul))?susunanBersih(data.simpul):null;
+      if(!next){
+        /* Migrasi format lama {pemegang:{...}}: jabatan bawaan menjadi
+           simpul awal, pemegang lama dipertahankan pada jabatannya. */
+        const legacy=data&&data.pemegang&&typeof data.pemegang==='object'&&!Array.isArray(data.pemegang)?data.pemegang:{};
+        next=susunanBawaan(legacy);
+        Object.keys(legacy).forEach(key=>{
+          if(key.indexOf('koord-')===0&&key!=='koord-wilayah'&&!next.some(n=>n.id===key)){
+            next.push({id:key,nama:'Koordinator '+key.slice(6),induk:'koord-wilayah',urutan:next.filter(n=>n.induk==='koord-wilayah').length,pemegang:legacy[key]||'',wilayah:key.slice(6)});
+          }
+        });
+        next=susunanBersih(next);
+      }
+      if(JSON.stringify(next)!==JSON.stringify(S.susunanSimpul||null)){
+        S.susunanSimpul=next;
+        const map={};(next||[]).forEach(n=>{if(n.pemegang)map[n.id]=n.pemegang});
+        S.susunanPemegang=map;
+        if(S.view==='susunan')render();
+      }
+    },error=>{console.error('Susunan pengurus gagal dimuat:',error)});
+  }catch(error){console.error('Susunan pengurus gagal dimuat:',error);return ()=>{}}
+}
+/* ===== Aksi perubahan struktur (semua lewat simpanSusunan) ===== */
+async function tetapkanPengurus(id,memberId){
+  await simpanSusunan(susunanSimpul().map(n=>n.id===id?{...n,pemegang:memberId||''}:n));
+}
+async function gantiNamaJabatan(id,nama){
+  await simpanSusunan(susunanSimpul().map(n=>n.id===id?{...n,nama}:n));
+}
+async function tambahJabatanBaru(nama,indukId,memberId){
+  const nodes=susunanSimpul().slice();
+  const id='jab-'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+  nodes.push({id,nama,induk:indukId,urutan:nodes.filter(n=>n.induk===indukId).length,pemegang:memberId||''});
+  await simpanSusunan(nodes);
+}
+/* Hapus jabatan: anak-anaknya NAIK ke induk jabatan yang dihapus (tidak
+   ikut terhapus), disisipkan pada posisi jabatan itu di antara saudara;
+   pemegang jabatan yang dihapus menjadi tidak menjabat. */
+async function hapusJabatan(id){
+  const nodes=susunanSimpul().map(n=>({...n}));
+  const target=nodes.find(n=>n.id===id);
+  if(!target||target.induk===null)return;
+  const parentId=target.induk;
+  const anak=nodes.filter(n=>n.induk===id).sort((a,b)=>a.urutan-b.urutan);
+  anak.forEach(n=>{n.induk=parentId});
+  const rest=nodes.filter(n=>n.id!==id);
+  const saudara=rest.filter(n=>n.induk===parentId&&!anak.includes(n)).sort((a,b)=>a.urutan-b.urutan);
+  const pos=Math.min(target.urutan,saudara.length);
+  [...saudara.slice(0,pos),...anak,...saudara.slice(pos)].forEach((n,i)=>{n.urutan=i});
+  await simpanSusunan(rest);
+}
+async function geserUrutanJabatan(id,arah){
+  const nodes=susunanSimpul().map(n=>({...n}));
+  const node=nodes.find(n=>n.id===id);
+  if(!node)return;
+  const sib=nodes.filter(n=>n.induk===node.induk).sort((a,b)=>a.urutan-b.urutan);
+  const i=sib.findIndex(n=>n.id===id),j=i+arah;
+  if(i<0||j<0||j>=sib.length)return;
+  const tmp=sib[i].urutan;sib[i].urutan=sib[j].urutan;sib[j].urutan=tmp;
+  await simpanSusunan(nodes);
+}
+/* Pindah induk. Ditolak (false) bila tujuannya diri sendiri/keturunan,
+   induk tidak ada, atau simpulnya akar. Memindah ke jabatan puncak sama
+   dengan menjadi anak langsung akar. */
+async function pindahIndukJabatan(id,indukBaru){
+  const nodes=susunanSimpul().map(n=>({...n}));
+  const node=nodes.find(n=>n.id===id);
+  if(!node||node.induk===null)return false;
+  if(!indukBaru||indukBaru===id||!nodes.some(n=>n.id===indukBaru))return false;
+  if(susunanKeturunan(nodes,id).has(indukBaru))return false;
+  if(node.induk===indukBaru)return true;
+  node.induk=indukBaru;
+  node.urutan=Number.MAX_SAFE_INTEGER;
+  await simpanSusunan(nodes);
+  return true;
+}
+/* Hasil seret di Bagan: 'before'/'after' menyusun ulang antar saudara
+   target, 'child' menjadikan jabatan anak dari target (paling bawah). */
+async function seretJabatan(id,targetId,mode){
+  const nodes=susunanSimpul().map(n=>({...n}));
+  const node=nodes.find(n=>n.id===id),target=nodes.find(n=>n.id===targetId);
+  if(!node||!target||node.induk===null)return false;
+  if(susunanKeturunan(nodes,id).has(targetId))return false;
+  if(mode==='child'){
+    if(node.induk===targetId)return true;
+    node.induk=targetId;node.urutan=Number.MAX_SAFE_INTEGER;
+  }else{
+    const parentId=target.induk;
+    const sib=nodes.filter(n=>n.induk===parentId&&n.id!==id).sort((a,b)=>a.urutan-b.urutan);
+    const ti=sib.findIndex(n=>n.id===targetId);
+    if(ti<0)return false;
+    node.induk=parentId;
+    sib.splice(mode==='before'?ti:ti+1,0,node);
+    sib.forEach((n,i)=>{n.urutan=i});
+  }
+  await simpanSusunan(nodes);
+  return true;
+}
+async function kembalikanSusunanAwal(){
+  const current={};
+  susunanSimpul().forEach(n=>{if(n.pemegang)current[n.id]=n.pemegang});
+  await simpanSusunan(susunanBawaan(current));
+}
+/* ===== Panel-panel penyuntingan (tanpa tombol X: tutup lewat
+   Simpan/Batal; satu panel tampil pada satu waktu di atas halaman) ===== */
+function bukaPanelSusunan(jenis,id){S.susunanPanel={jenis,id:id||null};render();window.scrollTo({top:0,behavior:'smooth'})}
+function tutupPanelSusunan(){S.susunanPanel=null;render()}
+function susunanPilihAnggota(currentId){
+  const sel=h('select',{});
+  sel.replaceChildren(
+    h('option',{value:''},'— Belum ditetapkan —'),
+    ...[...S.members].sort((a,b)=>(a.nama||'').localeCompare(b.nama||'','id'))
+      .map(member=>h('option',{value:member.id},(member.nama||'Tanpa nama')+' · '+memberRegion(member)))
+  );
+  sel.value=currentId||'';
+  return sel;
+}
+/* Pemilih induk: semua jabatan dalam urutan pohon, menjorok menurut
+   kedalaman. Simpul dalam 'excludeSet' (diri + keturunan) tidak
+   ditawarkan supaya putaran hierarki tidak mungkin terjadi. */
+function susunanPilihInduk(nodes,currentId,excludeSet){
+  const sel=h('select',{});
+  const opts=[];
+  const walk=(node,depth)=>{
+    if(excludeSet&&excludeSet.has(node.id))return;
+    opts.push(h('option',{value:node.id},'  '.repeat(depth)+node.nama+(depth===0?' (puncak)':'')));
+    susunanAnak(nodes,node.id).forEach(k=>walk(k,depth+1));
+  };
+  const root=susunanAkar(nodes);
+  if(root)walk(root,0);
+  sel.replaceChildren(...opts);
+  if(currentId&&[...sel.options].some(o=>o.value===currentId))sel.value=currentId;
+  return sel;
+}
+function susunanPanelRender(nodes){
+  const panel=S.susunanPanel;
+  if(!panel)return null;
+  if(panel.jenis==='tambah')return susunanPanelTambah(nodes);
+  const node=susunanCari(nodes,panel.id);
+  if(!node)return null;
+  if(panel.jenis==='nama')return susunanPanelNama(node);
+  if(panel.jenis==='geser')return susunanPanelGeser(nodes,node);
+  return susunanPanelPemegang(node);
+}
+function susunanPanelPemegang(node){
+  const current=pemegangJabatan(node);
+  const sel=susunanPilihAnggota(current?current.id:'');
+  return box(h('b',{},'Tetapkan pengurus — '+node.nama),
+    h('p',{class:'sub'},'Pilih pemegang jabatan dari daftar anggota. Kosongkan bila jabatan belum ada pemegangnya.'),
+    sel,
+    h('div',{class:'fl'},
+      h('button',{class:'btn',onclick:async()=>{
+        try{await tetapkanPengurus(node.id,sel.value||'');tutupPanelSusunan()}
+        catch(error){console.error(error);alert('Gagal menyimpan penetapan: '+(error.message||'periksa koneksi'))}
+      }},'Simpan'),
+      h('button',{class:'btn s',onclick:tutupPanelSusunan},'Batal')));
+}
+function susunanPanelNama(node){
+  const input=h('input',{type:'text',value:node.nama,maxlength:'60',placeholder:'Nama jabatan'});
+  return box(h('b',{},'Ganti nama jabatan'),
+    h('p',{class:'sub'},'Nama jabatan "'+node.nama+'" diganti menjadi:'),
+    input,
+    h('div',{class:'fl'},
+      h('button',{class:'btn',onclick:async()=>{
+        const nama=input.value.trim();
+        if(!nama){alert('Nama jabatan tidak boleh kosong.');return}
+        try{await gantiNamaJabatan(node.id,nama);tutupPanelSusunan()}
+        catch(error){console.error(error);alert('Gagal mengganti nama jabatan: '+(error.message||'periksa koneksi'))}
+      }},'Simpan'),
+      h('button',{class:'btn s',onclick:tutupPanelSusunan},'Batal')));
+}
+/* Panel Geser: andalan di HP — Naik/Turun untuk urutan antar saudara dan
+   pemilih induk baru. Panel tetap terbuka sesudah tiap gerakan supaya
+   admin bisa menggeser beberapa kali berturut-turut. */
+function susunanPanelGeser(nodes,node){
+  if(node.induk===null){
+    return box(h('b',{},'Geser posisi — '+node.nama),
+      h('p',{class:'sub'},'Ini jabatan puncak: posisinya tetap di paling atas dan tidak dapat dipindah atau dihapus. Jabatan lain bisa dipindahkan ke bawah jabatan ini (menjadi anak langsung puncak).'),
+      h('div',{class:'fl'},h('button',{class:'btn s',onclick:tutupPanelSusunan},'Tutup')));
+  }
+  const sib=susunanAnak(nodes,node.induk);
+  const idx=sib.findIndex(n=>n.id===node.id);
+  const naik=h('button',{class:'btn s',onclick:async()=>{
+    try{await geserUrutanJabatan(node.id,-1);render()}
+    catch(error){console.error(error);alert('Gagal menggeser urutan: '+(error.message||'periksa koneksi'))}
+  }},'↑ Naik');
+  const turun=h('button',{class:'btn s',onclick:async()=>{
+    try{await geserUrutanJabatan(node.id,1);render()}
+    catch(error){console.error(error);alert('Gagal menggeser urutan: '+(error.message||'periksa koneksi'))}
+  }},'↓ Turun');
+  if(idx<=0)naik.disabled=true;
+  if(idx<0||idx>=sib.length-1)turun.disabled=true;
+  const selInduk=susunanPilihInduk(nodes,node.induk,susunanKeturunan(nodes,node.id));
+  return box(h('b',{},'Geser posisi — '+node.nama),
+    h('p',{class:'sub'},'Urutan di antara jabatan setingkat di bawah "'+(susunanCari(nodes,node.induk)||{}).nama+'": posisi '+(idx+1)+' dari '+sib.length+'.'),
+    h('div',{class:'fl'},naik,turun),
+    h('p',{class:'sub',style:'margin-top:14px'},'Pindahkan ke bawah jabatan lain (jabatan ini beserta seluruh jabatan di bawahnya ikut pindah; tidak bisa dipindah ke bawah dirinya atau keturunannya):'),
+    selInduk,
+    h('div',{class:'fl'},
+      h('button',{class:'btn',onclick:async()=>{
+        if(selInduk.value===node.induk){alert('Jabatan ini sudah berada di bawah jabatan tersebut.');return}
+        try{
+          const ok=await pindahIndukJabatan(node.id,selInduk.value);
+          if(!ok){alert('Jabatan tidak dapat dipindah ke bawah dirinya sendiri atau keturunannya.');return}
+          render();
+        }catch(error){console.error(error);alert('Gagal memindah jabatan: '+(error.message||'periksa koneksi'))}
+      }},'Pindahkan'),
+      h('button',{class:'btn s',onclick:tutupPanelSusunan},'Selesai')));
+}
+function susunanPanelTambah(nodes){
+  const root=susunanAkar(nodes);
+  const input=h('input',{type:'text',maxlength:'60',placeholder:'Nama jabatan baru'});
+  const selInduk=susunanPilihInduk(nodes,root?root.id:'',null);
+  const selPemegang=susunanPilihAnggota('');
+  return box(h('b',{},'Tambah jabatan baru'),
+    h('p',{class:'sub'},'Nama jabatan:'),input,
+    h('p',{class:'sub',style:'margin-top:10px'},'Berada di bawah jabatan:'),selInduk,
+    h('p',{class:'sub',style:'margin-top:10px'},'Pemegang jabatan (boleh dikosongkan dulu):'),selPemegang,
+    h('div',{class:'fl'},
+      h('button',{class:'btn',onclick:async()=>{
+        const nama=input.value.trim();
+        if(!nama){alert('Isi nama jabatan baru terlebih dahulu.');return}
+        if(!selInduk.value){alert('Pilih jabatan induk terlebih dahulu.');return}
+        try{await tambahJabatanBaru(nama,selInduk.value,selPemegang.value||'');tutupPanelSusunan()}
+        catch(error){console.error(error);alert('Gagal menambah jabatan: '+(error.message||'periksa koneksi'))}
+      }},'Simpan'),
+      h('button',{class:'btn s',onclick:tutupPanelSusunan},'Batal')));
+}
+/* ===== Alat mode atur pada kartu/baris jabatan ===== */
+function orgTombolHapus(nodes,node){
+  return h('button',{class:'btn s btn-eh',onclick:async()=>{
+    const anak=susunanAnak(nodes,node.id);
+    const pesan='Hapus jabatan "'+node.nama+'"?'+(anak.length?' '+anak.length+' jabatan di bawahnya akan naik ke jabatan di atasnya ("'+(susunanCari(nodes,node.induk)||{}).nama+'").':'')+' Pemegangnya menjadi tidak menjabat.';
+    if(!confirm(pesan))return;
+    try{
+      await hapusJabatan(node.id);
+      if(S.susunanPanel&&S.susunanPanel.id===node.id)S.susunanPanel=null;
+      render();
+    }catch(error){console.error(error);alert('Gagal menghapus jabatan: '+(error.message||'periksa koneksi'))}
+  }},'Hapus');
+}
+function orgAlat(nodes,node){
+  const isRoot=node.induk===null;
+  return h('div',{class:'org-tools'},
+    h('button',{class:'btn s',onclick:()=>bukaPanelSusunan('nama',node.id)},'Nama'),
+    h('button',{class:'btn s',onclick:()=>bukaPanelSusunan('pemegang',node.id)},pemegangJabatan(node)?'Pemegang':'Tetapkan'),
+    !isRoot&&h('button',{class:'btn s',onclick:()=>bukaPanelSusunan('geser',node.id)},'Geser'),
+    !isRoot&&orgTombolHapus(nodes,node));
+}
+/* ===== Seret jabatan di Bagan (khusus mode atur, desktop & sentuh).
+   Seret dimulai dari pegangan pada kartu — bukan seluruh kartu — supaya
+   gulir halaman di HP tidak terganggu. Lepas di atas saudara menyusun
+   ulang urutan; lepas di atas jabatan lain menjadikannya anak jabatan
+   itu. Target yang sah berbingkai teal, yang terlarang (diri sendiri /
+   keturunan) berbingkai merah. ===== */
+function mulaiSeretSusunan(event,node){
+  const wrap=event.currentTarget.closest('.org-node');
+  const main=wrap&&wrap.querySelector('.org-node-main');
+  if(!main)return;
+  event.preventDefault();
+  const nodes=susunanSimpul();
+  const keturunan=susunanKeturunan(nodes,node.id);
+  const rect=main.getBoundingClientRect();
+  const ghost=main.cloneNode(true);
+  ghost.classList.add('org-ghost');
+  ghost.style.width=rect.width+'px';
+  ghost.style.left=rect.left+'px';
+  ghost.style.top=rect.top+'px';
+  document.body.appendChild(ghost);
+  wrap.classList.add('org-dragging');
+  let targetEl=null,targetId=null,targetMode=null;
+  const clearTarget=()=>{if(targetEl)targetEl.classList.remove('org-drop-ok','org-drop-bad');targetEl=null;targetId=null;targetMode=null};
+  const onMove=ev=>{
+    ghost.style.left=(ev.clientX-rect.width/2)+'px';
+    ghost.style.top=(ev.clientY-28)+'px';
+    ghost.style.display='none';
+    const under=document.elementFromPoint(ev.clientX,ev.clientY);
+    ghost.style.display='';
+    const host=under&&under.closest?under.closest('[data-susunan-id]'):null;
+    clearTarget();
+    if(!host)return;
+    const tmain=host.querySelector('.org-node-main');
+    if(!tmain)return;
+    const tid=host.getAttribute('data-susunan-id');
+    const targetNode=susunanCari(nodes,tid);
+    if(!targetNode)return;
+    const terlarang=tid===node.id||keturunan.has(tid);
+    const menyamping=window.innerWidth>720;
+    const sesudah=menyamping?(ev.clientX>tmain.getBoundingClientRect().left+tmain.getBoundingClientRect().width/2):(ev.clientY>tmain.getBoundingClientRect().top+tmain.getBoundingClientRect().height/2);
+    targetMode=targetNode.induk===node.induk?(sesudah?'after':'before'):'child';
+    targetEl=tmain;
+    tmain.classList.add(terlarang?'org-drop-bad':'org-drop-ok');
+    if(!terlarang)targetId=tid;
+  };
+  const onUp=async()=>{
+    window.removeEventListener('pointermove',onMove);
+    window.removeEventListener('pointerup',onUp);
+    window.removeEventListener('pointercancel',onUp);
+    ghost.remove();
+    wrap.classList.remove('org-dragging');
+    const tid=targetId,mode=targetMode;
+    clearTarget();
+    if(tid&&mode){
+      try{await seretJabatan(node.id,tid,mode);render()}
+      catch(error){console.error(error);alert('Gagal memindah jabatan: '+(error.message||'periksa koneksi'))}
+    }
+  };
+  window.addEventListener('pointermove',onMove);
+  window.addEventListener('pointerup',onUp);
+  window.addEventListener('pointercancel',onUp);
+}
+/* Satu simpul bagan (rekursif): kartu jabatan + foto/nama pemegang dari
+   data anggota; anak-anaknya digambar sebagai baris berkonektor di
+   bawahnya. Ketuk kartu membuka kartu ID anggota. */
+function orgNode(nodes,node,root){
+  const atur=!!(S.admin&&S.susunanAtur);
+  const member=pemegangJabatan(node);
+  const area=member?memberRegion(member):'';
+  const avatar=member
+    ?(member.foto?h('img',{class:'org-avatar',...memberMediaAttributes(member.foto,'src'),alt:'Foto '+(member.nama||'pengurus')}):h('div',{class:'org-avatar org-avatar-ph'},(member.nama||'?').trim().slice(0,1).toUpperCase()))
+    :h('div',{class:'org-avatar org-avatar-ph'},icon('team',22));
+  const isi=[
+    h('span',{class:'org-node-role'},node.nama),
+    avatar,
+    h('b',{class:'org-node-name'},member?(member.nama||'Nama belum diisi'):'Belum ditetapkan'),
+    member?h('span',{class:'member-region-tag',style:'--region-color:'+regionColor(area)},area.toUpperCase()):null
+  ];
+  const main=member
+    ?h('button',{class:'org-node-main',title:'Lihat kartu ID '+(member.nama||''),onclick:()=>openMember(member,'members')},...isi)
+    :h('div',{class:'org-node-main org-node-empty'},...isi);
+  const parts=[];
+  if(atur&&node.induk!==null){
+    const grip=h('div',{class:'org-grip',title:'Seret untuk memindah posisi jabatan ini','aria-label':'Seret untuk memindah '+node.nama},'⠿');
+    grip.onpointerdown=ev=>mulaiSeretSusunan(ev,node);
+    parts.push(grip);
+  }
+  parts.push(main);
+  if(atur)parts.push(orgAlat(nodes,node));
+  else if(S.admin)parts.push(h('button',{class:'btn s',onclick:()=>bukaPanelSusunan('pemegang',node.id)},member?'Atur':'Tetapkan'));
+  const el=h('div',{class:'org-node'+(root?' org-node-root':''),'data-susunan-id':node.id},...parts);
+  const kids=susunanAnak(nodes,node.id);
+  if(kids.length)el.append(h('ul',{class:'org-kids'},...kids.map(k=>h('li',{},orgNode(nodes,k,false)))));
+  return el;
+}
+/* Tipe HIERARKI: pohon digambar dari akar dengan garis penghubung;
+   di HP baris anak menumpuk ke bawah tanpa geser menyamping. */
+function orgBagan(nodes){
+  const root=susunanAkar(nodes);
+  if(!root)return h('p',{class:'warn'},'Susunan kepengurusan belum tersedia.');
+  return h('div',{class:'org-tree'},orgNode(nodes,root,true));
+}
+/* Tipe TABEL: satu baris per jabatan, berkelompok mengikuti cabang
+   pohon — kelompok pertama berisi jabatan puncak beserta anak-anaknya,
+   lalu satu kelompok per cabang yang mempunyai anak. */
+function orgRow(nodes,node){
+  const atur=!!(S.admin&&S.susunanAtur);
+  const member=pemegangJabatan(node);
+  const person=member
+    ?h('button',{class:'org-person',title:'Lihat kartu ID '+(member.nama||''),onclick:()=>openMember(member,'members')},
+        member.foto?h('img',{class:'org-mini',...memberMediaAttributes(member.foto,'src'),alt:'Foto '+(member.nama||'pengurus')}):h('span',{class:'org-mini org-avatar-ph'},(member.nama||'?').trim().slice(0,1).toUpperCase()),
+        h('span',{},member.nama||'Nama belum diisi'))
+    :h('span',{class:'org-empty-text'},'Belum ditetapkan');
+  const depth=susunanKedalaman(nodes,node);
+  return h('div',{class:'org-row'},
+    h('div',{class:'org-c-jabatan'},h('b',{style:'margin-left:'+(depth*14)+'px'},node.nama)),
+    h('div',{class:'org-c-orang'},person),
+    h('div',{class:'org-c-wilayah'},member?memberRegion(member):(node.wilayah||'—')),
+    h('div',{class:'org-c-kontak'},member?(member.wa?memberValue('wa',member.wa):(member.email||'—')):'—'),
+    S.admin?h('div',{class:'org-c-aksi'},atur?orgAlat(nodes,node):h('button',{class:'btn s',onclick:()=>bukaPanelSusunan('pemegang',node.id)},'Atur')):null);
+}
+function orgTabel(nodes){
+  const root=susunanAkar(nodes);
+  if(!root)return h('p',{class:'warn'},'Susunan kepengurusan belum tersedia.');
+  const groups=[{nama:root.nama,items:[root,...susunanAnak(nodes,root.id)]}];
+  const walk=node=>{susunanAnak(nodes,node.id).forEach(k=>{
+    const kids=susunanAnak(nodes,k.id);
+    if(kids.length)groups.push({nama:k.nama,items:kids});
+    walk(k);
+  })};
+  walk(root);
+  return h('div',{class:'org-table-wrap'},...groups.map(group=>h('section',{class:'org-table-group'},
+    h('h2',{class:'org-group-heading'},group.nama),
+    h('div',{class:'org-table'+(S.admin?' org-table-admin':'')},
+      h('div',{class:'org-row org-row-head'},h('span',{},'Jabatan'),h('span',{},'Pengurus'),h('span',{},'Wilayah'),h('span',{},'Kontak'),S.admin?h('span',{},''):null),
+      ...group.items.map(item=>orgRow(nodes,item))))));
+}
+/* Halaman Kepengurusan: pemilih tampilan Bagan | Tabel di bagian atas;
+   pilihan tampilan diingat selama sesi berjalan. Admin mendapat tombol
+   'Atur Struktur' untuk membuka mode atur struktur pohon. */
 function vSusunan(){
-  const pengurus=S.members.filter(member=>String(member.peran||'').toUpperCase()==='PENGURUS')
-    .sort((a,b)=>(a.nama||'').localeCompare(b.nama||'','id'));
-  const cards=pengurus.length?pengurus.map(member=>{
-    const area=memberRegion(member),location=[member.kota,member.pref].filter(Boolean).join(', ');
-    return h('article',{class:'member-card',style:'--region-color:'+regionColor(area)},
-      member.foto?h('img',{class:'member-avatar',...memberMediaAttributes(member.foto,'src'),alt:'Foto '+(member.nama||'pengurus')}):h('div',{class:'member-avatar member-avatar-placeholder'},(member.nama||'?').trim().slice(0,1).toUpperCase()),
-      h('div',{class:'member-card-info'},h('div',{class:'member-name-line'},h('b',{},(member.nama||'Nama belum diisi').toUpperCase()),h('span',{class:'member-region-tag'},area.toUpperCase())),
-        h('small',{},[memberCode(member),location].filter(Boolean).join(' · ').toUpperCase()),
-        h('small',{},member.wa?memberValue('wa',member.wa):member.email||'Kontak belum diisi')),
-      h('div',{class:'member-card-actions'},h('button',{class:'btn s',onclick:()=>openMember(member,'members')},'Lihat kartu ID')));
-  }):[h('div',{class:'member-empty'},icon('team',25),h('b',{},'Belum ada data pengurus'),h('p',{},'Anggota dengan peran Pengurus akan tampil di sini. Atur peran dari formulir data anggota.'))];
-  return [h('h1',{},'Kepengurusan'),guard(),h('div',{class:'member-grid'},...cards)];
+  const nodes=susunanSimpul();
+  const mode=S.susunanMode==='tabel'?'tabel':'bagan';
+  const atur=!!(S.admin&&S.susunanAtur);
+  const out=[h('h1',{},'Kepengurusan'),guard(),
+    h('div',{class:'org-toggle'},
+      h('button',{class:'org-toggle-btn'+(mode==='bagan'?' on':''),onclick:()=>{S.susunanMode='bagan';render()}},'Bagan'),
+      h('button',{class:'org-toggle-btn'+(mode==='tabel'?' on':''),onclick:()=>{S.susunanMode='tabel';render()}},'Tabel'))];
+  if(S.admin){
+    out.push(h('div',{class:'org-atur-bar'},
+      h('button',{class:'btn s',onclick:()=>{S.susunanAtur=!S.susunanAtur;if(!S.susunanAtur)S.susunanPanel=null;render()}},atur?'Selesai Mengatur':'Atur Struktur'),
+      atur&&h('button',{class:'btn s',onclick:()=>bukaPanelSusunan('tambah',null)},'+ Tambah Jabatan'),
+      atur&&h('button',{class:'btn s',onclick:async()=>{
+        if(!confirm('Kembalikan susunan ke jabatan bawaan? Jabatan tambahan akan hilang dan susunan hierarki kembali seperti semula; pemegang jabatan bawaan dipertahankan sebisa mungkin.'))return;
+        try{await kembalikanSusunanAwal();S.susunanPanel=null;render()}
+        catch(error){console.error(error);alert('Gagal mengembalikan susunan awal: '+(error.message||'periksa koneksi'))}
+      }},'Kembalikan Susunan Awal'),
+      atur&&h('p',{class:'sub org-atur-note'},'Mode atur aktif: pakai tombol Nama, Pemegang, Geser, dan Hapus pada tiap jabatan. Di tampilan Bagan, jabatan juga bisa diseret lewat pegangan ⠿ pada kartunya untuk memindah induk atau menggeser urutan.')
+    ));
+  }
+  if(S.admin&&S.susunanPanel){
+    const panelEl=susunanPanelRender(nodes);
+    if(panelEl)out.push(panelEl);
+  }
+  out.push(mode==='bagan'?orgBagan(nodes):orgTabel(nodes));
+  return out;
 }

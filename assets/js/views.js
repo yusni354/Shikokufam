@@ -10,7 +10,6 @@ const V={
   pesan:vPesan,
   musyawarah:musyawarahView,
   keuangan:vKeuangan,
-  pasang:(...args)=>vPasang(...args),
   susunan:vSusunan,
   pengaturan:vPengaturan,
   'map-settings':vPetaSettings,
@@ -139,4 +138,5 @@ function startDataSubscriptions(){
   add(()=>subscribePilihan());
   if(!S.supabase)add(()=>sub('pengaturan','pengaturan'));
   add(()=>subscribeSambutan());
+  add(()=>subscribeSusunan());
 }

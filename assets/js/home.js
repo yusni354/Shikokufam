@@ -72,7 +72,6 @@ function vHome(){
     h('div',{class:'home-section-heading'},h('h2',{},'Kegiatan komunitas'),h('button',{class:'btn s',onclick:()=>go('kegiatan')},'Lihat kegiatan')),
     recentEvents.length?h('div',{class:'home-events'},...recentEvents.map(event=>h('div',{class:'home-event'},icon('calendar',19),h('div',{},h('b',{},event.judul||'Kegiatan komunitas'),h('small',{},eventParticipantCount(event)+' peserta · '+eventAttendanceCount(event)+' hadir'))))):h('div',{class:'home-empty'},icon('calendar',23),h('p',{},'Belum ada kegiatan komunitas.')),
     homeAttendanceChart(),
-    (typeof isStandaloneApp==='function'&&!isStandaloneApp())?h('button',{class:'card install-home-card',onclick:()=>go('pasang')},h('img',{class:'install-home-icon',src:'assets/icons/icon-192.png',alt:''}),h('span',{style:'flex:1'},h('b',{},'Pasang aplikasi di HP'),h('small',{},'Tambahkan ke layar utama — dibuka seperti aplikasi biasa, Android & iPhone')),'›'):null,
     h('button',{class:'home-admin-link',onclick:askForm},icon('messages',17),' Butuh bantuan? Hubungi Admin')
   ];
 }
