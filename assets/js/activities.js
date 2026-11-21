@@ -366,6 +366,249 @@ function vAbsensiFokus(event,region){
     feedback
   );
 }
+/* ===== Ruangan laporan: halaman Ringkasan & Laporan dibagi empat
+   ruangan dengan tab di bagian atas — Kegiatan, Jadwal Piket,
+   Keuangan, Anggota. Mengetuk satu tab hanya menampilkan ruangan itu;
+   ruangan lain tersembunyi. Ruangan yang terakhir dibuka diingat di
+   sessionStorage (pola yang sama seperti halaman terakhir aplikasi),
+   dan ruangan bawaan yang terbuka pertama adalah Kegiatan.
+   Semua ruangan baca-saja dan dihitung dari data aplikasi yang sudah
+   ada: kegiatan (events), keuangan, jadwal piket (cleaning_duties),
+   dan anggota (members) — tidak ada model data baru. ===== */
+const RINGKASAN_RUANG=[['kegiatan','Kegiatan'],['piket','Jadwal Piket'],['keuangan','Keuangan'],['anggota','Anggota']];
+const RINGKASAN_RUANG_KEY='shikoku-family:ringkasan-ruang';
+function ringkasanRuangAktif(){
+  if(!RINGKASAN_RUANG.some(([key])=>key===S.ringkasanRuang)){
+    let saved='';
+    try{saved=sessionStorage.getItem(RINGKASAN_RUANG_KEY)||''}catch(e){/* storage terblokir: abaikan */}
+    S.ringkasanRuang=RINGKASAN_RUANG.some(([key])=>key===saved)?saved:'kegiatan';
+  }
+  return S.ringkasanRuang;
+}
+function setRingkasanRuang(ruang){
+  S.ringkasanRuang=ruang;
+  try{sessionStorage.setItem(RINGKASAN_RUANG_KEY,ruang)}catch(e){/* storage terblokir: abaikan */}
+  render();
+  window.scrollTo(0,0);
+}
+function tahunDariTanggal(tanggal){
+  const y=parseInt(String(tanggal||'').slice(0,4),10);
+  return Number.isNaN(y)?null:y;
+}
+/* Tabel laporan bersama ruangan-ruangan baru: kepala slate dan baris
+   zebra mengikuti gaya tabel rekap, wadahnya bisa digeser kanan-kiri
+   bila tabel lebih lebar dari layar. Kolom memakai kelas 'lap-left'
+   (rata kiri) atau 'lap-num' (rata kanan, tebal untuk isi angka). */
+function laporanTabel(kolom,baris,lebarMin){
+  return h('div',{class:'laporan-wrap'},
+    h('table',{class:'laporan-table',...(lebarMin?{style:'min-width:'+lebarMin+'px'}:{})},
+      h('thead',{},h('tr',{},...kolom.map(([label,kelas])=>h('th',kelas?{class:kelas}:{},label)))),
+      h('tbody',{},...baris)));
+}
+/* Batang mendatar sederhana untuk kolom 'Bagian' (persen) */
+function laporanBar(persen,warna){
+  const pct=Math.max(0,Math.min(100,Number(persen)||0));
+  return h('span',{class:'laporan-bar','aria-hidden':'true'},
+    h('span',{class:'laporan-bar-fill',style:'width:'+pct+'%'+(warna?';background:'+warna:'')}));
+}
+/* ===== Ruangan KEUANGAN: ringkasan koleksi 'keuangan' pada tahun
+   terpilih — total setahun, pengeluaran per bulan, per kategori
+   belanja, dan per pengguna/pembelanja. Format uang memakai
+   formatYen dari modul Keuangan; pengelompokan per pengguna memakai
+   kunci yang sama seperti ringkasan di halaman Laporan Keuangan
+   (uid, cadangan nama pengguna). ===== */
+function vRingkasanKeuangan(year){
+  const records=(S.keuangan||[]).filter(item=>tahunDariTanggal(item.tanggal)===year)
+    .sort((a,b)=>String(a.tanggal||'').localeCompare(String(b.tanggal||''))||(a.at||0)-(b.at||0));
+  if(!records.length)return [h('p',{class:'warn'},'Belum ada catatan keuangan pada tahun '+year+'.')];
+  const total=records.reduce((sum,item)=>sum+(Number(item.jumlah)||0),0);
+  const persen=n=>total?Math.round(n/total*100):0;
+  const summary=h('section',{class:'card ringkasan-summary'},
+    h('h2',{},'Keuangan tahun '+year),
+    h('p',{class:'activity-meta'},icon('wallet',15),h('span',{},records.length+' catatan belanja pada tahun ini')),
+    h('div',{class:'activity-counts','aria-label':'Total keuangan tahun '+year},
+      h('b',{class:'c-cuti'},'Total '+formatYen(total)),
+      h('b',{},'Rata-rata '+formatYen(Math.round(total/records.length))+' per catatan')));
+  /* Pengeluaran per bulan (hanya bulan yang memiliki catatan) */
+  const perBulan=new Map();
+  records.forEach(item=>{
+    const key=financeMonthKey(item.tanggal);
+    if(!key)return;
+    const cur=perBulan.get(key)||{count:0,total:0};
+    cur.count++;cur.total+=Number(item.jumlah)||0;
+    perBulan.set(key,cur);
+  });
+  const bulanRows=[...perBulan.entries()].sort((a,b)=>a[0].localeCompare(b[0])).map(([key,v])=>h('tr',{},
+    h('td',{class:'lap-left'},financeMonthLabel(key)),
+    h('td',{class:'lap-num'},String(v.count)),
+    h('td',{class:'lap-num'},formatYen(v.total)),
+    h('td',{class:'lap-num'},persen(v.total)+'%')));
+  bulanRows.push(h('tr',{class:'lap-total-row'},
+    h('td',{class:'lap-left'},'Total tahun '+year),
+    h('td',{class:'lap-num'},String(records.length)),
+    h('td',{class:'lap-num'},formatYen(total)),
+    h('td',{class:'lap-num'},'100%')));
+  const bulanCard=h('section',{class:'card lap-card'},
+    h('h3',{class:'lap-h'},'Pengeluaran per bulan'),
+    laporanTabel([['Bulan','lap-left'],['Catatan','lap-num'],['Total','lap-num'],['Bagian','lap-num']],bulanRows));
+  /* Pengelompokan generik: kunci -> {label, count, total}, urut total terbesar */
+  const kelompokkan=(keyOf,labelOf)=>{
+    const map=new Map();
+    records.forEach(item=>{
+      const key=keyOf(item);
+      const cur=map.get(key)||{label:labelOf(item),count:0,total:0};
+      cur.count++;cur.total+=Number(item.jumlah)||0;
+      map.set(key,cur);
+    });
+    return [...map.values()].sort((a,b)=>b.total-a.total||a.label.localeCompare(b.label,'id'));
+  };
+  const kategoriRows=kelompokkan(
+    item=>String(item.nama_pengeluaran||'').trim().toLowerCase()||'belanja',
+    item=>item.nama_pengeluaran||'Belanja'
+  ).map(v=>h('tr',{},
+    h('td',{class:'lap-left'},v.label),
+    h('td',{class:'lap-num'},String(v.count)),
+    h('td',{class:'lap-num'},formatYen(v.total)),
+    h('td',{class:'lap-bar-cell'},laporanBar(persen(v.total)),h('span',{class:'lap-pct'},persen(v.total)+'%'))));
+  const kategoriCard=h('section',{class:'card lap-card'},
+    h('h3',{class:'lap-h'},'Pengeluaran per kategori'),
+    laporanTabel([['Kategori','lap-left'],['Catatan','lap-num'],['Total','lap-num'],['Bagian','lap-left']],kategoriRows));
+  const penggunaRows=kelompokkan(
+    item=>String(item.uid||item.nama_user||'anggota'),
+    item=>item.nama_user||'Anggota'
+  ).map(v=>h('tr',{},
+    h('td',{class:'lap-left'},v.label),
+    h('td',{class:'lap-num'},String(v.count)),
+    h('td',{class:'lap-num'},formatYen(v.total)),
+    h('td',{class:'lap-num'},persen(v.total)+'%')));
+  const penggunaCard=h('section',{class:'card lap-card'},
+    h('h3',{class:'lap-h'},'Belanja per pengguna'),
+    laporanTabel([['Nama','lap-left'],['Catatan','lap-num'],['Total','lap-num'],['Bagian','lap-num']],penggunaRows));
+  return [summary,bulanCard,kategoriCard,penggunaCard];
+}
+/* ===== Ruangan ANGGOTA: potret daftar anggota SAAT INI (tanpa
+   pemilih tahun) — total anggota aktif, rincian per wilayah dengan
+   warna wilayah dan grafik batang tumpuk mengikuti gaya halaman ini,
+   lalu rincian angka lain dari field yang memang terisi pada data
+   anggota (kelompok, status visa, bidang pekerjaan, jenis kelamin).
+   Rincian yang field-nya kosong pada semua anggota tidak ditampilkan.
+   Daftar lengkap anggota tetap di halaman Daftar Anggota; ruangan ini
+   hanya ringkasan angka. ===== */
+function vRingkasanAnggota(){
+  const aktif=S.members.filter(member=>String(member.status||'aktif').toLowerCase()!=='nonaktif');
+  const total=aktif.length;
+  if(!total)return [h('p',{class:'warn'},'Belum ada anggota aktif.')];
+  const persen=n=>Math.round(n/total*100);
+  const wilayahRows=wilayahEfektif()
+    .map(([name,color])=>({name,color,count:aktif.filter(m=>memberRegion(m)===name).length}))
+    .filter(r=>r.count>0);
+  const belumDipilih=aktif.filter(m=>memberRegion(m)==='Belum dipilih').length;
+  if(belumDipilih)wilayahRows.push({name:'Belum dipilih',color:'#718096',count:belumDipilih});
+  const chart=h('div',{class:'activity-chart',role:'img','aria-label':'Grafik anggota per wilayah dari '+total+' anggota'},
+    ...wilayahRows.map(r=>h('span',{class:'activity-chart-seg',style:'width:'+(r.count/total*100)+'%;background:'+r.color,title:r.name+' '+r.count+' anggota ('+persen(r.count)+'%)'},
+      persen(r.count)>=14?h('small',{},persen(r.count)+'%'):'')));
+  const legend=h('div',{class:'activity-chart-legend'},
+    ...wilayahRows.map(r=>h('span',{},h('i',{style:'background:'+r.color,'aria-hidden':'true'}),r.name+' '+persen(r.count)+'%')));
+  const nonaktif=S.members.length-total;
+  const summary=h('section',{class:'card ringkasan-summary'},
+    h('h2',{},'Anggota saat ini'),
+    h('p',{class:'activity-meta'},icon('users',15),h('span',{},'Potret daftar anggota terbaru, tanpa saringan tahun')),
+    h('div',{class:'activity-counts','aria-label':'Total anggota'},
+      h('b',{class:'c-hadir'},'Aktif '+total),
+      nonaktif>0&&h('b',{class:'c-alpha'},'Nonaktif '+nonaktif)),
+    chart,legend);
+  const wilayahCard=h('section',{class:'card lap-card'},
+    h('h3',{class:'lap-h'},'Anggota per wilayah'),
+    laporanTabel([['Wilayah','lap-left'],['Anggota','lap-num'],['Bagian','lap-num']],
+      wilayahRows.map(r=>h('tr',{},
+        h('td',{class:'lap-left'},h('span',{class:'lap-dot',style:'background:'+r.color,'aria-hidden':'true'}),r.name),
+        h('td',{class:'lap-num'},String(r.count)),
+        h('td',{class:'lap-num'},persen(r.count)+'%')))));
+  /* Kartu rincian dari satu field anggota; null bila field itu kosong
+     pada semua anggota aktif (tidak ada yang bisa dilaporkan). */
+  const rincian=(judul,kolom,ambil)=>{
+    const map=new Map();
+    aktif.forEach(member=>{
+      const value=String(ambil(member)||'').trim();
+      if(!value)return;
+      map.set(value,(map.get(value)||0)+1);
+    });
+    if(!map.size)return null;
+    const rows=[...map.entries()].sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0],'id'))
+      .map(([label,count])=>h('tr',{},
+        h('td',{class:'lap-left'},label),
+        h('td',{class:'lap-num'},String(count)),
+        h('td',{class:'lap-num'},persen(count)+'%')));
+    return h('section',{class:'card lap-card'},
+      h('h3',{class:'lap-h'},judul),
+      laporanTabel([[kolom,'lap-left'],['Anggota','lap-num'],['Bagian','lap-num']],rows));
+  };
+  return [summary,wilayahCard,
+    rincian('Anggota per kelompok','Kelompok',m=>m.kelompok),
+    rincian('Anggota per status visa','Status visa',m=>m.tinggal),
+    rincian('Anggota per bidang pekerjaan','Bidang pekerjaan',m=>m.bidang),
+    rincian('Anggota per jenis kelamin','Jenis kelamin',m=>m.kelamin)
+  ].filter(Boolean);
+}
+/* ===== Ruangan JADWAL PIKET: ringkasan koleksi 'cleaning_duties'
+   yang sama dengan halaman Jadwal Piket — jadwal terdekat yang akan
+   datang (tanggal, nama bertugas, tugas) dan hitungan jumlah piket
+   per anggota pada tahun terpilih. Bentuk penugasan dibaca persis
+   seperti di halaman Jadwal Piket: daftar 'assignments', dengan
+   cadangan field lama nama/tugas pada dokumennya. ===== */
+function piketAssignments(duty){
+  return Array.isArray(duty.assignments)&&duty.assignments.length?duty.assignments:[{nama:duty.nama||'',tugas:duty.tugas||''}];
+}
+function vRingkasanPiket(year){
+  const duties=[...(S.cleaningDuties||[])].sort((a,b)=>(a.tanggal||'').localeCompare(b.tanggal||'')||(a.at||0)-(b.at||0));
+  if(!duties.length)return [h('p',{class:'warn'},'Belum ada data jadwal piket.')];
+  const today=new Date();
+  const todayKey=[today.getFullYear(),String(today.getMonth()+1).padStart(2,'0'),String(today.getDate()).padStart(2,'0')].join('-');
+  const yearDuties=duties.filter(d=>tahunDariTanggal(d.tanggal)===year);
+  const yearAssignments=yearDuties.reduce((n,d)=>n+piketAssignments(d).length,0);
+  const upcoming=duties.filter(d=>d.tanggal&&d.tanggal>=todayKey);
+  const summary=h('section',{class:'card ringkasan-summary'},
+    h('h2',{},'Jadwal piket tahun '+year),
+    h('p',{class:'activity-meta'},icon('brush',15),h('span',{},yearDuties.length+' jadwal · '+yearAssignments+' penugasan pada tahun ini')),
+    h('div',{class:'activity-counts','aria-label':'Ringkasan jadwal piket'},
+      h('b',{class:'c-hadir'},'Jadwal '+yearDuties.length),
+      h('b',{class:'c-cuti'},'Penugasan '+yearAssignments),
+      upcoming.length?h('b',{class:'c-izin'},'Terdekat '+financeDateLabel(upcoming[0].tanggal)):h('b',{},'Tidak ada jadwal mendatang')));
+  const out=[summary];
+  if(upcoming.length){
+    const rows=[];
+    upcoming.slice(0,10).forEach(duty=>{
+      piketAssignments(duty).forEach((assignment,index)=>rows.push(h('tr',{},
+        h('td',{class:'lap-left'},index===0?financeDateLabel(duty.tanggal):''),
+        h('td',{class:'lap-left'},assignment.nama||'—'),
+        h('td',{class:'lap-left'},assignment.tugas||'—'))));
+    });
+    out.push(h('section',{class:'card lap-card'},
+      h('h3',{class:'lap-h'},'Jadwal terdekat'),
+      laporanTabel([['Tanggal','lap-left'],['Nama bertugas','lap-left'],['Tugas','lap-left']],rows,520)));
+  }else{
+    out.push(h('p',{class:'warn'},'Tidak ada jadwal piket yang akan datang.'));
+  }
+  if(yearDuties.length){
+    const counts=new Map();
+    yearDuties.forEach(duty=>piketAssignments(duty).forEach(assignment=>{
+      const nama=String(assignment.nama||'').trim();
+      if(!nama)return;
+      counts.set(nama,(counts.get(nama)||0)+1);
+    }));
+    const rows=[...counts.entries()].sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0],'id'))
+      .map(([nama,count])=>h('tr',{},
+        h('td',{class:'lap-left'},nama),
+        h('td',{class:'lap-num'},String(count)),
+        h('td',{class:'lap-num'},(yearAssignments?Math.round(count/yearAssignments*100):0)+'%')));
+    if(rows.length)out.push(h('section',{class:'card lap-card'},
+      h('h3',{class:'lap-h'},'Jumlah piket per anggota · '+year),
+      laporanTabel([['Nama','lap-left'],['Kali piket','lap-num'],['Bagian','lap-num']],rows)));
+  }else{
+    out.push(h('p',{class:'warn'},'Belum ada jadwal piket pada tahun '+year+'.'));
+  }
+  return out;
+}
 /* ===== Halaman Ringkasan Kegiatan: rekap SELURUH kegiatan dalam satu
    tahun, baca-saja untuk semua pengguna yang masuk & disetujui. Tahun
    sebuah kegiatan ditentukan dari tanggalnya. Total absensi memakai
@@ -378,16 +621,32 @@ function activityYear(event){
 }
 function vRingkasan(){
   const currentYear=new Date().getFullYear();
-  /* Pilihan tahun: tahun-tahun yang memiliki kegiatan, ditambah tahun
-     berjalan (bawaan terpilih) supaya tahun yang masih kosong pun bisa
-     dipilih dan menampilkan pesan kosongnya. */
-  const years=[...new Set([currentYear,...S.events.map(activityYear).filter(y=>y!=null)])].sort((a,b)=>b-a);
+  const ruang=ringkasanRuangAktif();
+  /* Pilihan tahun: gabungan tahun-tahun yang memiliki kegiatan,
+     catatan keuangan, atau jadwal piket, ditambah tahun berjalan
+     (bawaan terpilih) supaya tahun yang masih kosong pun bisa dipilih
+     dan menampilkan pesan kosongnya. Tahun yang sama berlaku untuk
+     ruangan Kegiatan, Jadwal Piket, dan Keuangan. */
+  const years=[...new Set([currentYear,
+    ...S.events.map(activityYear),
+    ...(S.keuangan||[]).map(item=>tahunDariTanggal(item.tanggal)),
+    ...(S.cleaningDuties||[]).map(duty=>tahunDariTanggal(duty.tanggal))
+  ].filter(y=>y!=null))].sort((a,b)=>b-a);
   const selected=years.includes(S.ringkasanTahun)?S.ringkasanTahun:currentYear;
   const yearSelect=h('select',{'aria-label':'Pilih tahun',onchange:e=>{S.ringkasanTahun=Number(e.target.value);render()}},
     ...years.map(y=>h('option',{value:String(y)},String(y))));
   yearSelect.value=String(selected);
-  const head=[h('h1',{},'Ringkasan Kegiatan'),guard(),
-    h('label',{class:'activity-field ringkasan-year'},'Tahun',yearSelect)];
+  const tabs=h('nav',{class:'ringkasan-tabs','aria-label':'Ruangan laporan'},
+    ...RINGKASAN_RUANG.map(([key,label])=>h('button',{type:'button',class:'ringkasan-tab'+(ruang===key?' on':''),'aria-pressed':ruang===key?'true':'false',onclick:()=>{if(ruang!==key)setRingkasanRuang(key)}},label)));
+  const head=[h('h1',{},'Ringkasan & Laporan'),guard(),tabs];
+  /* Ruangan Anggota adalah potret saat ini: pemilih tahun tidak tampil di sana. */
+  if(ruang!=='anggota')head.push(h('label',{class:'activity-field ringkasan-year'},'Tahun',yearSelect));
+  if(ruang==='anggota')return [...head,...vRingkasanAnggota()];
+  if(ruang==='keuangan')return [...head,...vRingkasanKeuangan(selected)];
+  if(ruang==='piket')return [...head,...vRingkasanPiket(selected)];
+  /* Ruangan Kegiatan: isi persis seperti halaman Ringkasan Kegiatan
+     sebelumnya (ringkasan setahun + tabel rekap per anggota + daftar
+     kegiatan tahun terpilih). */
   const events=S.events.filter(event=>activityYear(event)===selected)
     .sort((a,b)=>(b.tanggal||'').localeCompare(a.tanggal||'')||(b.at||0)-(a.at||0));
   if(!events.length){
