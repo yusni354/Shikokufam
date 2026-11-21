@@ -773,26 +773,23 @@ input,textarea,select{background:#f4f8fa;border-color:#bfcfdb}
 .musy-root .musy-ta button.x{padding:1px 6px;font-size:10px}
 
 /* ===== Kepengurusan: pemilih tampilan, bagan hierarki & tabel =====
-   Bagan memakai garis penghubung CSS murni warna slate tegas (3px):
-   di desktop pola bagan organisasi baku — garis vertikal turun dari
-   induk ke batang mendatar yang membagi ke tiap anak; baris puncak
-   Ketua–Wakil yang sejajar menyambung ke tingkat bawah lewat garis
-   .org-join dari tengah baris puncak. Di HP pohon menumpuk ke bawah
-   dengan rel vertikal di sisi kiri tiap kelompok anak: siku dari
-   bawah kartu induk masuk ke rel, dan tiap anak terhubung ke rel
-   lewat garis pendek, tanpa geser menyamping.
-   Supaya TIDAK ADA garis yang putus: .org-node memakai gap 6px antar
-   elemen, jadi .org-kids ditarik naik margin-top:-6px dan .org-join
-   margin-top:-6px — garis vertikal pun mulai persis di bawah kartu
-   induk (atau baris puncak) dan menyambung utuh sampai batang
-   mendatar, lalu turun utuh ke tiap kartu anak. Kelompok anak yang
-   membungkus multi-baris disambung tulang vertikal + potongan ujung
-   per baris dari rapikanGarisBagan() di members.js. */
+   Garis penghubung bagan digambar oleh SATU lapisan SVG (.org-lines)
+   di belakang kartu, seluruhnya berupa kurva bezier halus — tidak ada
+   siku 90° di mana pun (gambarGarisBagan di members.js). Di desktop
+   kurva S mengalir dari induk ke puncak tiap anak (termasuk kelompok
+   anak multi-baris seperti Koordinator Wilayah, dan pasangan sejajar
+   Ketua–Wakil di baris puncak yang dihubungkan kurva mendatar); di HP
+   kurva induk melengkung masuk ke rel vertikal di sisi kiri kelompok
+   anak dan tiap anak terhubung ke rel lewat kurva pendek menyamping.
+   CSS di sini hanya mengatur tata letak (jarak antar tingkat); warna
+   dan ketebalan garis hidup di .org-line. */
 .org-toggle{display:inline-flex;gap:4px;padding:4px;background:var(--card);border:1px solid var(--line);border-radius:999px;margin-bottom:14px;box-shadow:0 4px 14px rgba(47,134,184,.08)}
 .org-toggle-btn{border:0;background:transparent;padding:8px 24px;border-radius:999px;font-weight:700;font-size:14px;color:var(--mut);cursor:pointer;font-family:inherit}
 .org-toggle-btn.on{background:var(--g);color:#ffffff;box-shadow:0 4px 10px rgba(43,122,140,.25)}
-.org-tree{display:flex;flex-direction:column;align-items:center;padding:10px 0 6px;max-width:100%}
-.org-node{display:flex;flex-direction:column;align-items:center;gap:6px}
+.org-tree{display:flex;flex-direction:column;align-items:center;padding:10px 0 6px;max-width:100%;position:relative}
+.org-lines{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0}
+.org-line{fill:none;stroke:#527f9f;stroke-width:3;stroke-linecap:round}
+.org-node{display:flex;flex-direction:column;align-items:center;gap:6px;position:relative;z-index:1}
 .org-node-main{display:flex;flex-direction:column;align-items:center;gap:4px;width:172px;max-width:44vw;padding:14px 10px 12px;background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:0 4px 14px rgba(47,134,184,.1);color:var(--ink);font-family:inherit;text-align:center}
 button.org-node-main{cursor:pointer}
 button.org-node-main:hover{border-color:var(--acc)}
@@ -803,22 +800,14 @@ button.org-node-main:hover{border-color:var(--acc)}
 .org-avatar{width:46px;height:46px;flex:none;border-radius:15px;object-fit:cover}
 .org-avatar-ph{display:grid;place-items:center;background:linear-gradient(145deg,#dff2e7,#dceef8);color:#000000;font-size:19px;font-weight:700}
 .org-kids{display:flex;flex-wrap:wrap;justify-content:center;list-style:none;margin:-6px 0 0;padding:28px 0 0;position:relative;max-width:100%}
-.org-kids::before{content:'';position:absolute;top:0;left:50%;height:28px;border-left:3px solid #527f9f}
 .org-kids>li{position:relative;padding:28px 10px 0;display:flex;justify-content:center}
-.org-kids>li::before,.org-kids>li::after{content:'';position:absolute;top:0;right:50%;width:50%;height:28px;border-top:3px solid #527f9f}
-.org-kids>li::after{right:auto;left:50%;border-left:3px solid #527f9f}
-.org-kids>li:only-child::before,.org-kids>li:only-child::after{display:none}
 .org-kids>li:only-child{padding-top:0}
-.org-kids>li:first-child::before,.org-kids>li:last-child::after{border-top:0}
-.org-kids>li:last-child::before{border-right:3px solid #527f9f;border-radius:0 10px 0 0}
-.org-kids>li:first-child::after{border-radius:10px 0 0 0}
-.org-kids-joined{padding-top:0}
-.org-kids-joined::before{display:none}
 .org-top-row{display:flex;align-items:flex-start;justify-content:center;max-width:100%}
 .org-node-head{display:flex;flex-direction:column;align-items:center;gap:6px}
 .org-top-row .org-node-main{width:160px}
-.org-pair-link{flex:none;width:34px;height:3px;background:#527f9f;margin-top:64px}
-.org-join{width:3px;height:22px;background:#527f9f;flex:none;margin:-6px 0 0}
+/* Penghubung Ketua–Wakil kini digambar lapisan SVG; elemen ini hanya
+   penjarang antar dua kartu di baris puncak. */
+.org-pair-link{flex:none;width:34px;height:3px;background:transparent;margin-top:64px}
 .org-group{display:flex;flex-direction:column;align-items:center;width:100%}
 .org-group-title{padding:7px 18px;border-radius:999px;background:#dcebf3;color:#000000;font-weight:700;font-size:13px;letter-spacing:.04em;text-transform:uppercase}
 .org-grid{position:relative;display:flex;flex-wrap:wrap;justify-content:center;width:100%}
@@ -842,19 +831,11 @@ span.org-mini{display:grid;place-items:center;font-size:14px}
 @media (max-width:720px){
   .org-top-row .org-node-main{width:auto;max-width:41vw}
   .org-pair-link{width:16px;margin-top:58px}
-  .org-join{height:10px}
-  /* HP: bagan menjadi rel kiri — tiap kelompok anak punya garis
-     vertikal di sisi kirinya, siku dari bawah kartu induk masuk ke
-     rel itu, dan tiap anak terhubung ke rel lewat garis pendek,
-     jadi jelas anak-anak ini milik induk yang mana. */
+  /* HP: bagan menumpuk ke bawah; kelompok anak digeser 30px ke kanan
+     untuk memberi ruang bagi rel lengkung SVG di sisi kirinya. */
   .org-tree .org-kids{flex-direction:column;flex-wrap:nowrap;align-items:stretch;width:100%;padding:20px 0 0 30px}
-  .org-tree .org-kids::before{display:block;left:15px;top:0;width:calc(50% - 15px);height:20px;border-left:0;border-right:3px solid #527f9f;border-bottom:3px solid #527f9f;border-bottom-right-radius:12px}
-  .org-tree .org-kids .org-kids::before{width:calc(min(86px,22vw) - 15px)}
   .org-tree .org-kids>li{display:block;width:100%;padding:14px 0 0}
   .org-tree .org-kids>li>.org-node{align-items:flex-start}
-  .org-tree .org-kids>li::before{display:block;left:-15px;right:auto;top:40px;width:15px;height:0;border-top:3px solid #527f9f;border-right:0;border-radius:0}
-  .org-tree .org-kids>li::after{display:block;left:-15px;right:auto;top:0;width:0;height:100%;border-top:0;border-left:3px solid #527f9f;border-radius:0}
-  .org-tree .org-kids>li:last-child::after{height:40px}
   .org-row-head{display:none}
   .org-table .org-row,.org-table-admin .org-row{display:flex;flex-direction:column;align-items:flex-start;gap:5px;padding:13px 14px}
   .org-c-aksi{align-self:flex-end}
@@ -881,35 +862,24 @@ body.org-drag-on,body.org-drag-on *{cursor:grabbing!important}
 .anggota-opt-info small{display:block;color:var(--mut);font-size:12px;margin-top:1px}
 .org-node.org-dragging{opacity:.45}
 .org-ghost{position:fixed;z-index:300;pointer-events:none;opacity:.88;margin:0;box-shadow:0 14px 34px rgba(31,58,80,.35)}
-/* Tulang vertikal untuk kelompok anak yang membungkus multi-baris
-   (diatur JS lewat rapikanGarisBagan): menyambung batang baris
-   pertama ke batang baris terakhir pada sumbu tengah kelompok.
-   Anak yang sendirian di barisnya tidak menggambar segmen batang
-   menyamping — garis lurus tulang → kartunya yang berbicara. */
-.org-kids-wrapped::after{content:'';position:absolute;left:50%;top:var(--spine-top,28px);height:var(--spine-h,0);border-left:3px solid #527f9f}
-/* Tulang multi-baris lewat DI BELAKANG kartu & tombol anak (bukan
-   menimpa isinya): kartu anak berada di lapisan atas, jadi garis
-   tampak mengalir di belakang kartu dan muncul lagi di celah antar
-   baris — jalurnya tetap utuh dari batang pertama ke batang terakhir. */
-.org-kids-wrapped>li{position:relative;z-index:1}
-.org-kids>li.org-li-solo::before{display:none}
-.org-kids>li.org-li-solo::after{border-top:0}
-/* Ujung batang tiap baris pada kelompok multi-baris (kelas diatur JS
-   lewat rapikanGarisBagan): segmen menyamping berhenti tepat di
-   tengah kartu pertama/terakhir baris itu, sama seperti potongan
-   :first-child/:last-child untuk baris tunggal — tanpa ini ujung
-   baris lanjutan menyisakan garis menggantung yang tampak putus.
-   Garis vertikal turun ke kartu (::after border-left) tidak disentuh. */
-.org-kids>li.org-li-rowfirst::before{border-top:0}
-.org-kids>li.org-li-rowlast::after{border-top:0}
 .org-node-main.org-drop-ok{outline:3px solid var(--acc);outline-offset:2px}
 .org-node-main.org-drop-before{outline:2px solid var(--acc);outline-offset:2px;box-shadow:inset 0 7px 0 var(--acc)}
 .org-node-main.org-drop-after{outline:2px solid var(--acc);outline-offset:2px;box-shadow:inset 0 -7px 0 var(--acc)}
 .org-node-main.org-drop-bad{outline:3px solid #d95763;outline-offset:2px}
 @media (max-width:720px){
   .org-c-aksi .org-tools{justify-content:flex-start}
-  .org-tree .org-kids-wrapped::after{display:none}
 }
+
+/* ===== Kepengurusan: satu kartu pengaturan jabatan & pemilih letak =====
+   Kartu pengaturan membagi isinya menjadi blok-blok bertajuk (Nama,
+   Pemegang, Geser Posisi, Tambah Dapukan, Hapus) dengan garis pemisah
+   tipis; pemilih letak adalah dua tombol pilihan sejajar/di bawah. */
+.org-set-blok{border-top:1px solid var(--line);padding-top:12px;margin-top:14px}
+.org-set-judul{display:block;font-size:15px;margin-bottom:8px}
+.org-letak{display:flex;flex-wrap:wrap;gap:6px}
+.org-letak-btn{flex:1 1 150px;padding:9px 10px;border-radius:12px;border:1px solid var(--line);background:var(--card);font:inherit;font-size:14px;font-weight:600;color:var(--ink);cursor:pointer}
+.org-letak-btn.on{background:var(--g);border-color:transparent;color:#ffffff;box-shadow:0 4px 10px rgba(43,122,140,.25)}
+.org-letak-btn:disabled{opacity:.45;cursor:not-allowed;box-shadow:none}
 
 /* ===== Gerbang awal: hanya halaman login tanpa kerangka =====
    Selama body ber-class auth-locked (belum masuk, sesi masih diperiksa,

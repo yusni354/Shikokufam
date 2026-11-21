@@ -119,7 +119,7 @@ function render(){
   $('#app').replaceChildren(...content);
   hydrateMemberQrCodes();
   hydrateMemberMedia();
-  if(typeof rapikanGarisBagan==='function')rapikanGarisBagan();
+  if(typeof gambarGarisBagan==='function')gambarGarisBagan();
   /* Halaman Peta: bangun peta Leaflet sesudah DOM terpasang (dijaga di
      dalam initPetaMap sendiri supaya kegagalan peta tidak merusak render) */
   if(typeof initPetaMap==='function')initPetaMap();
