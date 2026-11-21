@@ -139,6 +139,42 @@ function pinManualCoords(m){
   return [lat,lng];
 }
 function pinManualObj(coords){return {lat:Number(Number(coords[0]).toFixed(6)),lng:Number(Number(coords[1]).toFixed(6))}}
+/* Posisi pin seorang anggota saat ini, dari sumber mana pun yang sudah
+   tersedia: pin manual didahulukan, selain itu hasil geocoding
+   alamat/kode pos yang tersimpan di cache v3 (sumber yang sama dengan
+   petaEntries). Mengembalikan {coords:[lat,lng], manual} atau null
+   bila anggota belum punya posisi apa pun. Dipakai formulir anggota
+   dan halaman detail untuk menampilkan link 'Lihat Posisi di Peta'
+   hanya bagi anggota yang memang sudah berposisi. */
+function posisiPinAnggota(m){
+  if(!m)return null;
+  const manual=pinManualCoords(m);
+  if(manual)return {coords:manual,manual:true};
+  try{
+    const cache=petaGeoCacheLoad();
+    const tersimpan=cache[petaGeoKey(m)];
+    if(tersimpan&&tersimpan.c)return {coords:[tersimpan.c[0],tersimpan.c[1]],manual:false,lvl:tersimpan.l};
+  }catch(e){}
+  return null;
+}
+/* Buka halaman Peta & Wilayah terpusat pada pin anggota ini dengan
+   popup-nya terbuka (dari link 'Lihat Posisi di Peta' di halaman
+   detail/profil anggota). Saringan & pencarian peta dibersihkan dulu
+   supaya pin anggota pasti tampil; pilihan anggota dipasang sebelum
+   pindah halaman, lalu sesudah peta terbangun pin dipilih lewat
+   petaSelect yang sama seperti ketukan pada daftar anggota peta. */
+function bukaPosisiPinDiPeta(member){
+  if(!member||!member.id)return;
+  S.petaFilter=null;S.petaSearch='';
+  S.petaSelected=String(member.id);
+  go('peta');
+  setTimeout(()=>{
+    try{
+      const en=PM.entries.find(x=>x.key===String(member.id));
+      if(en&&typeof petaSelect==='function')petaSelect(en,{fly:true,popup:true});
+    }catch(e){console.error('Gagal memusatkan peta ke pin anggota:',e)}
+  },150);
+}
 /* Simpan / hapus pin manual lewat jalur data anggota yang sudah ada
    (Supabase app_data & lokal memakai doc.set yang sama seperti simpan
    profil). pin=null berarti hapus pin manual (kembali otomatis).

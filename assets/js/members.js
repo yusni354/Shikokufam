@@ -90,11 +90,19 @@ function hydrateMemberQrCodes(){
   });
 }
 function detailCard(){
-  const member=S.detail,area=memberRegion(member),code=memberCode(member),sections=[
+  const member=S.detail,area=memberRegion(member),code=memberCode(member);
+  /* Baris 'Posisi pin di peta': isi field-nya TIDAK ditampilkan di sini.
+     Sebagai gantinya, bila anggota sudah punya posisi (pin manual atau
+     hasil geocoding alamatnya), tampil satu link 'Lihat Posisi di Peta'
+     yang membuka halaman Peta & Wilayah terpusat pada pin anggota itu
+     dengan popup-nya terbuka. Tanpa posisi, barisnya tidak tampil. */
+  const posisiPinDetail=(typeof posisiPinAnggota==='function')?posisiPinAnggota(member):null;
+  const linkPosisiPinDetail=posisiPinDetail?h('a',{class:'member-contact-link pin-lihat-link',href:'#',onclick:ev=>{ev.preventDefault();if(typeof bukaPosisiPinDiPeta==='function')bukaPosisiPinDiPeta(member)}},'Lihat Posisi di Peta'):null;
+  const sections=[
     ['Identitas & Keanggotaan',[['Nama lengkap',member.nama],['Nomor HP / WhatsApp',member.wa],['Nomor anggota',code],['Jenis kelamin',member.kelamin],['Tanggal lahir',member.lahir],['Umur',memberAge(member)===null?'-':memberAge(member)+' tahun'],['Peran',member.peran||'Anggota'],['Pernikahan',member.nikah],['MT',member.mt],['Email',member.email],['Instagram',member.instagram],['Facebook',member.facebook]]],
     ['Kontak & Keluarga',[['Nama pengurus daerah',member.pengurus],['Nomor HP pengurus daerah',member.hp_pengurus],['Nama orang tua',member.ortu],['Nomor HP orang tua',member.hp_ortu]]],
     ['Alamat Indonesia',[['Kelompok',member.kelompok],['Desa',member.desa],['Daerah',member.daerah],['Alamat Indonesia',member.alamat_id]]],
-    ['Alamat & Pekerjaan di Jepang',[['Kode pos',member.kodepos],['Alamat',member.alamat_jp],['Stasiun',member.stasiun],['Status visa',member.tinggal],['Bidang pekerjaan',member.bidang],['Perusahaan',member.perusahaan],['Posisi pin di peta',(typeof pinManualCoords==='function'&&pinManualCoords(member))?('Posisi manual — '+(member.alamat_jp||'alamat belum terisi')):'Otomatis dari alamat']]],
+    ['Alamat & Pekerjaan di Jepang',[['Kode pos',member.kodepos],['Alamat',member.alamat_jp],['Stasiun',member.stasiun],['Status visa',member.tinggal],['Bidang pekerjaan',member.bidang],['Perusahaan',member.perusahaan],['Posisi pin di peta',linkPosisiPinDetail]]],
     ['Catatan',[['Catatan',member.catatan]]]
   ];
   const qrValue=memberQrValue(member);
@@ -107,7 +115,7 @@ function detailCard(){
         member.foto?h('img',{class:'member-id-photo member-id-photo-zoom',...memberMediaAttributes(member.foto,'src'),alt:'Foto '+(member.nama||'anggota'),title:'Klik untuk memperbesar foto',onclick:()=>{S.idPhoto=member.foto;render()}}):h('div',{class:'member-id-photo member-avatar-placeholder'},(member.nama||'?').trim().slice(0,1).toUpperCase()),
         h('div',{class:'member-id-info'},h('small',{},'KARTU ANGGOTA'),h('h1',{},(member.nama||'Nama belum diisi').toUpperCase()),member.wa&&h('p',{class:'member-id-phone'},icon('phone',14),h('span',{},member.wa)),h('b',{},code.toUpperCase()),h('p',{},[member.kota,member.pref].filter(Boolean).join(' · ').toUpperCase()||area.toUpperCase()))),
       h('div',{class:'member-id-barcode'},h('b',{class:'member-barcode-label'},'QR CODE ABSENSI'),qrValue?h('img',{class:'member-qr-code','data-member-qr':qrValue,alt:'QR code untuk ID anggota'}):h('p',{class:'member-barcode-help'},'ID anggota belum tersedia.'),h('small',{class:'member-barcode-help','data-member-qr-status':'true'},qrValue?'Membuat QR code...':'QR code akan tersedia setelah ID anggota tersimpan.'))),
-    ...sections.filter(([,rows])=>rows.some(([,value])=>value)).map(([title,rows])=>h('section',{class:'member-detail-section'},h('h3',{},title.toUpperCase()),h('div',{class:'member-detail-grid'},...rows.filter(([,value])=>value).map(([label,value])=>h('div',{class:'member-detail-item'},h('small',{},label.toUpperCase()),h('span',{},memberValue(label==='Nomor HP / WhatsApp'?'wa':label==='Nomor HP pengurus daerah'?'hp_pengurus':label==='Nomor HP orang tua'?'hp_ortu':label.toLowerCase(),value))))))),
+    ...sections.filter(([,rows])=>rows.some(([,value])=>value)).map(([title,rows])=>h('section',{class:'member-detail-section'},h('h3',{},title.toUpperCase()),h('div',{class:'member-detail-grid'},...rows.filter(([,value])=>value).map(([label,value])=>h('div',{class:'member-detail-item'},h('small',{},label.toUpperCase()),h('span',{},label==='Posisi pin di peta'?value:memberValue(label==='Nomor HP / WhatsApp'?'wa':label==='Nomor HP pengurus daerah'?'hp_pengurus':label==='Nomor HP orang tua'?'hp_ortu':label.toLowerCase(),value))))))),
     (member.surat||[]).length>0&&h('section',{class:'member-detail-section'},h('h3',{},'Foto Surat Sambung'),...(member.surat||[]).map((id,index)=>h('a',{class:'member-file-link',...memberMediaAttributes(id,'href'),target:'_blank',rel:'noopener'},icon('attachment',16),h('span',{},'Buka lampiran '+(index+1))))),
     S.admin&&h('div',{class:'member-detail-actions'},h('button',{class:'btn btn-eh',onclick:()=>{S.form={...member};S.detail=null;S.idPhoto=null;S.detailOrigin=null;S.formPinAlamatHasil='';render()}},icon('edit',16),h('span',{},'Edit data anggota'))),
     /* Penampil foto besar kartu ID: klik foto di kartu membuka lapisan ini;
@@ -394,11 +402,22 @@ function memberFormCard(){
     const anak=[
       h('div',{class:'form-pin-head'},h('b',{},'Posisi Pin di Peta'),h('span',{class:'form-pin-sumber'},manual?'Posisi manual':'Otomatis dari alamat'))
     ];
-    anak.push(h('p',{class:'sub form-pin-note'},manual
-      ?(S.formPinAlamatHasil
-        ?'Alamat dari titik pin: '+S.formPinAlamatHasil+' — alamat ini sudah terisi di field Alamat di Jepang dan ikut tersimpan saat formulir disimpan. Posisi pin ini dipakai di Peta & Wilayah dan tidak digeser oleh geocoding otomatis.'
-        :'Pin manual tersimpan. Alamat di field Alamat di Jepang mengikuti titik pin ini, dan posisi pin tidak digeser oleh geocoding otomatis.')
-      :'Belum ada pin manual. Posisi pin ditentukan otomatis dari alamat & kode pos. Letakkan pin sendiri bila posisi otomatis kurang tepat — alamat dari titik pin akan terisi otomatis ke field Alamat di Jepang.'));
+    /* Isi hasil penempatan pin TIDAK ditampilkan di bagian ini: alamat
+       dari titik pin tetap terisi ke field Alamat di Jepang & Kode Pos
+       seperti biasa dan ikut tersimpan saat formulir disimpan — hanya
+       tampilannya di sini yang diganti. Sebagai gantinya, bila anggota
+       sudah punya posisi (pin manual atau hasil geocoding alamatnya),
+       tampil satu link 'Lihat Posisi di Peta' yang membuka panel peta
+       yang sudah ada di bawah ini, terpusat pada pin anggota itu dengan
+       penandanya terlihat. Anggota tanpa posisi apa pun tidak
+       menampilkan link. */
+    const posisiPin=(typeof posisiPinAnggota==='function')?posisiPinAnggota(f):(manual?{coords:manual,manual:true}:null);
+    if(posisiPin)anak.push(h('p',{class:'form-pin-lihat'},h('a',{class:'member-contact-link pin-lihat-link',href:'#',onclick:ev=>{
+      ev.preventDefault();
+      S.formPinTemp=[posisiPin.coords[0],posisiPin.coords[1]];
+      S.formPinOpen=true;render();
+      setTimeout(()=>{const el=document.getElementById('form-pin-map');if(el)el.scrollIntoView({behavior:'smooth',block:'center'})},80);
+    }},'Lihat Posisi di Peta')));
     const tombol=[
       h('button',{type:'button',class:'btn s',onclick:()=>{
         if(!S.admin){alert('Hanya admin yang dapat meletakkan pin.');return}
