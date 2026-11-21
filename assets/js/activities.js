@@ -398,6 +398,16 @@ function activityCard(event){
         status)
     );
   }
+  /* Tombol PENGATURAN kecil (ikon roda gigi) khusus admin di ujung
+     bawah kartu — di bawah grafik batang + legenda persen dan
+     keterangan total anggota. Mengetuknya membuka panel pengaturan
+     kegiatan (Edit Kegiatan / Hapus Kegiatan) lewat S.kegiatanDialog;
+     ketukannya tidak membuka/menutup akordeon kartu (tombol di dalam
+     kartu memang diabaikan handler klik kartu, dan rambatannya juga
+     dihentikan di sini). Anggota biasa tidak melihat tombol ini. */
+  if(S.admin)content.push(h('div',{class:'activity-card-foot'},
+    h('button',{class:'activity-gear-btn',type:'button','aria-label':'Pengaturan kegiatan '+(event.judul||''),title:'Pengaturan kegiatan',
+      onclick:e=>{e.stopPropagation();S.kegiatanDialog={id:event.id,tahap:'atur'};render()}},icon('settings',16))));
   /* Animasi pegas ala ikon Mac: kartu yang baru saja dibuka/ditutup
      lewat klik mendapat kelas 'spring-in' SATU kali (penanda
      S.activitySpringId dipakai lalu dibersihkan di sini) supaya
@@ -1105,6 +1115,85 @@ function dialogRekapKegiatan(){
         h('button',{class:'btn s',onclick:tutup},'Tutup'),
         h('button',{class:'btn',onclick:()=>{S.rekapDialog={...d,tahap:'yakin'};render()}},'Hapus Kegiatan'))));
 }
+/* ===== Panel pengaturan kegiatan dari tombol gigi kartu kegiatan =====
+   Dibuka dengan mengetuk tombol roda gigi kecil di ujung bawah kartu
+   kegiatan (khusus admin). Pola aplikasi yang sama seperti panel dari
+   kepala tabel Ringkasan: tanpa tombol X — mengetuk bidang di luar
+   kotak atau tombol penutup menutupnya. Tahap 'atur' berisi dua
+   pilihan: 'Edit Kegiatan' membuka formulir edit (field yang sama
+   seperti Buat Kegiatan TANPA Pengulangan: Nama & Lokasi dropdown
+   terkelola yang sama, Tanggal, Waktu — semua terisi nilai kegiatan
+   saat ini; menyimpan hanya memperbarui dokumen kegiatan itu, data
+   absensinya tidak berubah) dan 'Hapus Kegiatan' membuka konfirmasi
+   tegas yang menyebut nama kegiatan; sesudah dikonfirmasi kegiatan
+   beserta data absensinya terhapus dan daftar kartu digambar ulang. */
+function dialogKegiatanKartu(){
+  const d=S.kegiatanDialog;
+  if(!d)return null;
+  const event=S.events.find(item=>String(item.id)===String(d.id));
+  if(!event){S.kegiatanDialog=null;return null}
+  const tutup=()=>{S.kegiatanDialog=null;render()};
+  const nama=event.judul||'Kegiatan komunitas';
+  const tgl=event.tanggal?new Date(event.tanggal+'T00:00:00'):null;
+  const tglLabel=tgl&&!Number.isNaN(tgl.getTime())?tgl.toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'}):'Tanggal belum ditentukan';
+  if(d.tahap==='yakin'){
+    return h('div',{class:'confirm-overlay',onclick:tutup},
+      h('div',{class:'card confirm-card',onclick:ev=>ev.stopPropagation()},
+        h('b',{class:'confirm-title'},'Hapus Kegiatan'),
+        h('p',{class:'confirm-text'},'Hapus kegiatan "'+nama+'" ('+tglLabel+')? Kegiatan ini beserta seluruh data absensinya akan terhapus dan tidak bisa dibatalkan.'),
+        h('div',{class:'fl confirm-actions'},
+          h('button',{class:'btn s',onclick:tutup},'Batal'),
+          h('button',{class:'btn',onclick:async()=>{
+            const id=d.id;S.kegiatanDialog=null;
+            if(String(S.activityExpanded)===String(id))S.activityExpanded=null;
+            try{
+              await S.db.collection('events').doc(id).delete();
+              S.events=S.events.filter(e=>String(e.id)!==String(id));
+            }catch(error){console.error(error);alert('Gagal menghapus kegiatan: '+(error.message||'periksa koneksi'))}
+            render();
+          }},'Hapus'))));
+  }
+  if(d.tahap==='edit'){
+    const judulSel=managedSelect({key:'nama_kegiatan',bawaan:daftarUnikKegiatan('judul'),value:event.judul||'',placeholder:'Pilih nama kegiatan',countUsage:hitungPemakaianKegiatan('judul')});
+    const lokasiSel=managedSelect({key:'lokasi_kegiatan',bawaan:daftarUnikKegiatan('lokasi'),value:event.lokasi||'',placeholder:'Pilih lokasi kegiatan',countUsage:hitungPemakaianKegiatan('lokasi')});
+    const tglInput=h('input',{type:'date'});
+    tglInput.value=event.tanggal||'';
+    const waktuInput=h('input',{type:'time'});
+    waktuInput.value=event.waktu||'';
+    return h('div',{class:'confirm-overlay',onclick:tutup},
+      h('div',{class:'card confirm-card kegiatan-edit-card',onclick:ev=>ev.stopPropagation()},
+        h('b',{class:'confirm-title'},'Edit Kegiatan'),
+        h('div',{class:'activity-create-grid'},
+          h('label',{class:'activity-field'},'Nama kegiatan *',judulSel),
+          h('label',{class:'activity-field'},'Lokasi *',lokasiSel)),
+        h('div',{class:'activity-create-grid'},
+          h('label',{class:'activity-field'},'Tanggal *',tglInput),
+          h('label',{class:'activity-field'},'Waktu',waktuInput)),
+        h('div',{class:'fl confirm-actions'},
+          h('button',{class:'btn s',onclick:tutup},'Batal'),
+          h('button',{class:'btn',onclick:async()=>{
+            const judul=judulSel.getValue().trim();
+            const lokasi=lokasiSel.getValue().trim();
+            if(!judul||!lokasi||!tglInput.value){alert('Isi nama kegiatan, lokasi, dan tanggal kegiatan.');return}
+            const id=event.id,nilaiBaru={judul,tanggal:tglInput.value,waktu:waktuInput.value,lokasi};
+            S.kegiatanDialog=null;
+            try{
+              await S.db.collection('events').doc(id).update(nilaiBaru);
+              const ev=S.events.find(item=>String(item.id)===String(id));
+              if(ev)Object.assign(ev,nilaiBaru);
+            }catch(error){console.error(error);alert('Gagal menyimpan perubahan kegiatan: '+(error.message||'periksa koneksi'))}
+            render();
+          }},'Simpan'))));
+  }
+  return h('div',{class:'confirm-overlay',onclick:tutup},
+    h('div',{class:'card confirm-card',onclick:ev=>ev.stopPropagation()},
+      h('b',{class:'confirm-title'},'Pengaturan Kegiatan'),
+      h('p',{class:'confirm-text'},h('b',{},nama),h('br',{}),tglLabel),
+      h('div',{class:'fl confirm-actions'},
+        h('button',{class:'btn s',onclick:tutup},'Tutup'),
+        h('button',{class:'btn',onclick:()=>{S.kegiatanDialog={...d,tahap:'edit'};render()}},'Edit Kegiatan'),
+        h('button',{class:'btn',onclick:()=>{S.kegiatanDialog={...d,tahap:'yakin'};render()}},'Hapus Kegiatan'))));
+}
 /* ===== Pengulangan bulanan pada formulir Buat Kegiatan =====
    Tanggal pada formulir adalah AWAL rangkaian. Untuk pola 'tanggal',
    tanggalnya tetap tiap bulan; bila tanggal itu tidak ada pada suatu
@@ -1321,6 +1410,7 @@ function vKegiatan(){
     guard(),
     createForm,
     kegiatanFilters,
-    kegiatanDaftar
+    kegiatanDaftar,
+    dialogKegiatanKartu()
   ];
 }

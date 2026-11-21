@@ -457,6 +457,16 @@ body.admin-dark .card .e{background:#293946;color:var(--acc)}
 .ringkasan-item{cursor:pointer}
 .ringkasan-item h2{font-size:17px;margin:0}
 .activity-total-note{margin:5px 0 0;font-size:11px;color:var(--mut)}
+/* Tombol pengaturan kecil (roda gigi) di ujung bawah kartu kegiatan,
+   khusus admin: baris kaki rata kanan, tombolnya kecil & proporsional */
+.activity-card-foot{display:flex;justify-content:flex-end;margin-top:10px}
+.activity-gear-btn{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;padding:0;border:2px solid var(--line);border-radius:10px;background:var(--card);color:var(--acc);cursor:pointer;box-shadow:none}
+.activity-gear-btn:active{transform:scale(.93)}
+/* Formulir Edit Kegiatan di dalam panel pengaturan kartu */
+.kegiatan-edit-card{width:100%;max-width:460px}
+.kegiatan-edit-card .activity-create-grid{margin-top:2px}
+.kegiatan-edit-card .activity-create-grid+.activity-create-grid{margin-top:8px}
+.kegiatan-edit-card .activity-field input,.kegiatan-edit-card .activity-field select{margin:4px 0 0;min-width:0}
 .ringkasan-summary,.ringkasan-item,.ringkasan-rekap{display:block;width:100%}
 .ringkasan-rekap{padding:12px}
 .rekap-wrap{overflow-x:auto;overflow-y:hidden;max-width:100%;margin-top:0;border:1px solid var(--line);border-radius:12px;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}
