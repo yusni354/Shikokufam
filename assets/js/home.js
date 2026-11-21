@@ -34,36 +34,90 @@ function vPengaturan(){
         catch(e){alert('Gagal menyimpan pesan: '+(e.message||'periksa koneksi'))}
       }},'Simpan')))];
 }
-/* Maskot Home berupa VIDEO (tanpa suara, berputar otomatis, berulang).
-   Sumbernya data URI base64 di assets/js/maskot-video.js — berkas teks
-   JavaScript yang SENGAJA tidak dimuat di index.html: berkas itu baru
-   dimuat di sini, saat Home benar-benar dibuka, supaya halaman lain
-   tidak ikut terbebani ±444 KB. Bentuk teks dipilih karena jalur unggah
-   repo hanya membawa berkas teks, jadi video tetap tampil di situs
-   asli. Bila pengguna mengaktifkan pengurangan gerak
-   (prefers-reduced-motion), video tidak dimuat sama sekali dan yang
-   tampil hanya poster diamnya (gambar maskot statis). */
-let maskotVideoSkripDimuat=false;
-const maskotVideoAntre=[];
-function pasangSumberVideoMaskot(vid){
-  if(window.MASKOT_VIDEO_SRC){vid.src=window.MASKOT_VIDEO_SRC;const p=vid.play();if(p&&p.catch)p.catch(()=>{})}
-  else maskotVideoAntre.push(vid);
+/* Maskot Home: gambar ASLI assets/mascot.webp (latarnya memang
+   transparan), dianimasikan sebagai boneka berlapis — BUKAN video
+   atau gif, jadi tidak ada latar yang perlu dipotong dan tidak ada
+   putaran yang berulang. Beberapa salinan gambar yang sama ditumpuk
+   persis sejajar: lapisan dasar utuh DIAM sebagai penopang, lalu di
+   atasnya salinan yang dipotong clip-path mengikuti pose gambar —
+   kepala+topi (poros di leher ±47%/50%), lengan terangkat (poros di
+   bahu ±69%/56%), dan burung kecil (poros di kakinya ±88%/72%).
+   Satu-satunya gerak kontinu adalah NAPAS (skala ±0,8% berporos di
+   bawah, ±3,4 detik). Gerakan lain dijalankan penjadwal JavaScript
+   lewat Web Animations API dengan jeda dan besar ACAK dalam rentang
+   manusiawi, sehingga tidak pernah membentuk pola yang bisa ditebak.
+   Penjadwal berhenti sendiri begitu elemen maskot lepas dari halaman
+   (pindah menu) dan mulai lagi saat Home dibuka kembali. Bila
+   pengguna mengaktifkan pengurangan gerak (prefers-reduced-motion),
+   yang tampil gambar diam utuh dan penjadwal tidak jalan. */
+function homeMascot(){
+  const kurangiGerak=!!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  if(kurangiGerak)return h('img',{class:'home-welcome-mascot',src:'assets/mascot.webp',alt:'Maskot Shikoku Family'});
+  const lapis=kelas=>h('img',{class:'mascot-layer '+kelas,src:'assets/mascot.webp',alt:'','aria-hidden':'true',draggable:'false'});
+  const head=lapis('mascot-head'),arm=lapis('mascot-arm'),bird=lapis('mascot-bird');
+  const breath=h('div',{class:'mascot-breath'},lapis('mascot-body'),head,arm,bird);
+  const sway=h('div',{class:'mascot-sway'},breath);
+  const stage=h('div',{class:'home-welcome-mascot mascot-live',role:'img','aria-label':'Maskot Shikoku Family'},
+    h('img',{class:'mascot-layer',src:'assets/mascot.webp',alt:'','aria-hidden':'true',draggable:'false'}),sway);
+  mulaiGerakMaskot(stage,breath,sway,head,arm,bird);
+  return stage;
 }
-function muatSumberVideoMaskot(vid){
-  if(window.MASKOT_VIDEO_SRC||maskotVideoSkripDimuat){pasangSumberVideoMaskot(vid);return}
-  maskotVideoSkripDimuat=true;
-  pasangSumberVideoMaskot(vid);
-  const sc=document.createElement('script');
-  sc.src='assets/js/maskot-video.js?v=20270122';
-  sc.onload=()=>{maskotVideoAntre.splice(0).forEach(v=>{if(v.isConnected)pasangSumberVideoMaskot(v)})};
-  document.head.appendChild(sc);
-}
-function homeMascotVideo(){
-  const gerakDikurangi=!!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-  const vid=h('video',{class:'home-welcome-mascot',poster:'assets/mascot.webp',preload:'none','aria-label':'Video maskot Shikoku Family'});
-  vid.muted=true;vid.loop=true;vid.playsInline=true;vid.setAttribute('playsinline','');vid.setAttribute('disablepictureinpicture','');
-  if(!gerakDikurangi){vid.autoplay=true;muatSumberVideoMaskot(vid)}
-  return vid;
+function mulaiGerakMaskot(stage,breath,sway,head,arm,bird){
+  const acak=(a,b)=>a+Math.random()*(b-a);
+  const hidup=()=>stage.isConnected;
+  /* Napas: gerak kontinu satu-satunya, sangat halus. */
+  const napas=breath.animate([{transform:'scale(1)'},{transform:'scale(1.008)'}],{duration:1700,iterations:Infinity,direction:'alternate',easing:'ease-in-out'});
+  const matikan=()=>{try{napas.cancel()}catch(e){}};
+  /* Jalankan satu gerakan; saat selesai hasilnya ditanam sebagai gaya
+     tetap supaya animasi lama tidak menumpuk di elemen. */
+  const gerak=(el,kf,dur)=>{const an=el.animate(kf,{duration:dur,easing:'ease-in-out',fill:'forwards'});
+    an.onfinish=()=>{try{an.commitStyles()}catch(e){}try{an.cancel()}catch(e){}};return an};
+  /* Rantai penjadwal per bagian tubuh: tidur selama jeda acak,
+     bergerak sekali, lalu menjadwalkan dirinya lagi. Berhenti rapi
+     saat maskot sudah tidak tampil di halaman. */
+  const rantai=(jedaAwal,jedaMin,jedaMax,aksi)=>{
+    const putar=()=>{if(!hidup()){matikan();return}
+      setTimeout(()=>{if(!hidup()){matikan();return}aksi();putar()},acak(jedaMin,jedaMax))};
+    setTimeout(()=>{if(!hidup()){matikan();return}aksi();putar()},jedaAwal);
+  };
+  /* Kepala: miring halus ke sudut diam baru (maks ±1,8°), kadang
+     angguk kecil. Sudut terakhir diingat supaya gerakan menyambung. */
+  let sudutKepala=0;
+  rantai(acak(1200,2600),4000,9000,()=>{
+    const dari='rotate('+sudutKepala.toFixed(2)+'deg)';
+    if(Math.random()<0.3){
+      gerak(head,[{transform:dari},{transform:'rotate('+(sudutKepala+acak(1,1.6)).toFixed(2)+'deg)',offset:0.45},{transform:dari}],acak(650,950));
+    }else{
+      const target=acak(-1.8,1.8);
+      const an=gerak(head,[{transform:dari},{transform:'rotate('+target.toFixed(2)+'deg)'}],acak(1100,1900));
+      an.onfinish=()=>{sudutKepala=target;try{an.commitStyles()}catch(e){}try{an.cancel()}catch(e){}};
+    }
+  });
+  /* Lengan terangkat: satu-dua ayunan kecil seperti melambai. */
+  rantai(acak(3000,6000),6000,13000,()=>{
+    const dua=Math.random()<0.4;
+    const kf=dua
+      ?[{transform:'rotate(0deg)'},{transform:'rotate(-5deg)',offset:0.2},{transform:'rotate(3deg)',offset:0.4},{transform:'rotate(-4deg)',offset:0.6},{transform:'rotate(2deg)',offset:0.8},{transform:'rotate(0deg)'}]
+      :[{transform:'rotate(0deg)'},{transform:'rotate(-5deg)',offset:0.3},{transform:'rotate(3.2deg)',offset:0.6},{transform:'rotate(0deg)'}];
+    gerak(arm,kf,dua?acak(1400,1700):acak(900,1200));
+  });
+  /* Burung kecil: lompat mungil, kadang dua kali berturut. */
+  rantai(acak(4000,8000),7000,15000,()=>{
+    const dua=Math.random()<0.3;
+    const kf=[{transform:'translateY(0px) scale(1,1)'},
+      {transform:'translateY(1.5px) scale(1.05,0.9)',offset:0.16},
+      {transform:'translateY(-7px) scale(0.97,1.04)',offset:0.32},
+      {transform:'translateY(0px) scale(1.02,0.96)',offset:0.46},
+      {transform:'translateY(0px) scale(1,1)',offset:0.56}];
+    if(dua)kf.push({transform:'translateY(1px) scale(1.04,0.92)',offset:0.68},{transform:'translateY(-5px) scale(0.98,1.03)',offset:0.82},{transform:'translateY(0px) scale(1,1)',offset:1});
+    else kf.push({transform:'translateY(0px) scale(1,1)',offset:1});
+    gerak(bird,kf,dua?acak(950,1150):acak(550,700));
+  });
+  /* Sesekali seluruh badan menoleh sangat halus lalu kembali. */
+  rantai(acak(6000,10000),11000,20000,()=>{
+    const besar=((Math.random()<0.5?-1:1)*acak(0.4,0.7)).toFixed(2);
+    gerak(sway,[{transform:'rotate(0deg)'},{transform:'rotate('+besar+'deg)',offset:0.5},{transform:'rotate(0deg)'}],acak(2400,3200));
+  });
 }
 /* Halaman Home dan Ringkasan */
 function vHome(){
@@ -91,7 +145,7 @@ function vHome(){
   return [
     h('section',{class:'home-welcome'},
       h('div',{class:'home-welcome-text'},h('small',{},today.toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'})),h('h1',{},'Selamat datang'+(S.name?', '+S.name.split(' ')[0]:'')+'!'),h('p',{},welcomeMessage()),h('button',{class:'btn home-welcome-cta',onclick:()=>go('kegiatan')},'Lihat Kegiatan')),
-      homeMascotVideo()
+      homeMascot()
     ),
     h('div',{class:'stats home-stats'},...[['Anggota',S.members.length],['Kegiatan',S.events.length],['Wilayah',Object.keys(wilayah()).length],['Jadwal Piket',S.cleaningDuties.length]].map(item=>h('div',{},h('small',{},item[0]),h('b',{},String(item[1]))))),
     h('div',{class:'home-section-heading'},h('h2',{},'Daftar anggota'),S.admin&&h('button',{class:'btn s',onclick:()=>go('members')},'+ Tambah')),
