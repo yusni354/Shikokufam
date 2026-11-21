@@ -141,8 +141,12 @@ function pinManualCoords(m){
 function pinManualObj(coords){return {lat:Number(Number(coords[0]).toFixed(6)),lng:Number(Number(coords[1]).toFixed(6))}}
 /* Simpan / hapus pin manual lewat jalur data anggota yang sudah ada
    (Supabase app_data & lokal memakai doc.set yang sama seperti simpan
-   profil). pin=null berarti hapus pin manual (kembali otomatis). */
-async function simpanPinManualAnggota(member,pin){
+   profil). pin=null berarti hapus pin manual (kembali otomatis).
+   alamatHasil (opsional, dari geocoding terbalik titik pin baru):
+   alamat_jp & kodepos anggota ikut diperbarui dalam simpan yang sama,
+   sehingga field alamat anggota berisi TEKS ALAMAT titik pin itu —
+   bukan angka koordinatnya. Tanpa alamatHasil, alamat lama utuh. */
+async function simpanPinManualAnggota(member,pin,alamatHasil){
   if(!S.admin)throw new Error('Hanya admin yang dapat mengubah posisi pin.');
   if(!member||!member.id||!S.db)throw new Error('Data anggota tidak ditemukan.');
   const idx=(S.members||[]).findIndex(x=>x.id===member.id);
@@ -150,11 +154,80 @@ async function simpanPinManualAnggota(member,pin){
   const salin={...sumber};delete salin.id;
   if(pin)salin.pinManual=pinManualObj([pin.lat!=null?pin.lat:pin[0],pin.lng!=null?pin.lng:pin[1]]);
   else delete salin.pinManual;
+  const alamatBaru=(pin&&alamatHasil&&alamatHasil.alamat)?String(alamatHasil.alamat).trim():'';
+  if(alamatBaru){
+    salin.alamat_jp=alamatBaru;
+    if(alamatHasil.kodepos)salin.kodepos=String(alamatHasil.kodepos);
+  }
   /* Perbarui ingatan lebih dulu supaya peta langsung memakai posisi baru
      walau langganan data tiba sesudahnya. */
-  if(idx>=0){if(pin)S.members[idx].pinManual=salin.pinManual;else delete S.members[idx].pinManual}
+  if(idx>=0){
+    if(pin)S.members[idx].pinManual=salin.pinManual;else delete S.members[idx].pinManual;
+    if(alamatBaru){S.members[idx].alamat_jp=salin.alamat_jp;if(alamatHasil.kodepos)S.members[idx].kodepos=salin.kodepos}
+  }
   await S.db.collection('members').doc(member.id).set(salin);
   return salin.pinManual||null;
+}
+/* ===== Geocoding TERBALIK untuk pin manual: titik pin -> TEKS ALAMAT =====
+   Peletakan pin manual mencatat ALAMAT titik itu, bukan angka lintang/
+   bujurnya. Sumber utama: Nominatim reverse berbahasa Jepang (tanpa
+   kunci API) — memberi prefektur, kota, distrik, blok, jalan, nomor,
+   dan kode pos. Cadangan: GSI reverse resmi Jepang (nama distrik
+   lv01Nm) untuk melengkapi hasil Nominatim yang hanya setingkat kota,
+   atau berdiri sendiri bila Nominatim tidak terjangkau.
+   Mengembalikan {alamat, kodepos} atau null bila titik itu memang
+   tidak beralamat (mis. tengah laut): pemanggil lalu TIDAK menimpa
+   alamat lama anggota. */
+function petaKodeposFormat(v){const d=String(v||'').replace(/\D/g,'');return d.length===7?d.slice(0,3)+'-'+d.slice(3):''}
+async function petaNomReverse(coords){
+  const jeda=1100-(Date.now()-PETA_GEO.lastNom);
+  if(PETA_GEO.lastNom&&jeda>0)await petaTunggu(jeda);
+  PETA_GEO.lastNom=Date.now();
+  const res=await fetch('https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat='+coords[0]+'&lon='+coords[1]+'&zoom=18&addressdetails=1&accept-language=ja',{headers:{'Accept':'application/json'}});
+  if(!res.ok)throw new Error('Nominatim reverse HTTP '+res.status);
+  const j=await res.json();
+  if(!j||j.error||!j.address)return null;
+  const a=j.address;
+  if(a.country_code&&a.country_code!=='jp')return null;
+  const ambil=(...ks)=>{for(const k of ks){if(a[k])return String(a[k])}return ''};
+  const pref=ambil('province','state');
+  const kota=ambil('city','town','village')||ambil('county');
+  /* Detail di bawah tingkat kota (distrik/blok/jalan/nomor) adalah bukti
+     titik ini benar-benar beralamat; hasil yang hanya setingkat kota
+     (mis. titik di perairan yang menempel batas administrasi kota)
+     tidak dianggap alamat. */
+  const rinci=['city_block','quarter','neighbourhood','suburb','city_district','road','house_number'].some(k=>a[k]);
+  /* Susun mengikuti urutan alamat Jepang: prefektur → kota → distrik →
+     blok → jalan → nomor; bagian yang sudah tercakup tidak diulang. */
+  const urutan=[pref,kota,ambil('city_district'),ambil('suburb'),ambil('quarter'),ambil('neighbourhood'),ambil('city_block'),ambil('road'),ambil('house_number')];
+  let alamat='';
+  urutan.forEach(bag=>{if(bag&&!alamat.includes(bag))alamat+=bag});
+  return {alamat,kodepos:petaKodeposFormat(a.postcode),rinci:rinci&&!!alamat,pref,kota};
+}
+async function petaGsiReverse(coords){
+  const res=await fetch('https://mreversegeocoder.gsi.go.jp/reverse-geocoder/LonLatToAddress?lat='+coords[0]+'&lon='+coords[1],{headers:{'Accept':'application/json'}});
+  if(!res.ok)throw new Error('GSI reverse HTTP '+res.status);
+  const j=await res.json();
+  const nama=j&&j.results?String(j.results.lv01Nm||'').trim():'';
+  return nama||null;
+}
+async function petaReverseGeocode(coords){
+  let nom=null;
+  try{nom=await petaNomReverse(coords)}catch(e){/* lanjut ke GSI */}
+  if(nom&&nom.rinci)return {alamat:nom.alamat,kodepos:nom.kodepos};
+  let gsi=null;
+  try{gsi=await petaGsiReverse(coords)}catch(e){/* kedua sumber gagal */}
+  if(gsi){
+    if(nom&&(nom.pref||nom.kota)){
+      let alamat='';
+      [nom.pref,nom.kota,gsi].forEach(bag=>{if(bag&&!alamat.includes(bag))alamat+=bag});
+      return {alamat,kodepos:nom.kodepos||''};
+    }
+    return {alamat:gsi,kodepos:nom?nom.kodepos||'':''};
+  }
+  /* Nominatim hanya memberi tingkat kota / kedua layanan kosong:
+     titik dianggap tidak beralamat. */
+  return null;
 }
 /* Bagi anggota menjadi yang terpetakan dan yang belum. Di v3, pin
    HANYA berasal dari hasil geocoding alamat/kode pos yang tersimpan di
@@ -642,13 +715,26 @@ function petaRenderMarkers(){
       mk.on('dragend',async()=>{
         const ll=mk.getLatLng();
         const baru=[ll.lat,ll.lng];
+        /* Titik baru dicarikan ALAMATNYA (geocoding terbalik): yang
+           disimpan ke field alamat anggota adalah teks alamat titik
+           itu, bukan angka koordinatnya. Bila alamat tidak ditemukan
+           (mis. titik di perairan), pin tetap disimpan dan alamat lama
+           anggota tidak berubah. */
+        petaSetFixNotice('Mencari alamat dari titik…');
+        let hasil=null;
+        try{hasil=await petaReverseGeocode(baru)}catch(e){hasil=null}
         try{
-          await simpanPinManualAnggota(m,{lat:baru[0],lng:baru[1]});
+          await simpanPinManualAnggota(m,{lat:baru[0],lng:baru[1]},hasil);
           en.coords=baru;en.manual=true;en.lvl='Posisi manual';
-          if(m&&typeof m==='object')m.pinManual=pinManualObj(baru);
+          if(m&&typeof m==='object'){
+            m.pinManual=pinManualObj(baru);
+            if(hasil){m.alamat_jp=hasil.alamat;if(hasil.kodepos)m.kodepos=hasil.kodepos}
+          }
           mk.setIcon(petaIcon(en,String(S.petaSelected)===en.key));
           mk.setPopupContent(petaPopupContent(en));
-          petaSetFixNotice('Posisi pin '+(m.nama||'anggota')+' disimpan');
+          petaSetFixNotice(hasil
+            ?('Posisi pin '+(m.nama||'anggota')+' disimpan — '+hasil.alamat)
+            :('Posisi pin '+(m.nama||'anggota')+' disimpan — alamat tidak ditemukan dari titik ini, alamat lama tidak berubah.'));
           if(String(S.petaSelected)===en.key)petaShowDetail(en);
           petaRenderList();
         }catch(error){
@@ -922,7 +1008,7 @@ function formPinCleanup(){
 }
 function formPinSetCoordsText(){
   const el=document.getElementById('form-pin-coords');if(!el)return;
-  if(FP.temp)el.textContent='Koordinat terpilih: '+FP.temp[0].toFixed(6)+', '+FP.temp[1].toFixed(6);
+  if(FP.temp)el.textContent='Pin terpilih di titik ini — tekan "Pakai Posisi Ini" dan alamat dari titik itu terisi otomatis ke field Alamat di Jepang.';
   else el.textContent='Belum ada titik dipilih — ketuk peta untuk meletakkan pin.';
 }
 function formPinSetMarker(coords){

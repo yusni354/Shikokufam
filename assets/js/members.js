@@ -24,7 +24,7 @@ function vMembers(){
           h('small',{},member.wa?memberValue('wa',member.wa):member.email||'Kontak belum diisi')),
         h('div',{class:'member-card-actions'},
           h('button',{class:'btn s',onclick:()=>openMember(member,'members')},'Lihat kartu ID'),
-          S.admin&&h('button',{class:'btn s btn-eh',onclick:()=>{S.form={...member};S.detail=null;render()}},icon('edit',15),h('span',{},'Edit')),
+          S.admin&&h('button',{class:'btn s btn-eh',onclick:()=>{S.form={...member};S.detail=null;S.formPinAlamatHasil='';render()}},icon('edit',15),h('span',{},'Edit')),
           S.admin&&h('button',{class:'btn s member-delete btn-eh',onclick:async()=>{
             if(!confirm('Hapus data anggota '+(member.nama||'ini')+'?'))return;
             try{await S.db.collection('members').doc(member.id).delete()}catch(error){console.error(error);alert('Gagal menghapus data anggota: '+(error.message||'periksa koneksi'))}
@@ -36,7 +36,7 @@ function vMembers(){
   draw();
   return [
     h('div',{class:'member-page-heading'},h('div',{},h('p',{class:'member-eyebrow'},'KOMUNITAS SHIKOKU FAMILY'),h('h1',{},'Daftar Anggota')),
-      S.admin&&h('button',{class:'btn',onclick:()=>{S.form={};S.detail=null;render()}},'+ Tambah Anggota')),
+      S.admin&&h('button',{class:'btn',onclick:()=>{S.form={};S.detail=null;S.formPinAlamatHasil='';render()}},'+ Tambah Anggota')),
     guard(),
     S.detail&&detailCard(),
     h('div',{class:'member-toolbar'},search,h('div',{class:'member-filters'},region)),
@@ -88,13 +88,13 @@ function detailCard(){
     ['Identitas & Keanggotaan',[['Nama lengkap',member.nama],['Nomor HP / WhatsApp',member.wa],['Nomor anggota',code],['Jenis kelamin',member.kelamin],['Tanggal lahir',member.lahir],['Umur',memberAge(member)===null?'-':memberAge(member)+' tahun'],['Peran',member.peran||'Anggota'],['Pernikahan',member.nikah],['MT',member.mt],['Email',member.email],['Instagram',member.instagram],['Facebook',member.facebook]]],
     ['Kontak & Keluarga',[['Nama pengurus daerah',member.pengurus],['Nomor HP pengurus daerah',member.hp_pengurus],['Nama orang tua',member.ortu],['Nomor HP orang tua',member.hp_ortu]]],
     ['Alamat Indonesia',[['Kelompok',member.kelompok],['Desa',member.desa],['Daerah',member.daerah],['Alamat Indonesia',member.alamat_id]]],
-    ['Alamat & Pekerjaan di Jepang',[['Kode pos',member.kodepos],['Alamat',member.alamat_jp],['Stasiun',member.stasiun],['Status visa',member.tinggal],['Bidang pekerjaan',member.bidang],['Perusahaan',member.perusahaan],['Posisi pin di peta',(typeof pinManualCoords==='function'&&pinManualCoords(member))?('Posisi manual ('+pinManualCoords(member)[0].toFixed(5)+', '+pinManualCoords(member)[1].toFixed(5)+')'):'Otomatis dari alamat']]],
+    ['Alamat & Pekerjaan di Jepang',[['Kode pos',member.kodepos],['Alamat',member.alamat_jp],['Stasiun',member.stasiun],['Status visa',member.tinggal],['Bidang pekerjaan',member.bidang],['Perusahaan',member.perusahaan],['Posisi pin di peta',(typeof pinManualCoords==='function'&&pinManualCoords(member))?('Posisi manual — '+(member.alamat_jp||'alamat belum terisi')):'Otomatis dari alamat']]],
     ['Catatan',[['Catatan',member.catatan]]]
   ];
   const qrValue=memberQrValue(member);
   return h('section',{class:'member-profile-page',style:'--region-color:'+regionColor(area)},
     h('div',{class:'member-profile-toolbar'},h('button',{class:'btn s',onclick:()=>{S.detail=null;const origin=S.detailOrigin;S.detailOrigin=null;S.view=origin==='landing'?'landing':'members';render()}},'← Kembali'),
-      S.admin&&h('button',{class:'btn s btn-eh',onclick:()=>{S.form={...member};S.detail=null;S.detailOrigin=null;render()}},icon('edit',15),h('span',{},'Edit data'))),
+      S.admin&&h('button',{class:'btn s btn-eh',onclick:()=>{S.form={...member};S.detail=null;S.detailOrigin=null;S.formPinAlamatHasil='';render()}},icon('edit',15),h('span',{},'Edit data'))),
     h('article',{class:'member-id-card'},
       h('div',{class:'member-id-banner'},h('span',{},'SHIKOKU FAMILY'),h('span',{class:'member-region-tag'},area)),
       h('div',{class:'member-id-main'},
@@ -103,7 +103,7 @@ function detailCard(){
       h('div',{class:'member-id-barcode'},h('b',{class:'member-barcode-label'},'QR CODE ABSENSI'),qrValue?h('img',{class:'member-qr-code','data-member-qr':qrValue,alt:'QR code untuk ID anggota'}):h('p',{class:'member-barcode-help'},'ID anggota belum tersedia.'),h('small',{class:'member-barcode-help','data-member-qr-status':'true'},qrValue?'Membuat QR code...':'QR code akan tersedia setelah ID anggota tersimpan.'))),
     ...sections.filter(([,rows])=>rows.some(([,value])=>value)).map(([title,rows])=>h('section',{class:'member-detail-section'},h('h3',{},title.toUpperCase()),h('div',{class:'member-detail-grid'},...rows.filter(([,value])=>value).map(([label,value])=>h('div',{class:'member-detail-item'},h('small',{},label.toUpperCase()),h('span',{},memberValue(label==='Nomor HP / WhatsApp'?'wa':label==='Nomor HP pengurus daerah'?'hp_pengurus':label==='Nomor HP orang tua'?'hp_ortu':label.toLowerCase(),value))))))),
     (member.surat||[]).length>0&&h('section',{class:'member-detail-section'},h('h3',{},'Foto Surat Sambung'),...(member.surat||[]).map((id,index)=>h('a',{class:'member-file-link',...memberMediaAttributes(id,'href'),target:'_blank',rel:'noopener'},icon('attachment',16),h('span',{},'Buka lampiran '+(index+1))))),
-    S.admin&&h('div',{class:'member-detail-actions'},h('button',{class:'btn btn-eh',onclick:()=>{S.form={...member};S.detail=null;S.detailOrigin=null;render()}},icon('edit',16),h('span',{},'Edit data anggota')))
+    S.admin&&h('div',{class:'member-detail-actions'},h('button',{class:'btn btn-eh',onclick:()=>{S.form={...member};S.detail=null;S.detailOrigin=null;S.formPinAlamatHasil='';render()}},icon('edit',16),h('span',{},'Edit data anggota')))
   );
 }
 
@@ -356,7 +356,7 @@ async function saveForm(){
     else delete f.pinManual;
   }
   const d={...f};delete d.id;Object.keys(d).forEach(key=>{if(typeof d[key]!=='string')return;const v=cleanMemberValue(d[key]);d[key]=key==='email'?v.toLowerCase():KEEP_CASE.includes(key)?v:v.toUpperCase()});d.peran=d.peran||'ANGGOTA';
-  try{if(f.id)await S.db.collection('members').doc(f.id).set(d);else await S.db.collection('members').add({...d,at:Date.now()});S.form=null;S.memberUploadState=null;S.formPinOpen=false;S.formPinTemp=null;render()}catch(e){console.error(e);alert('Tidak bisa menyimpan: '+(e.message||'periksa koneksi dan izin database'))}}
+  try{if(f.id)await S.db.collection('members').doc(f.id).set(d);else await S.db.collection('members').add({...d,at:Date.now()});S.form=null;S.memberUploadState=null;S.formPinOpen=false;S.formPinTemp=null;S.formPinAlamatHasil='';render()}catch(e){console.error(e);alert('Tidak bisa menyimpan: '+(e.message||'periksa koneksi dan izin database'))}}
 function memberFormCard(){
   const f=S.form;
   if(!f.id&&!f.kode){
@@ -385,8 +385,10 @@ function memberFormCard(){
       h('div',{class:'form-pin-head'},h('b',{},'Posisi Pin di Peta'),h('span',{class:'form-pin-sumber'},manual?'Posisi manual':'Otomatis dari alamat'))
     ];
     anak.push(h('p',{class:'sub form-pin-note'},manual
-      ?'Pin manual tersimpan: '+manual[0].toFixed(6)+', '+manual[1].toFixed(6)+'. Posisi ini dipakai di Peta & Wilayah dan tidak digeser oleh geocoding otomatis.'
-      :'Belum ada pin manual. Posisi pin ditentukan otomatis dari alamat & kode pos. Letakkan pin sendiri bila posisi otomatis kurang tepat.'));
+      ?(S.formPinAlamatHasil
+        ?'Alamat dari titik pin: '+S.formPinAlamatHasil+' — alamat ini sudah terisi di field Alamat di Jepang dan ikut tersimpan saat formulir disimpan. Posisi pin ini dipakai di Peta & Wilayah dan tidak digeser oleh geocoding otomatis.'
+        :'Pin manual tersimpan. Alamat di field Alamat di Jepang mengikuti titik pin ini, dan posisi pin tidak digeser oleh geocoding otomatis.')
+      :'Belum ada pin manual. Posisi pin ditentukan otomatis dari alamat & kode pos. Letakkan pin sendiri bila posisi otomatis kurang tepat — alamat dari titik pin akan terisi otomatis ke field Alamat di Jepang.'));
     const tombol=[
       h('button',{type:'button',class:'btn s',onclick:()=>{
         if(!S.admin){alert('Hanya admin yang dapat meletakkan pin.');return}
@@ -395,19 +397,44 @@ function memberFormCard(){
         setTimeout(()=>{const el=document.getElementById('form-pin-map');if(el)el.scrollIntoView({behavior:'smooth',block:'center'})},80);
       }},manual?'Ubah Posisi Pin':'Letakkan Pin di Peta')
     ];
-    if(manual)tombol.push(h('button',{type:'button',class:'btn s',onclick:()=>{delete f.pinManual;S.formPinTemp=null;S.formPinOpen=false;render()}},'Hapus Pin Manual'));
+    if(manual)tombol.push(h('button',{type:'button',class:'btn s',onclick:()=>{delete f.pinManual;S.formPinTemp=null;S.formPinOpen=false;S.formPinAlamatHasil='';render()}},'Hapus Pin Manual'));
     anak.push(h('div',{class:'fl form-pin-actions'},...tombol));
     if(S.formPinOpen){
       anak.push(h('div',{class:'form-pin-panel'},
-        h('p',{class:'sub',style:'margin:0 0 8px'},'Ketuk peta untuk meletakkan pin, atau geser penanda ke posisi yang tepat.'),
+        h('p',{class:'sub',style:'margin:0 0 8px'},'Ketuk peta untuk meletakkan pin, atau geser penanda ke posisi yang tepat. Sesudah menekan "Pakai Posisi Ini", alamat dari titik itu terisi otomatis ke field Alamat di Jepang (dan Kode Pos bila tersedia).'),
         h('div',{id:'form-pin-map',role:'application','aria-label':'Peta untuk meletakkan pin anggota'}),
-        h('p',{class:'form-pin-coords',id:'form-pin-coords'},manual?('Koordinat terpilih: '+manual[0].toFixed(6)+', '+manual[1].toFixed(6)):'Belum ada titik dipilih — ketuk peta untuk meletakkan pin.'),
+        h('p',{class:'form-pin-coords',id:'form-pin-coords'},manual?'Pin manual sudah terpasang — ketuk titik baru atau geser penanda bila ingin mengubahnya.':'Belum ada titik dipilih — ketuk peta untuk meletakkan pin.'),
         h('div',{class:'fl'},
-          h('button',{type:'button',class:'btn s',onclick:()=>{
+          h('button',{type:'button',class:'btn s',onclick:async()=>{
             const t=S.formPinTemp;
             if(!t||t.length!==2){alert('Ketuk peta dulu untuk memilih titik pin.');return}
+            if(S.formPinBusy)return;
+            S.formPinBusy=true;
             f.pinManual={lat:Number(Number(t[0]).toFixed(6)),lng:Number(Number(t[1]).toFixed(6))};
+            /* Geocoding terbalik atas titik terpilih: yang dicatat di
+               field alamat adalah TEKS ALAMAT titik itu, bukan angka
+               koordinatnya. Alamat tidak ditemukan -> field alamat lama
+               tidak ditimpa, pin tetap dipakai. */
+            const status=document.getElementById('form-pin-coords');
+            if(status)status.textContent='Mencari alamat dari titik…';
+            let hasil=null;
+            try{hasil=(typeof petaReverseGeocode==='function')?await petaReverseGeocode(t):null}catch(e){hasil=null}
+            S.formPinBusy=false;
+            if(hasil&&hasil.alamat){
+              f.alamat_jp=hasil.alamat;
+              if(hasil.kodepos)f.kodepos=hasil.kodepos;
+              S.formPinAlamatHasil=hasil.alamat;
+              const loc=inferJapanLocation(hasil.alamat,hasil.kodepos||'');
+              if(loc){
+                if(!f.pref)f.pref=loc.pref.toUpperCase();
+                if(!f.wilayah)f.wilayah=loc.wilayah.toUpperCase();
+                if(!f.kota&&loc.kota)f.kota=loc.kota.toUpperCase();
+              }
+            }else{
+              S.formPinAlamatHasil='';
+            }
             S.formPinOpen=false;S.formPinTemp=null;render();
+            if(!hasil)alert('Alamat tidak ditemukan dari titik ini — alamat bisa diisi manual');
           }},'Pakai Posisi Ini'),
           h('button',{type:'button',class:'btn s',onclick:()=>{S.formPinOpen=false;S.formPinTemp=null;render()}},'Batal'))));
     }
@@ -418,7 +445,7 @@ function memberFormCard(){
     h('div',{class:'fl'},pick('Ambil / foto dokumen','image/*,application/pdf',1,file=>up(file,'surat',1)),pick('Pilih dokumen','image/*,application/pdf',0,file=>up(file,'surat',1))),
     dropZone('Tambah foto atau PDF surat sambung','image/*,application/pdf','surat',1));
   return h('div',{class:'member-editor'},
-    h('div',{class:'member-editor-heading'},h('button',{class:'btn s',onclick:()=>{S.form=null;S.formPinOpen=false;S.formPinTemp=null;render()}},'← Kembali'),
+    h('div',{class:'member-editor-heading'},h('button',{class:'btn s',onclick:()=>{S.form=null;S.formPinOpen=false;S.formPinTemp=null;S.formPinAlamatHasil='';render()}},'← Kembali'),
       h('div',{},h('p',{class:'member-eyebrow'},'DATA KOMUNITAS'),h('h1',{},f.id?'Edit data anggota':'Anggota baru'))),
     topCard(),
     box(h('div',{class:'member-section-heading'},h('b',{},'Profil anggota')),
@@ -432,7 +459,7 @@ function memberFormCard(){
       S.admin?pinBox():null),
     photoBox(),documentBox(),
     box(h('div',{class:'member-section-heading'},h('b',{},'Catatan tambahan')),fld('Catatan','catatan',{area:1})),
-    h('div',{class:'member-editor-actions'},h('button',{class:'btn s',onclick:()=>{S.form=null;S.formPinOpen=false;S.formPinTemp=null;render()}},'Batal'),h('button',{class:'btn',onclick:saveForm},f.id?'Simpan perubahan':'Simpan anggota'))
+    h('div',{class:'member-editor-actions'},h('button',{class:'btn s',onclick:()=>{S.form=null;S.formPinOpen=false;S.formPinTemp=null;S.formPinAlamatHasil='';render()}},'Batal'),h('button',{class:'btn',onclick:saveForm},f.id?'Simpan perubahan':'Simpan anggota'))
   );
 }
 
@@ -1053,12 +1080,15 @@ function orgTabel(nodes){
     h('div',{class:'org-summary-item'},h('b',{},String(groups.length)),h('span',{},'Kelompok')));
   const hint=h('p',{class:'org-hint'},'Daftar disusun mengikuti urutan kepengurusan dari nomor 1 dan seterusnya. Ketuk nama pengurus untuk melihat kartu ID-nya.');
   let urutGlobal=0;
-  const groupEls=groups.map(grup=>{
+  const groupEls=groups.map((grup,gi)=>{
     const rows=grup.items.map(item=>{
       urutGlobal+=1;
       return orgRow(nodes,item,urutGlobal);
     });
-    return h('section',{class:'org-table-group'},
+    /* Tiap kelompok mendapat kelas palet pastel berputar (org-pal-0..4)
+       supaya warna kepala kelompok dan baris-barisnya berbeda dari
+       kelompok lain dan mudah dibedakan sekilas. */
+    return h('section',{class:'org-table-group org-pal org-pal-'+(gi%5)},
       orgKepalaKelompok(grup),
       h('div',{class:'org-table'+(S.admin?' org-table-admin':'')},
         h('div',{class:'org-row org-row-head org-row-head-v2'},
@@ -1069,13 +1099,22 @@ function orgTabel(nodes){
           S.admin?h('span',{},''):null),
         ...rows));
   });
+  /* Tombol '+ Tambah Dapukan Baru' (khusus admin) kini berada di BAGIAN
+     BAWAH kartu: sesudah baris terakhir, sebagai kaki kartu kelompok
+     terakhir — bukan lagi di bilah atas. */
+  if(S.admin&&groupEls.length){
+    const lastTable=groupEls[groupEls.length-1].querySelector('.org-table');
+    if(lastTable)lastTable.append(h('div',{class:'org-table-foot'},
+      h('button',{class:'btn org-add-btn',onclick:()=>bukaPanelSusunan('tambah',null)},'+ Tambah Dapukan Baru')));
+  }
   return h('div',{class:'org-table-wrap'},summary,hint,...groupEls);
 }
 /* Halaman Kepengurusan: langsung menampilkan susunan berbasis tabel
    (tanpa pemilih Bagan/Tabel dan tanpa tampilan hierarki). Tidak ada
    mode khusus untuk mengatur: bagi ADMIN semua alat pengaturan tampil
-   langsung dan selalu di tabel — tombol '+ Tambah Dapukan Baru' dan
-   'Kembalikan Susunan Awal' di atas tabel, tombol Atur pada tiap baris
+   langsung dan selalu di tabel — tombol 'Kembalikan Susunan Awal' di
+   atas tabel, tombol '+ Tambah Dapukan Baru' di BAGIAN BAWAH kartu
+   tabel (kaki kelompok terakhir), tombol Atur pada tiap baris
    (membuka satu kartu 'Pengaturan Dapukan'), dan ikon pensil pada tiap
    kepala kelompok untuk mengubah tulisannya. Anggota biasa hanya
    melihat tabel yang bersih. */
@@ -1084,13 +1123,12 @@ function vSusunan(){
   const out=[h('h1',{},'Kepengurusan'),guard()];
   if(S.admin){
     out.push(h('div',{class:'org-atur-bar'},
-      h('button',{class:'btn',onclick:()=>bukaPanelSusunan('tambah',null)},'+ Tambah Dapukan Baru'),
       h('button',{class:'btn s',onclick:async()=>{
         if(!confirm('Kembalikan susunan ke dapukan bawaan? Dapukan tambahan akan hilang dan susunan kembali seperti semula; pemegang dapukan bawaan dipertahankan sebisa mungkin.'))return;
         try{await kembalikanSusunanAwal();S.susunanPanel=null;render()}
         catch(error){console.error(error);alert('Gagal mengembalikan susunan awal: '+(error.message||'periksa koneksi'))}
       }},'Kembalikan Susunan Awal'),
-      h('p',{class:'sub org-atur-note'},'Pengaturan ada langsung di tabel ini: ketuk tombol Atur pada baris sebuah dapukan untuk membuka satu kartu pengaturannya — ganti nama, tetapkan pemegang, geser posisi (Naik/Turun dan pindah induk), tambah dapukan (sejajar atau di bawah dapukan itu), dan hapus dapukan semuanya di kartu tersebut. Tulisan kepala kelompok (mis. "'+labelKelompokPuncak()+'") bisa diubah lewat ikon pensil di sampingnya.')
+      h('p',{class:'sub org-atur-note'},'Pengaturan ada langsung di tabel ini: ketuk tombol Atur pada baris sebuah dapukan untuk membuka satu kartu pengaturannya — ganti nama, tetapkan pemegang, geser posisi (Naik/Turun dan pindah induk), tambah dapukan (sejajar atau di bawah dapukan itu), dan hapus dapukan semuanya di kartu tersebut. Tombol "+ Tambah Dapukan Baru" ada di bagian bawah tabel. Tulisan kepala kelompok (mis. "'+labelKelompokPuncak()+'") bisa diubah lewat ikon pensil di sampingnya.')
     ));
   }
   if(S.admin&&S.susunanPanel){
