@@ -119,6 +119,18 @@ function activityCard(event){
   const expanded=String(S.activityExpanded)===String(event.id);
   const totals={hadir:0,izin:0,cuti:0,alpha:0};
   Object.values(activityStatusMap(event)).forEach(st=>{if(totals[st]!=null)totals[st]++});
+  /* Persentase tiap total dihitung dari TOTAL KESELURUHAN ANGGOTA
+     aktif (semua wilayah, populasi yang sama dengan daftar absensi).
+     Bila belum ada anggota sama sekali, persentase tidak ditampilkan
+     supaya tidak ada pembagian dengan nol. */
+  const totalAnggota=registeredMembers.length;
+  const pctOf=n=>totalAnggota?Math.round(n/totalAnggota*100):null;
+  const countPill=(cls,label,n)=>{
+    const p=pctOf(n);
+    return p===null
+      ?h('b',{class:cls},label+' '+n)
+      :h('b',{class:cls},label+' '+n,h('span',{class:'activity-pct'},'('+p+'%)'));
+  };
   /* Tahap 1: pilih wilayah dulu. Daftar anggota BELUM tampil di sini;
      admin mengetuk satu wilayah untuk masuk ke halaman pengabsenannya. */
   const regionPick=(region,color)=>{
@@ -138,7 +150,7 @@ function activityCard(event){
       try{await S.db.collection('events').doc(event.id).delete()}catch(error){console.error(error);alert('Gagal menghapus kegiatan: '+(error.message||'periksa koneksi'))}
     }},'Hapus kegiatan'),h('span',{class:'activity-chevron','aria-hidden':'true'},'›'))),
     event.deskripsi&&h('p',{class:'activity-description'},event.deskripsi),
-    h('div',{class:'activity-counts','aria-label':'Total absensi kegiatan'},h('b',{class:'c-hadir'},'Hadir '+totals.hadir),h('b',{class:'c-izin'},'Izin '+totals.izin),h('b',{class:'c-cuti'},'Cuti '+totals.cuti),h('b',{class:'c-alpha'},'Alpha '+totals.alpha))
+    h('div',{class:'activity-counts','aria-label':'Total absensi kegiatan'},countPill('c-hadir','Hadir',totals.hadir),countPill('c-izin','Izin',totals.izin),countPill('c-cuti','Cuti',totals.cuti),countPill('c-alpha','Alpha',totals.alpha))
   ];
   if(expanded)content.push(
     event.lokasi&&h('p',{class:'activity-meta'},icon('pin',15),h('span',{},event.lokasi)),
