@@ -322,27 +322,89 @@ function vAbsensiFokus(event,region){
     summary.textContent=done+' dari '+members.length+' anggota sudah dicatat · '+counts.hadir+' hadir · '+counts.izin+' izin · '+counts.cuti+' cuti · '+alpha+' alpha';
   };
   const feedback=h('p',{class:'activity-feedback','aria-live':'polite'},'');
+  /* ===== Seret-untuk-mengisi (drag fill) pada segmen status =====
+     Menekan tombol status lalu menyeret ke atas/bawah mengisi semua
+     baris yang dilewati dengan status yang sama, langsung pada DRAF
+     (tersimpan hanya lewat 'Simpan absensi', sama seperti ketukan).
+     Ketukan biasa tanpa seret tetap berperilaku lama (pilih / ketuk
+     status yang sama untuk membatalkan) lewat onclick di bawah;
+     klik yang mengikuti akhir sebuah seretan ditelan memakai
+     penanda waktu suppressClickUntil supaya baris awal tidak malah
+     ter-batalkan. Gulir halaman dari luar segmen status tidak
+     terganggu: pencegahan gulir hanya berasal dari segmen itu
+     sendiri (touch-action:none di CSS + preventDefault saat aktif). */
+  const rowSegs=new Map();
+  let suppressClickUntil=0;
+  const paintRow=id=>{
+    const seg=rowSegs.get(id);
+    if(!seg)return;
+    seg.querySelectorAll('.absensi-opt').forEach(btn=>{
+      const on=draft[id]===btn.getAttribute('data-st');
+      btn.classList.toggle('on',on);
+      btn.setAttribute('aria-pressed',on?'true':'false');
+    });
+  };
+  const applyDragRange=(fromIdx,toIdx,key)=>{
+    const lo=Math.min(fromIdx,toIdx),hi=Math.max(fromIdx,toIdx);
+    for(let i=lo;i<=hi;i++){
+      const mid=String(members[i].id);
+      if(draft[mid]!==key){draft[mid]=key;paintRow(mid)}
+    }
+    feedback.textContent='';
+    updateSummary();
+  };
+  const startDragFill=(e,startId,key)=>{
+    if(e.button!=null&&e.button>0)return;
+    const startIdx=members.findIndex(m=>String(m.id)===startId);
+    if(startIdx<0)return;
+    const pointerId=e.pointerId,startY=e.clientY;
+    let active=false;
+    const onMove=ev=>{
+      if(ev.pointerId!==pointerId)return;
+      if(!active){
+        if(Math.abs(ev.clientY-startY)<8)return;
+        active=true;
+      }
+      if(ev.cancelable)ev.preventDefault();
+      const el=document.elementFromPoint(ev.clientX,ev.clientY);
+      const rowEl=el&&el.closest?el.closest('.absensi-row'):null;
+      if(!rowEl)return;
+      const targetIdx=members.findIndex(m=>String(m.id)===String(rowEl.getAttribute('data-mid')));
+      if(targetIdx<0)return;
+      applyDragRange(startIdx,targetIdx,key);
+    };
+    const onUp=ev=>{
+      if(ev.pointerId!==pointerId)return;
+      window.removeEventListener('pointermove',onMove);
+      window.removeEventListener('pointerup',onUp);
+      window.removeEventListener('pointercancel',onUp);
+      if(active)suppressClickUntil=Date.now()+400;
+    };
+    window.addEventListener('pointermove',onMove,{passive:false});
+    window.addEventListener('pointerup',onUp);
+    window.addEventListener('pointercancel',onUp);
+  };
   const memberRow=member=>{
     const id=String(member.id);
     const info=h('div',{class:'absensi-info'},h('b',{},member.nama||'Tanpa nama'));
     if(!S.admin){
       const st=draft[id]||'';
       const label=st?ABSENSI_STATUS.find(([key])=>key===st)[1]:'Belum dicatat';
-      return h('div',{class:'absensi-row'},info,h('span',{class:'absensi-chip'+(st?' st-'+st:'')},label));
+      return h('div',{class:'absensi-row','data-mid':id},info,h('span',{class:'absensi-chip'+(st?' st-'+st:'')},label));
     }
     const seg=h('div',{class:'absensi-seg',role:'radiogroup','aria-label':'Status kehadiran '+(member.nama||'anggota')},
-      ...ABSENSI_PILIHAN.map(([key,label])=>h('button',{type:'button',class:'absensi-opt'+(draft[id]===key?' on':''),'data-st':key,'aria-pressed':draft[id]===key?'true':'false',onclick:()=>{
-        if(draft[id]===key)delete draft[id];
-        else draft[id]=key;
-        seg.querySelectorAll('.absensi-opt').forEach(btn=>{
-          const on=draft[id]===btn.getAttribute('data-st');
-          btn.classList.toggle('on',on);
-          btn.setAttribute('aria-pressed',on?'true':'false');
-        });
-        feedback.textContent='';
-        updateSummary();
-      }},label)));
-    return h('div',{class:'absensi-row'},info,seg);
+      ...ABSENSI_PILIHAN.map(([key,label])=>h('button',{type:'button',class:'absensi-opt'+(draft[id]===key?' on':''),'data-st':key,'aria-pressed':draft[id]===key?'true':'false',
+        onpointerdown:e=>startDragFill(e,id,key),
+        onclick:()=>{
+          if(Date.now()<suppressClickUntil)return;
+          if(draft[id]===key)delete draft[id];
+          else draft[id]=key;
+          paintRow(id);
+          feedback.textContent='';
+          updateSummary();
+        }},label)));
+    rowSegs.set(id,seg);
+    return h('div',{class:'absensi-row','data-mid':id},info,seg);
   };
   updateSummary();
   return h('section',{class:'card absensi-card'},
@@ -354,7 +416,7 @@ function vAbsensiFokus(event,region){
     h('div',{class:'absensi-region-title'},h('span',{class:'absensi-dot',style:'background:'+color}),h('h3',{},'Wilayah '+region)),
     summary,
     members.length?h('div',{class:'absensi-list'},...members.map(memberRow)):h('p',{class:'activity-empty'},'Belum ada anggota di wilayah ini.'),
-    S.admin&&h('p',{class:'activity-help'},'Ketuk salah satu status di kanan nama anggota. Ketuk status yang sama sekali lagi untuk membatalkan pilihan. Anggota yang tidak dipilih statusnya terhitung Alpha.'),
+    S.admin&&h('p',{class:'activity-help'},'Ketuk salah satu status di kanan nama anggota. Ketuk status yang sama sekali lagi untuk membatalkan pilihan. Tekan lalu seret satu status ke baris-baris lain untuk mengisi banyak anggota sekaligus dengan status yang sama. Anggota yang tidak dipilih statusnya terhitung Alpha.'),
     S.admin&&h('div',{class:'absensi-savebar'},
       h('button',{class:'btn',onclick:async()=>{
         try{
@@ -743,6 +805,54 @@ function vRingkasan(){
       :h('p',{class:'warn'},'Belum ada anggota aktif.'));
   return [...head,summaryCard,rekapCard,h('div',{class:'activity-list'},...events.map(item))];
 }
+/* ===== Pengulangan bulanan pada formulir Buat Kegiatan =====
+   Tanggal pada formulir adalah AWAL rangkaian. Untuk pola 'tanggal',
+   tanggalnya tetap tiap bulan; bila tanggal itu tidak ada pada suatu
+   bulan (mis. 31 di Februari), dipakai hari terakhir bulan tersebut.
+   Untuk pola 'minggu', dipakai hari yang sama pada minggu ke-n tiap
+   bulan (atau kemunculan terakhir hari itu bila memilih 'Terakhir').
+   Rangkaian berisi 12 kejadian: kejadian pertama adalah tanggal yang
+   sesuai pola pada/setelah tanggal awal, lalu satu per bulan sesudahnya.
+   Hasilnya dokumen events BIASA yang berdiri sendiri-sendiri — tidak
+   ada aturan pengulangan yang disimpan. */
+function activityDateKey(d){
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function activityMonthShort(d){
+  return d.toLocaleDateString('id-ID',{month:'short',year:'numeric'});
+}
+function activityMonthlyByDay(y,m,day){
+  const dim=new Date(y,m+1,0).getDate();
+  return new Date(y,m,Math.min(day,dim));
+}
+function activityMonthlyByWeek(y,m,week,weekday){
+  if(week==='last'){
+    const last=new Date(y,m+1,0);
+    return new Date(y,m,last.getDate()-((last.getDay()-weekday+7)%7));
+  }
+  const n=parseInt(week,10)||1;
+  const first=new Date(y,m,1);
+  let day=1+((weekday-first.getDay()+7)%7)+(n-1)*7;
+  const dim=new Date(y,m+1,0).getDate();
+  if(day>dim)day-=7;
+  return new Date(y,m,day);
+}
+function activityRecurringDates(startValue,mode,opts){
+  const parts=String(startValue).split('-').map(Number);
+  const start=new Date(parts[0],(parts[1]||1)-1,parts[2]||1);
+  const dates=[];
+  let offset=0;
+  while(dates.length<12&&offset<48){
+    const base=new Date(start.getFullYear(),start.getMonth()+offset,1);
+    const y=base.getFullYear(),m=base.getMonth();
+    const candidate=mode==='tanggal'
+      ?activityMonthlyByDay(y,m,opts.day)
+      :activityMonthlyByWeek(y,m,opts.week,opts.weekday);
+    if(candidate>=start)dates.push(candidate);
+    offset++;
+  }
+  return dates;
+}
 function vKegiatan(){
   /* Tahap 2 aktif: tampilkan hanya halaman pengabsenan wilayah terpilih */
   if(S.absensiRegion){
@@ -754,6 +864,44 @@ function vKegiatan(){
   const date=h('input',{type:'date'});
   const time=h('input',{type:'time'});
   const location=h('input',{placeholder:'Lokasi kegiatan',maxlength:'180'});
+  /* Pengulangan bulanan: pilihan utama selebar penuh di bawah dua baris
+     field yang ada; sub-pemilihnya hanya tampil sesuai pilihan. */
+  const repeat=h('select',{'aria-label':'Pengulangan kegiatan'},
+    h('option',{value:'sekali'},'Sekali saja'),
+    h('option',{value:'bulanan-tanggal'},'Setiap bulan — tanggal tertentu'),
+    h('option',{value:'bulanan-minggu'},'Setiap bulan — minggu tertentu'));
+  const repeatDay=h('select',{'aria-label':'Tanggal pengulangan bulanan'},
+    ...Array.from({length:31},(_,i)=>h('option',{value:String(i+1)},String(i+1))));
+  const repeatWeek=h('select',{'aria-label':'Minggu ke- pengulangan bulanan'},
+    h('option',{value:'1'},'1'),
+    h('option',{value:'2'},'2'),
+    h('option',{value:'3'},'3'),
+    h('option',{value:'4'},'4'),
+    h('option',{value:'last'},'Terakhir'));
+  const repeatWeekday=h('select',{'aria-label':'Hari pengulangan bulanan'},
+    h('option',{value:'1'},'Senin'),
+    h('option',{value:'2'},'Selasa'),
+    h('option',{value:'3'},'Rabu'),
+    h('option',{value:'4'},'Kamis'),
+    h('option',{value:'5'},'Jumat'),
+    h('option',{value:'6'},'Sabtu'),
+    h('option',{value:'0'},'Minggu'));
+  const repeatDateWrap=h('div',{class:'activity-repeat-sub',style:'display:none'},
+    h('label',{class:'activity-field'},'Tanggal',repeatDay));
+  const repeatWeekWrap=h('div',{class:'activity-repeat-sub activity-repeat-week',style:'display:none'},
+    h('label',{class:'activity-field'},'Minggu ke-',repeatWeek),
+    h('label',{class:'activity-field'},'Hari',repeatWeekday));
+  const repeatFeedback=h('p',{class:'activity-feedback','aria-live':'polite'},'');
+  repeat.onchange=()=>{
+    repeatDateWrap.style.display=repeat.value==='bulanan-tanggal'?'':'none';
+    repeatWeekWrap.style.display=repeat.value==='bulanan-minggu'?'':'none';
+    /* Bawaan tanggal mengikuti tanggal awal yang sudah diisi */
+    if(repeat.value==='bulanan-tanggal'&&date.value){
+      const d=parseInt(String(date.value).split('-')[2],10);
+      if(d>=1&&d<=31)repeatDay.value=String(d);
+    }
+    repeatFeedback.textContent='';
+  };
   const events=[...S.events].sort((a,b)=>(b.tanggal||'').localeCompare(a.tanggal||'')||(b.at||0)-(a.at||0));
   const createForm=S.admin&&h('section',{class:'card activity-create'},h('h2',{},'Buat kegiatan'),
     h('div',{class:'activity-create-grid'},
@@ -761,14 +909,38 @@ function vKegiatan(){
       h('label',{class:'activity-field'},'Lokasi',location),
       h('label',{class:'activity-field'},'Tanggal *',date),
       h('label',{class:'activity-field'},'Waktu',time)),
+    h('label',{class:'activity-field activity-repeat-field'},'Pengulangan',repeat),
+    repeatDateWrap,
+    repeatWeekWrap,
     h('button',{class:'btn',onclick:async()=>{
       const judul=title.value.trim();
       if(!judul||!date.value){alert('Isi nama dan tanggal kegiatan.');return}
+      const lokasi=location.value.trim();
       try{
-        await S.db.collection('events').add({judul,tanggal:date.value,waktu:time.value,lokasi:location.value.trim(),peserta_anggota:[],hadir_anggota:[],at:Date.now()});
+        if(repeat.value==='sekali'){
+          await S.db.collection('events').add({judul,tanggal:date.value,waktu:time.value,lokasi,peserta_anggota:[],hadir_anggota:[],at:Date.now()});
+        }else{
+          const mode=repeat.value==='bulanan-tanggal'?'tanggal':'minggu';
+          const dates=activityRecurringDates(date.value,mode,{
+            day:parseInt(repeatDay.value,10)||1,
+            week:repeatWeek.value,
+            weekday:parseInt(repeatWeekday.value,10)||0
+          });
+          const baseAt=Date.now();
+          for(let i=0;i<dates.length;i++){
+            await S.db.collection('events').add({judul,tanggal:activityDateKey(dates[i]),waktu:time.value,lokasi,peserta_anggota:[],hadir_anggota:[],at:baseAt+i});
+          }
+          const pesan=dates.length+' kegiatan dibuat ('+activityMonthShort(dates[0])+' – '+activityMonthShort(dates[dates.length-1])+')';
+          repeatFeedback.textContent=pesan;
+          alert(pesan);
+        }
         title.value='';date.value='';time.value='';location.value='';
+        repeat.value='sekali';
+        repeatDateWrap.style.display='none';
+        repeatWeekWrap.style.display='none';
       }catch(error){console.error(error);alert('Gagal membuat kegiatan: '+(error.message||'periksa koneksi'))}
-    }},'Buat kegiatan'));
+    }},'Buat kegiatan'),
+    repeatFeedback);
   return [
     h('h1',{},'Kegiatan'),
     guard(),
