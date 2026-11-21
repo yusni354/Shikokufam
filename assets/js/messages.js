@@ -25,12 +25,18 @@ function updateMessageBadges(){
     badge.textContent=value;
     badge.style.display=S.unreadMessages>0?'':'none';
   });
-  const nav=document.querySelector('[data-message-nav]');
-  if(nav){
-    let badge=nav.querySelector('.nav-badge');
-    if(S.unreadMessages>0&&!badge){badge=h('span',{class:'nav-badge'},value);nav.append(badge)}
+  /* Lencana menu Pesan hidup di dua tempat: item drawer (data-message-nav)
+     dan tombol navigasi bawah (data-message-tab). Keduanya disinkronkan di
+     sini supaya pesan baru yang tiba lewat realtime langsung menaikkan
+     angka di semua tombol navigasi tanpa menggambar ulang halaman. */
+  const syncBadge=(anchor,badgeClass)=>{
+    if(!anchor)return;
+    let badge=anchor.querySelector('.'+badgeClass);
+    if(S.unreadMessages>0&&!badge){badge=h('span',{class:badgeClass},value);anchor.append(badge)}
     if(badge){badge.textContent=value;badge.style.display=S.unreadMessages>0?'':'none'}
-  }
+  };
+  syncBadge(document.querySelector('[data-message-nav]'),'nav-badge');
+  syncBadge(document.querySelector('[data-message-tab]'),'tab-badge');
 }
 function userMessageSeen(){
   try{return JSON.parse(localStorage.getItem('shikoku-family:message-seen:'+S.uid)||'{}')}catch(e){return {}}

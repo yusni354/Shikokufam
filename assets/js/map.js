@@ -11,13 +11,17 @@ async function loadMapSettings(){
 }
 async function loadPendingUsers(){
   if(!S.supabase){
-    if(!S.mainAdmin){S.pendingUsers=[];S.approvedUsers=[];return}
-    const ringkas=user=>({id:user.id,name:user.name,email:user.email,created_at:user.created_at,approval_status:user.approval_status,approved_at:user.approved_at||null,approved_by:user.approved_by||'',role:user.role,is_main_admin:user.is_main_admin===true,avatar_url:user.avatar_url||''});
-    S.pendingUsers=localUsers().filter(user=>user.approval_status==='pending').map(ringkas);
-    S.approvedUsers=localUsers().filter(user=>user.approval_status==='approved').map(ringkas);
+    if(!S.mainAdmin){S.pendingUsers=[];S.approvedUsers=[]}
+    else{
+      const ringkas=user=>({id:user.id,name:user.name,email:user.email,created_at:user.created_at,approval_status:user.approval_status,approved_at:user.approved_at||null,approved_by:user.approved_by||'',role:user.role,is_main_admin:user.is_main_admin===true,avatar_url:user.avatar_url||''});
+      S.pendingUsers=localUsers().filter(user=>user.approval_status==='pending').map(ringkas);
+      S.approvedUsers=localUsers().filter(user=>user.approval_status==='approved').map(ringkas);
+    }
+    /* Lencana navigasi Persetujuan mengikuti daftar terbaru ini juga */
+    if(typeof updateApprovalBadges==='function')updateApprovalBadges();
     return;
   }
-  if(!S.mainAdmin){S.pendingUsers=[];S.approvedUsers=[];return}
+  if(!S.mainAdmin){S.pendingUsers=[];S.approvedUsers=[];if(typeof updateApprovalBadges==='function')updateApprovalBadges();return}
   const {data,error}=await S.supabase.from('profiles').select('id,name,email,created_at,approval_status').eq('approval_status','pending').order('created_at',{ascending:true});
   if(error){console.error(error);S.pendingUsers=[]}else S.pendingUsers=data||[];
   /* Catatan akun yang sudah disetujui untuk tab 'Sudah Disetujui'.
@@ -25,6 +29,7 @@ async function loadPendingUsers(){
      region warisan) ikut terbaca bila ada, tanpa gagal bila belum ada. */
   const disetujui=await S.supabase.from('profiles').select('*').eq('approval_status','approved');
   if(disetujui.error){console.error(disetujui.error);S.approvedUsers=[]}else S.approvedUsers=disetujui.data||[];
+  if(typeof updateApprovalBadges==='function')updateApprovalBadges();
 }
 function csvEsc(v){v=String(v==null?'':v);return(v.includes(',')||v.includes('"')||v.includes(String.fromCharCode(10)))?'"'+v.split('"').join('""')+'"':v}
 async function exportMyMaps(det){

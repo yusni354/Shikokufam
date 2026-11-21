@@ -10,7 +10,7 @@ header b{letter-spacing:.45px;font-size:14px}
 .ic{width:38px;height:38px;padding:0;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.28);border-radius:13px;display:grid;place-items:center;color:inherit}
 .app-icon{display:inline-block;flex:none;vertical-align:middle}
 .settings-wrap{display:none;position:relative;margin-left:auto}
-.header-action{display:grid;place-items:center;width:40px;height:40px;padding:0;border:1px solid rgba(255,255,255,.55);border-radius:999px;background:rgba(255,255,255,.14);color:#fff}
+.header-action{position:relative;display:grid;place-items:center;width:40px;height:40px;padding:0;border:1px solid rgba(255,255,255,.55);border-radius:999px;background:rgba(255,255,255,.14);color:#fff}
 .user-profile{display:none;align-items:center;gap:8px;min-width:0}
 .user-avatar{width:32px;height:32px;border-radius:50%;object-fit:cover;background:rgba(255,255,255,.2);flex:none;border:1px solid rgba(255,255,255,.35)}
 .user-avatar.user-avatar-placeholder{background:linear-gradient(145deg,#dff2e7,#dceef8);color:#258a73;display:grid;place-items:center;font-weight:700;font-size:15px;border:none}
@@ -307,6 +307,11 @@ body.open #dr{transform:none}body.open #ov{display:block}
 .nav-badge,.icon-badge{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 5px;border-radius:999px;background:#d9455f;color:#fff;font-size:11px;font-weight:700;line-height:1}
 .nav-badge{margin-left:auto}
 .icon-badge{position:absolute;top:-7px;right:-7px;border:2px solid var(--card)}
+/* Lencana pada tombol navigasi bawah: pil merah kecil menempel di sudut
+   kanan atas ikon, dengan cincin warna kartu supaya tetap terbaca di atas
+   permukaan navigasi terang maupun slate. Ukuran tombol tidak berubah. */
+.tab-badge{position:absolute;top:0;left:calc(50% + 2px);display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:#d9455f;color:#fff;font-size:10px;font-weight:700;line-height:1;border:2px solid var(--card);pointer-events:none}
+#tb a .tab-badge{color:#fff}
 .chat-card{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:12px;margin-bottom:12px;box-shadow:0 4px 16px rgba(47,134,184,.1);height:clamp(280px,calc(100vh - 170px),720px);height:clamp(280px,calc(100dvh - 170px),720px);display:flex;flex-direction:column;overflow:hidden}
 .chat-head{display:flex;align-items:center;gap:10px;padding:4px 4px 12px;border-bottom:1px solid var(--line)}
 .chat-avatar{width:40px;height:40px;border-radius:50%;background:var(--g);color:#fff;display:grid;place-items:center;font-weight:700;flex:none}
@@ -340,7 +345,7 @@ body.open #dr{transform:none}body.open #ov{display:block}
 .chat-file{display:block;color:var(--acc);margin-top:6px;font-weight:600;overflow-wrap:anywhere}
 .chat-bubble audio{display:block;max-width:220px;margin-top:6px}
 #tb{position:fixed;left:12px;right:12px;bottom:calc(10px + env(safe-area-inset-bottom,0px));background:var(--card);border-radius:24px;box-shadow:0 8px 30px rgba(47,134,184,.28);display:flex;justify-content:space-around;padding:8px;z-index:6}
-#tb a{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;font-size:11px;color:var(--mut);padding:6px 0;border-radius:16px;cursor:pointer}
+#tb a{position:relative;flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;font-size:11px;color:var(--mut);padding:6px 0;border-radius:16px;cursor:pointer}
 #tb a>.app-icon{color:var(--mut)}
 #tb a.on{color:var(--acc);background:var(--line);font-weight:700}
 #tb a.on>.app-icon{color:var(--acc)}

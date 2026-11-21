@@ -17,12 +17,34 @@ const V={
 };
 function navTo(view){return event=>{event.preventDefault();go(view)}}
 /* Menu samping, render() utama, dan langganan data */
+/* Lencana persetujuan: sinkronkan lencana pada item menu Persetujuan di
+   drawer admin dan pada tombol roda gigi (#st) di header — tombol itulah
+   jalan masuk ke menu Persetujuan, jadi admin utama melihat jumlah akun
+   yang menunggu tanpa harus membuka menunya dulu. Dipanggil setiap kali
+   daftar pengguna menunggu berubah (loadPendingUsers) dan setiap render,
+   supaya angka selalu mengikuti data terbaru tanpa muat ulang halaman. */
+function updateApprovalBadges(){
+  const count=S.mainAdmin?(S.pendingUsers||[]).length:0;
+  const value=String(count);
+  const nav=document.querySelector('[data-approval-nav]');
+  if(nav){
+    let badge=nav.querySelector('.nav-badge');
+    if(count>0&&!badge){badge=h('span',{class:'nav-badge'},value);nav.append(badge)}
+    if(badge){badge.textContent=value;badge.style.display=count>0?'':'none'}
+  }
+  const st=document.querySelector('#st');
+  if(st){
+    let badge=st.querySelector('#ab');
+    if(count>0&&!badge){badge=h('span',{id:'ab',class:'icon-badge'},value);st.append(badge)}
+    if(badge){badge.textContent=value;badge.style.display=count>0?'inline-grid':'none'}
+  }
+}
 function renderDrawer(){
   const d=$('#dr');
   if(S.adminMenuOpen){
     d.replaceChildren(
       h('p',{class:'sub',style:'padding:0 14px'},h('b',{style:'color:var(--ink)'},'PENGATURAN ADMIN')),
-      ...ADMIN_MENU.map(([view,label,glyph])=>h('a',{class:S.view===view?'on':'',href:'#',onclick:navTo(view)},icon(glyph),h('span',{},label))),
+      ...ADMIN_MENU.map(([view,label,glyph])=>h('a',{class:S.view===view?'on':'',href:'#',onclick:navTo(view),...(view==='approvals'?{'data-approval-nav':'true'}:{})},icon(glyph),h('span',{},label),view==='approvals'&&S.mainAdmin&&S.pendingUsers.length>0&&h('span',{class:'nav-badge'},String(S.pendingUsers.length)))),
       h('button',{class:'menu-logout',onclick:()=>go('landing')},icon('back',17),h('span',{},'Kembali ke menu utama'))
     );
     return;
@@ -70,11 +92,7 @@ function render(){
   }
   renderDrawer();
   $('#sw').style.display=S.mainAdmin?'flex':'none';
-  const approvalBadge=$('#ab');
-  if(approvalBadge){
-    approvalBadge.textContent=S.pendingUsers.length?String(S.pendingUsers.length):'';
-    approvalBadge.style.display=S.pendingUsers.length?'inline-grid':'none';
-  }
+  updateApprovalBadges();
   const current=ALL.find(x=>x[0]===S.view);
   if(!V[S.view]||(['map-settings','approvals'].includes(S.view)&&!S.mainAdmin)||(S.view==='pengaturan'&&!S.admin))S.view='landing';
   const content=[];
@@ -87,7 +105,7 @@ function render(){
   hydrateMemberQrCodes();
   hydrateMemberMedia();
   const tb=$('#tb');tb.style.display=S.form?'none':'flex';$('#pet').style.display=S.form?'none':'block';
-  tb.replaceChildren(...[['landing','home','Home'],['members','users','Anggota'],['kegiatan','calendar','Kegiatan'],['piket','brush','Piket'],['musyawarah','meeting','Musyawarah'],['susunan','team','Kepengurusan'],['pesan','inbox','Pesan Masuk']].map(x=>h('a',{class:S.view===x[0]?'on':'',href:'#',onclick:navTo(x[0])},icon(x[1],19),h('span',{},x[2]))));
+  tb.replaceChildren(...[['landing','home','Home'],['members','users','Anggota'],['kegiatan','calendar','Kegiatan'],['piket','brush','Piket'],['musyawarah','meeting','Musyawarah'],['susunan','team','Kepengurusan'],['pesan','inbox','Pesan Masuk']].map(x=>h('a',{class:S.view===x[0]?'on':'',href:'#',onclick:navTo(x[0]),...(x[0]==='pesan'?{'data-message-tab':'true'}:{})},icon(x[1],19),h('span',{},x[2]),x[0]==='pesan'&&S.unreadMessages>0&&h('span',{class:'tab-badge'},String(S.unreadMessages)))));
 }
 function sub(name,key){
   return S.db.collection(name).onSnapshot(s=>{
