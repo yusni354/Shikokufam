@@ -57,3 +57,88 @@ if(brandTitleEl){
   brandTitleEl.addEventListener('click',()=>go('landing'));
 }
 
+/* ===== Geser mendatar tabel lebar: seret mouse & Shift + roda =====
+   Aturan umum untuk wadah gulir mendatar tabel laporan (.rekap-wrap
+   pada tabel rekap absensi dan .laporan-wrap pada tabel laporan lain):
+   1) SERET: menekan tombol kiri mouse lalu menyeret kanan/kiri
+      menggeser guliran mendatar wadah mengikuti seretan, seperti
+      menggeser kertas. Hanya penunjuk mouse — di layar sentuh usapan
+      bawaan peramban sudah menggeser dan tidak diubah.
+   2) SHIFT + RODA: menahan Shift sambil menggulir roda di atas wadah
+      menggesernya kanan/kiri (roda turun = ke kanan, naik = ke kiri)
+      dan menggantikan gulir tegak halaman selama kursor di atasnya.
+   Penjagaan klik: seretan yang melewati ambang 5px dianggap seret,
+   bukan klik — klik yang mengikuti akhir seretan ditelan satu kali
+   (pola yang sama seperti penjaga klik seret-isi absensi), jadi klik
+   biasa tanpa seret pada kepala kolom kegiatan (panel hapus admin)
+   dan pada pembatas wilayah (lipat/buka) tetap bekerja persis
+   seperti sebelumnya. Semua pendengar didelegasikan ke document
+   supaya tetap berlaku sesudah halaman digambar ulang. */
+(function(){
+  const SELEKTOR_WADAH='.rekap-wrap,.laporan-wrap';
+  const cariWadah=target=>(target&&target.closest)?target.closest(SELEKTOR_WADAH):null;
+  const bisaGeser=w=>w.scrollWidth>w.clientWidth+1;
+  let suppressClickUntil=0,suppressWrap=null;
+  /* Kursor tangan hanya saat wadah memang meluber (bisa digeser);
+     diperiksa saat penunjuk melintas supaya selalu mengikuti isi. */
+  document.addEventListener('pointerover',e=>{
+    const w=cariWadah(e.target);
+    if(w)w.classList.toggle('bisa-seret',bisaGeser(w));
+  });
+  document.addEventListener('pointerdown',e=>{
+    if(e.pointerType!=='mouse'||!e.isPrimary||e.button!==0)return;
+    const w=cariWadah(e.target);
+    if(!w||!bisaGeser(w))return;
+    /* Seretan tidak dimulai dari unsur interaktif di dalam tabel */
+    if(e.target.closest('a,button,input,select,textarea,label,[contenteditable="true"]'))return;
+    const pointerId=e.pointerId,startX=e.clientX,startScroll=w.scrollLeft;
+    let aktif=false;
+    const onMove=ev=>{
+      if(ev.pointerId!==pointerId)return;
+      const dx=ev.clientX-startX;
+      if(!aktif){
+        if(Math.abs(dx)<=5)return;
+        aktif=true;
+        w.classList.add('menyeret');
+      }
+      if(ev.cancelable)ev.preventDefault();
+      w.scrollLeft=startScroll-dx;
+    };
+    const onUp=ev=>{
+      if(ev.pointerId!==pointerId)return;
+      window.removeEventListener('pointermove',onMove);
+      window.removeEventListener('pointerup',onUp);
+      window.removeEventListener('pointercancel',onUp);
+      if(aktif){
+        w.classList.remove('menyeret');
+        suppressWrap=w;
+        suppressClickUntil=Date.now()+400;
+      }
+    };
+    window.addEventListener('pointermove',onMove,{passive:false});
+    window.addEventListener('pointerup',onUp);
+    window.addEventListener('pointercancel',onUp);
+  });
+  /* Telan klik pertama sesudah seretan di dalam wadah yang sama */
+  document.addEventListener('click',e=>{
+    if(suppressWrap&&Date.now()<suppressClickUntil&&suppressWrap.contains(e.target)){
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      suppressWrap=null;
+      suppressClickUntil=0;
+    }
+  },true);
+  document.addEventListener('wheel',e=>{
+    if(!e.shiftKey)return;
+    const w=cariWadah(e.target);
+    if(!w||!bisaGeser(w))return;
+    let d=Math.abs(e.deltaY)>=Math.abs(e.deltaX)?e.deltaY:e.deltaX;
+    if(!d)return;
+    if(e.deltaMode===1)d*=16;
+    else if(e.deltaMode===2)d*=w.clientWidth;
+    e.preventDefault();
+    w.scrollLeft+=d;
+  },{passive:false});
+})();
+

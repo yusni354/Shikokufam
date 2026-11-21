@@ -188,6 +188,19 @@ input[type=checkbox]{width:20px;height:20px;margin:0;flex:none;accent-color:var(
 .home-region-arrow{font-size:18px;color:var(--mut)}
 .home-region-empty{margin:0;padding:8px 3px;color:var(--mut);font-size:12px}
 .home-region-unknown{--region-color:#718096}
+/* Khusus tampilan HP (grid 2 kolom, di bawah breakpoint desktop
+   1024px): nama wilayah menempati SATU BARIS PENUH di dalam kartu dan
+   pil jumlah anggota pindah ke bawahnya — sebelumnya nama dan jumlah
+   berdampingan sebaris sehingga nama patah di tengah kata ('TOKUS
+   HIMA', 'NIIHAM A'). Ukuran huruf nama dikecilkan seperlunya agar
+   nama terpanjang ('Zentsuji / Takuma') muat satu baris; aturan umum
+   teks kartu (overflow-wrap:anywhere + word-break:break-word) dikalahkan
+   khusus untuk nama ini, jadi bila tetap tidak muat patahnya hanya di
+   batas kata, tidak pernah di tengah kata. Desktop tidak berubah. */
+@media (max-width:1023px){
+  .home-region-heading{flex-direction:column;align-items:flex-start;gap:5px}
+  .home-region-card .home-region-heading>b{font-size:12.5px;overflow-wrap:normal;word-break:normal}
+}
 .member-profile-page{position:fixed;inset:0;z-index:12;overflow-y:auto;overscroll-behavior:contain;padding:calc(16px + env(safe-area-inset-top,0px)) max(16px,calc((100vw - 760px)/2)) calc(28px + env(safe-area-inset-bottom,0px));background:var(--bg)}
 .member-profile-toolbar{position:sticky;top:0;z-index:2;display:flex;justify-content:space-between;gap:8px;margin:-4px 0 12px;padding:4px 0 10px;background:var(--bg)}
 .member-id-card{max-width:560px;margin:0 auto 16px;overflow:hidden;border:1px solid var(--line);border-radius:24px;background:var(--card);box-shadow:0 12px 30px rgba(23,50,77,.14)}
@@ -496,6 +509,12 @@ body.admin-dark .card .e{background:#293946;color:var(--acc)}
 .lap-card{display:block;margin-bottom:12px}
 .lap-h{margin:0 0 10px;font-size:15px}
 .laporan-wrap{overflow-x:auto;overflow-y:hidden;max-width:100%;border:1px solid var(--line);border-radius:12px;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}
+/* Seret-untuk-menggeser pada wadah tabel lebar (diatur JS di shell.js):
+   kursor tangan saat wadah bisa digeser, tangan menarik + teks tidak
+   terseleksi selama seretan berlangsung. */
+.rekap-wrap.bisa-seret,.laporan-wrap.bisa-seret{cursor:grab}
+.rekap-wrap.menyeret,.laporan-wrap.menyeret{cursor:grabbing;user-select:none;-webkit-user-select:none}
+.rekap-wrap.menyeret *,.laporan-wrap.menyeret *{cursor:grabbing!important}
 .laporan-table{border-collapse:separate;border-spacing:0;width:100%;font-size:12.5px;background:var(--card)}
 .laporan-table th,.laporan-table td{padding:7px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
 .laporan-table thead th{background:#2c4a5e;color:#fff;font-size:11px;font-weight:700;white-space:nowrap}
