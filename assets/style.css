@@ -377,11 +377,13 @@ body.admin-dark .card .e{background:#293946;color:var(--acc)}
 .activity-create select{padding:10px 40px 10px 12px;border-radius:14px}
 .activity-create>.btn{margin-top:10px}
 .activity-repeat-field{margin:8px 0 0}
-.activity-repeat-field select{display:block;margin:4px 0 0;min-width:0;color:var(--ink);font-weight:400}
-.activity-repeat-sub{margin-top:8px}
+.activity-create-grid .activity-repeat-field{margin:0}
+.activity-repeat-field select{display:block;width:100%;margin:4px 0 0;min-width:0;color:var(--ink);font-weight:400}
+.activity-repeat-extra{min-width:0}
+.activity-repeat-sub{margin-top:0}
 .activity-repeat-sub .activity-field{margin:0;min-width:0}
-.activity-repeat-sub select{display:block;margin:4px 0 0;min-width:0;color:var(--ink);font-weight:400}
-.activity-repeat-week{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 10px;align-items:start}
+.activity-repeat-sub select{display:block;width:100%;margin:4px 0 0;min-width:0;color:var(--ink);font-weight:400}
+.activity-repeat-week{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;align-items:start}
 .activity-create .activity-feedback{margin:8px 0 0}
 .activity-list{display:grid;gap:12px}
 .activity-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
