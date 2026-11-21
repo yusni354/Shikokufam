@@ -1272,9 +1272,6 @@ function orgTabel(nodes){
 function vSusunan(){
   const nodes=susunanSimpul();
   const out=[h('h1',{},'Kepengurusan'),guard()];
-  /* Satu baris petunjuk kecil khusus admin tentang cara menggeser
-     urutan (tekan lama pada baris) — bukan keterangan panjang. */
-  if(S.admin)out.push(h('p',{class:'sub',style:'margin:0 0 10px'},'Tekan lama baris dapukan untuk menggeser urutannya.'));
   out.push(orgTabel(nodes));
   return out;
 }
