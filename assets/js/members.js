@@ -16,7 +16,7 @@ function vMembers(){
     ).sort((a,b)=>(a.nama||'').localeCompare(b.nama||'','id'));
     count.textContent='Menampilkan '+rows.length+' dari '+S.members.length+' anggota';
     list.replaceChildren(...(rows.length?rows.map(member=>{
-      const code=memberCode(member),area=memberRegion(member),location=[member.kota,member.pref].filter(Boolean).join(', ');
+      const area=memberRegion(member),location=[member.kota,member.pref].filter(Boolean).join(', ');
       /* Seluruh badan kartu bisa diklik untuk membuka kartu ID anggota
          (pengganti tombol 'Lihat kartu ID' yang sudah dihapus). Klik
          yang berasal dari tombol/tautan di dalam kartu (Edit, Hapus,
@@ -27,7 +27,7 @@ function vMembers(){
         }},
         member.foto?h('img',{class:'member-avatar',...memberMediaAttributes(member.foto,'src'),alt:'Foto '+(member.nama||'anggota')}):h('div',{class:'member-avatar member-avatar-placeholder'},(member.nama||'?').trim().slice(0,1).toUpperCase()),
         h('div',{class:'member-card-info'},h('div',{class:'member-name-line'},h('b',{},(member.nama||'Nama belum diisi').toUpperCase()),h('span',{class:'member-region-tag'},area.toUpperCase())),
-          h('small',{},[code,location].filter(Boolean).join(' · ').toUpperCase()),
+          location&&h('small',{},location.toUpperCase()),
           h('small',{},member.wa?memberValue('wa',member.wa):member.email||'Kontak belum diisi')),
         h('div',{class:'member-card-actions'},
           S.admin&&h('button',{class:'btn s btn-eh',onclick:()=>{S.form={...member};S.detail=null;S.formPinAlamatHasil='';render()}},icon('edit',15),h('span',{},'Edit')),

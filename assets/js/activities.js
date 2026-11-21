@@ -9,15 +9,21 @@ function eventAttendanceCount(event){
 function activityMemberIds(event,key){
   return Array.isArray(event[key])?event[key].map(String):[];
 }
-/* ===== Absensi per wilayah: empat status =====
+/* ===== Absensi per wilayah: status kehadiran =====
    Status tersimpan di field 'absensi_status' pada dokumen kegiatan yang
-   sama (peta id anggota -> 'hadir'|'izin'|'alpha'|'cuti'). Dua field lama
-   tetap dirawat persis seperti sebelumnya supaya rekap & grafik tetap
-   terbaca: 'peserta_anggota' = anggota yang sudah dicatat statusnya,
-   'hadir_anggota' = yang berstatus hadir. Data lama tanpa 'absensi_status'
-   tetap terbaca: anggota di 'hadir_anggota' = Hadir, peserta lama yang
-   tidak tercatat hadir = Alpha. */
+   sama (peta id anggota -> 'hadir'|'izin'|'alpha'|'cuti'). Di halaman
+   fokus, admin hanya mencentang TIGA pilihan: Hadir / Izin / Cuti.
+   Anggota yang tidak dipilih status apa pun otomatis terhitung ALPHA:
+   saat absensi wilayah disimpan, yang kosong ditulis 'alpha' ke peta
+   status. Dua field lama tetap dirawat persis seperti sebelumnya supaya
+   rekap & grafik tetap terbaca: 'peserta_anggota' = anggota yang sudah
+   dicatat statusnya, 'hadir_anggota' = yang berstatus hadir. Data lama
+   tanpa 'absensi_status' tetap terbaca: anggota di 'hadir_anggota' =
+   Hadir, peserta lama yang tidak tercatat hadir = Alpha. */
 const ABSENSI_STATUS=[['hadir','Hadir'],['izin','Izin'],['alpha','Alpha'],['cuti','Cuti']];
+/* Pilihan yang bisa dicentang admin di halaman fokus (Alpha tidak ada:
+   Alpha adalah keadaan kosong/tidak dipilih) */
+const ABSENSI_PILIHAN=[['hadir','Hadir'],['izin','Izin'],['cuti','Cuti']];
 function activityStatusMap(event){
   const map={};
   if(event.absensi_status&&typeof event.absensi_status==='object'&&!Array.isArray(event.absensi_status)){
@@ -71,8 +77,10 @@ async function saveRegionAttendance(eventId,region,draft){
   const map=activityStatusMap(event);
   absensiRegionMembers(region).forEach(member=>{
     const id=String(member.id);
-    if(draft&&draft[id])map[id]=draft[id];
-    else delete map[id];
+    /* Yang dipilih Hadir/Izin/Cuti tersimpan apa adanya; yang KOSONG
+       (tidak dipilih status apa pun) tersimpan sebagai 'alpha' —
+       Alpha memang berarti tidak ada pilihan yang dicentang. */
+    map[id]=draft&&ABSENSI_PILIHAN.some(([key])=>key===draft[id])?draft[id]:'alpha';
   });
   const peserta=Object.keys(map);
   const hadir=peserta.filter(id=>map[id]==='hadir');
@@ -217,9 +225,10 @@ function activityCard(event){
 }
 /* Tahap 2: halaman fokus mengabsen anggota SATU wilayah untuk satu
    kegiatan. Seluruh anggota wilayah tampil; di kanan tiap baris ada
-   checklist status Hadir / Izin / Alpha / Cuti (satu anggota satu status).
-   Pilihan bekerja pada draf lokal dan baru tersimpan lewat tombol
-   'Simpan absensi', jadi status lama tampil terpilih dan bisa diubah. */
+   checklist status Hadir / Izin / Cuti (satu anggota satu status);
+   yang tidak dipilih status apa pun terhitung Alpha. Pilihan bekerja
+   pada draf lokal dan baru tersimpan lewat tombol 'Simpan absensi',
+   jadi status lama tampil terpilih dan bisa diubah. */
 function vAbsensiFokus(event,region){
   if(!S.absensiDraft)S.absensiDraft=buildAbsensiDraft(event,region);
   const draft=S.absensiDraft;
@@ -229,22 +238,25 @@ function vAbsensiFokus(event,region){
   const dateLabel=date&&!Number.isNaN(date.getTime())?date.toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'}):'Tanggal belum ditentukan';
   const summary=h('p',{class:'activity-feedback absensi-summary','aria-live':'polite'},'');
   const updateSummary=()=>{
-    const counts={hadir:0,izin:0,alpha:0,cuti:0};
+    const counts={hadir:0,izin:0,cuti:0};
     members.forEach(member=>{const st=draft[String(member.id)];if(st&&counts[st]!=null)counts[st]++});
-    const done=counts.hadir+counts.izin+counts.alpha+counts.cuti;
-    summary.textContent=done+' dari '+members.length+' anggota sudah dicatat · '+counts.hadir+' hadir · '+counts.izin+' izin · '+counts.alpha+' alpha · '+counts.cuti+' cuti';
+    const done=counts.hadir+counts.izin+counts.cuti;
+    /* Alpha tidak dicentang: ia adalah sisa anggota yang belum/tidak
+       dipilih statusnya */
+    const alpha=members.length-done;
+    summary.textContent=done+' dari '+members.length+' anggota sudah dicatat · '+counts.hadir+' hadir · '+counts.izin+' izin · '+counts.cuti+' cuti · '+alpha+' alpha';
   };
   const feedback=h('p',{class:'activity-feedback','aria-live':'polite'},'');
   const memberRow=member=>{
     const id=String(member.id);
-    const info=h('div',{class:'absensi-info'},h('b',{},member.nama||'Tanpa nama'),h('small',{},memberCode(member)));
+    const info=h('div',{class:'absensi-info'},h('b',{},member.nama||'Tanpa nama'));
     if(!S.admin){
       const st=draft[id]||'';
       const label=st?ABSENSI_STATUS.find(([key])=>key===st)[1]:'Belum dicatat';
       return h('div',{class:'absensi-row'},info,h('span',{class:'absensi-chip'+(st?' st-'+st:'')},label));
     }
     const seg=h('div',{class:'absensi-seg',role:'radiogroup','aria-label':'Status kehadiran '+(member.nama||'anggota')},
-      ...ABSENSI_STATUS.map(([key,label])=>h('button',{type:'button',class:'absensi-opt'+(draft[id]===key?' on':''),'data-st':key,'aria-pressed':draft[id]===key?'true':'false',onclick:()=>{
+      ...ABSENSI_PILIHAN.map(([key,label])=>h('button',{type:'button',class:'absensi-opt'+(draft[id]===key?' on':''),'data-st':key,'aria-pressed':draft[id]===key?'true':'false',onclick:()=>{
         if(draft[id]===key)delete draft[id];
         else draft[id]=key;
         seg.querySelectorAll('.absensi-opt').forEach(btn=>{
@@ -267,7 +279,7 @@ function vAbsensiFokus(event,region){
     h('div',{class:'absensi-region-title'},h('span',{class:'absensi-dot',style:'background:'+color}),h('h3',{},'Wilayah '+region)),
     summary,
     members.length?h('div',{class:'absensi-list'},...members.map(memberRow)):h('p',{class:'activity-empty'},'Belum ada anggota di wilayah ini.'),
-    S.admin&&h('p',{class:'activity-help'},'Ketuk salah satu status di kanan nama anggota. Ketuk status yang sama sekali lagi untuk membatalkan pilihan.'),
+    S.admin&&h('p',{class:'activity-help'},'Ketuk salah satu status di kanan nama anggota. Ketuk status yang sama sekali lagi untuk membatalkan pilihan. Anggota yang tidak dipilih statusnya terhitung Alpha.'),
     S.admin&&h('div',{class:'absensi-savebar'},
       h('button',{class:'btn',onclick:async()=>{
         try{
