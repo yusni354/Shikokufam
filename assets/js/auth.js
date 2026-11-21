@@ -128,6 +128,69 @@ function friendlyAuthError(error,fallback){
   if(isEmailRateLimitError(error))return EMAIL_RATE_LIMIT_MESSAGE;
   return (error&&error.message)||fallback;
 }
+/* Keterangan menunggu persetujuan: satu bunyi yang sama di formulir masuk
+   (sesudah daftar / saat masuk sebagai akun menunggu) dan di layar
+   menunggu persetujuan, supaya pendaftar paham status akunnya. */
+const PENDING_APPROVAL_MESSAGE='Akun Anda sedang menunggu persetujuan admin. Silakan tunggu — Anda bisa masuk setelah akun disetujui.';
+/* Draf formulir masuk/daftar, disimpan di ingatan selama aplikasi terbuka:
+   render() menggambar ulang seluruh halaman (mis. sesudah daftar berhasil
+   sesi ditutup lalu halaman digambar lagi), dan tanpa draf ini field yang
+   sudah diisi ikut terhapus. Dengan draf, berpindah tab Masuk <-> Daftar
+   maupun gambar ulang sesudah pendaftaran TIDAK mengosongkan email, kata
+   sandi, nama, dan keterangan yang sedang tampil — pendaftar yang diarahkan
+   ke formulir Masuk mendapati email & kata sandinya sudah terisi. */
+let authDraft={email:'',password:'',name:'',signup:false,notice:'',noticeKind:''};
+let authNoticeEl=null;
+function setAuthNotice(text,kind){
+  authDraft.notice=text||'';authDraft.noticeKind=kind||'';
+  if(authNoticeEl){authNoticeEl.className='warn'+(kind?' '+kind:'');authNoticeEl.textContent=text||''}
+}
+/* Penanda per akun (kunci: email) di perangkat ini:
+   - 'pernah-menunggu': akun ini pernah melihat keterangan menunggu
+     persetujuan di perangkat ini (sesudah daftar, saat mencoba masuk, atau
+     di layar menunggu).
+   - 'selamat-ditampilkan': keterangan 'Selamat, akun Anda telah disetujui.'
+     sudah pernah ditampilkan untuk akun ini.
+   Keduanya disimpan di localStorage dengan cermin ingatan (penyimpanan
+   bisa terblokir di webview; penanda tetap bekerja selama sesi berjalan). */
+const PENDING_SEEN_PREFIX='shikoku-family:pernah-menunggu:';
+const APPROVED_SHOWN_PREFIX='shikoku-family:selamat-ditampilkan:';
+const memoryPendingSeen=new Set(),memoryApprovedShown=new Set();
+function authMarkerKey(value){return String(value||'').trim().toLowerCase()}
+function markPendingSeen(email){
+  const key=authMarkerKey(email);if(!key)return;
+  memoryPendingSeen.add(key);
+  try{localStorage.setItem(PENDING_SEEN_PREFIX+key,'1')}catch(e){/* terblokir: cermin ingatan tetap berlaku sesi ini */}
+}
+function pendingSeen(email){
+  const key=authMarkerKey(email);if(!key)return false;
+  if(memoryPendingSeen.has(key))return true;
+  try{return localStorage.getItem(PENDING_SEEN_PREFIX+key)==='1'}catch(e){return false}
+}
+function markApprovedShown(email){
+  const key=authMarkerKey(email);if(!key)return;
+  memoryApprovedShown.add(key);
+  try{localStorage.setItem(APPROVED_SHOWN_PREFIX+key,'1')}catch(e){/* terblokir: cermin ingatan tetap berlaku sesi ini */}
+}
+function approvedShown(email){
+  const key=authMarkerKey(email);if(!key)return false;
+  if(memoryApprovedShown.has(key))return true;
+  try{return localStorage.getItem(APPROVED_SHOWN_PREFIX+key)==='1'}catch(e){return false}
+}
+/* Dipanggil Home setiap kali digambar untuk pengguna yang sudah masuk &
+   disetujui: membersihkan sisa keterangan/kata sandi draf formulir, lalu
+   mengembalikan true TEPAT SATU KALI bagi akun yang pernah terlihat
+   menunggu di perangkat ini dan kini sudah disetujui — Home menampilkan
+   spanduk 'Selamat, akun Anda telah disetujui.' pada saat itu saja.
+   Akun yang tidak pernah tercatat menunggu di perangkat ini tidak
+   memicu spanduk apa pun. */
+function authOnSignedIn(){
+  setAuthNotice('','');authDraft.password='';
+  const key=authMarkerKey(S.email||S.uid);
+  if(!key)return false;
+  if(pendingSeen(key)&&!approvedShown(key)){markApprovedShown(key);return true}
+  return false;
+}
 /* Formulir masuk / daftar / lupa password */
 function accountForm(){
   const email=h('input',{type:'email',placeholder:'Email',autocomplete:'email'});
@@ -147,7 +210,19 @@ function accountForm(){
   const passwordWrap=h('span',{class:'pw-wrap'},password,eyeButton);
   const name=h('input',{placeholder:'Nama lengkap',autocomplete:'name'});
   const notice=h('p',{class:'warn'});
-  let signup=false;
+  /* Pulihkan isi dari draf: field yang sudah diketik (di tab mana pun)
+     dan keterangan terakhir tetap ada walau formulir digambar ulang. */
+  authNoticeEl=notice;
+  email.value=authDraft.email;password.value=authDraft.password;name.value=authDraft.name;
+  email.addEventListener('input',()=>{authDraft.email=email.value});
+  password.addEventListener('input',()=>{authDraft.password=password.value});
+  name.addEventListener('input',()=>{authDraft.name=name.value});
+  if(authDraft.notice){notice.className='warn'+(authDraft.noticeKind?' '+authDraft.noticeKind:'');notice.textContent=authDraft.notice}
+  /* Cerminkan setiap perubahan keterangan ke draf, supaya keterangan yang
+     ditulis penangan lama (yang menulis langsung ke elemen ini) tetap
+     selamat dari gambar ulang halaman. */
+  if(window.MutationObserver)new MutationObserver(()=>{authDraft.notice=notice.textContent||'';authDraft.noticeKind=notice.className.replace(/\bwarn\b/,'').trim()}).observe(notice,{childList:true,subtree:true,characterData:true,attributes:true,attributeFilter:['class']});
+  let signup=authDraft.signup===true;
   const titleText=h('span',{},'Masuk ke Shikoku Family');
   const submitLabel=h('span',{},'Masuk');
   const lockTap=h('button',{type:'button',id:'login-lock',class:'login-lock-tap','aria-label':'Masuk ke Shikoku Family'},icon('lock',20));
@@ -172,13 +247,13 @@ function accountForm(){
   const loginTab=h('button',{type:'button',class:'auth-tab on',onclick:()=>setMode(false)},'Masuk');
   const signupTab=h('button',{type:'button',class:'auth-tab',onclick:()=>setMode(true)},'Daftar');
   const setMode=next=>{
-    signup=next;nameLabel.style.display=signup?'':'none';
+    signup=next;authDraft.signup=next;nameLabel.style.display=signup?'':'none';
     submitLabel.textContent=signup?'Daftar':'Masuk';
     password.setAttribute('autocomplete',signup?'new-password':'current-password');
     titleText.textContent=signup?'Daftar sebagai anggota':'Masuk ke Shikoku Family';
     loginTab.className=signup?'auth-tab':'auth-tab on';signupTab.className=signup?'auth-tab on':'auth-tab';
   };
-  nameLabel.style.display='none';
+  setMode(signup);
   /* Masuk dengan Google (Supabase Auth OAuth); alur persetujuan akun tidak berubah */
   const google=h('button',{class:'btn s auth-alt',style:'width:100%;margin-top:10px',onclick:async()=>{
     if(!S.supabase){
@@ -237,8 +312,8 @@ function accountForm(){
           await loadMessages();
           return;
         }
-        notice.className='warn auth-success';
-        notice.textContent='Akun berhasil dibuat dan menunggu persetujuan admin.';
+        markPendingSeen(emailValue);
+        setAuthNotice(PENDING_APPROVAL_MESSAGE,'auth-success');
         setMode(false);
         return;
       }
@@ -249,8 +324,8 @@ function accountForm(){
         return;
       }
       if(user.approval_status==='pending'||user.approval_status==null){
-        notice.className='warn auth-error';
-        notice.textContent='Akun Anda masih menunggu persetujuan admin.';
+        markPendingSeen(emailValue);
+        setAuthNotice(PENDING_APPROVAL_MESSAGE,'auth-error');
         return;
       }
       if(user.approval_status==='rejected'){
@@ -291,7 +366,10 @@ function accountForm(){
     }else{
       notice.className='warn auth-success';
       if(signup){
-        notice.textContent='Akun berhasil dibuat dan menunggu persetujuan admin.';
+        markPendingSeen(emailValue);
+        authDraft.signup=false;
+        setAuthNotice(PENDING_APPROVAL_MESSAGE,'auth-success');
+        setMode(false);
         if(result.data.session)await S.supabase.auth.signOut();
       }else{
         const {data:profile,error:profileError}=await S.supabase.from('profiles').select('name,role,is_main_admin,approval_status').eq('id',result.data.user.id).maybeSingle();
@@ -301,8 +379,8 @@ function accountForm(){
           notice.textContent='Gagal memeriksa status persetujuan: '+profileError.message;
         }else if(profile?.approval_status==='pending'||profile?.approval_status==null){
           await S.supabase.auth.signOut();
-          notice.className='warn auth-error';
-          notice.textContent='Akun Anda masih menunggu persetujuan admin.';
+          markPendingSeen(emailValue);
+          setAuthNotice(PENDING_APPROVAL_MESSAGE,'auth-error');
         }else if(profile.approval_status==='rejected'){
           await S.supabase.auth.signOut();
           notice.className='warn auth-error';

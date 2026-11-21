@@ -129,8 +129,14 @@ function render(){
   if(S.uid&&S.approvalStatus!=='approved'&&!S.admin){
     setAuthLocked(true);
     $('#dr').replaceChildren();
-    const status=S.approvalStatus==='rejected'?'Akun ini ditolak admin.':'Akun ini belum disetujui admin.';
-    $('#app').replaceChildren(h('section',{class:'card auth-card'},h('b',{},status),h('p',{class:'sub'},'Data anggota, kegiatan, dan wilayah hanya dimuat setelah akun disetujui. Hubungi admin utama untuk memeriksa status akun.'),h('button',{class:'btn',onclick:()=>signOut()},'Keluar')));
+    const rejected=S.approvalStatus==='rejected';
+    const status=rejected?'Akun ini ditolak admin.':'Akun Anda sedang menunggu persetujuan admin.';
+    /* Layar ini salah satu tempat pengguna melihat keterangan menunggu:
+       catat penandanya, supaya sesudah disetujui ia mendapat keterangan
+       'Selamat, akun Anda telah disetujui.' satu kali (lihat auth.js). */
+    if(!rejected&&typeof markPendingSeen==='function')markPendingSeen(S.email||S.uid);
+    const detail=rejected?'Data anggota, kegiatan, dan wilayah hanya dimuat setelah akun disetujui. Hubungi admin utama untuk memeriksa status akun.':'Silakan tunggu — Anda bisa masuk setelah akun disetujui. Data anggota, kegiatan, dan wilayah hanya dimuat setelah akun disetujui; hubungi admin utama untuk memeriksa status akun.';
+    $('#app').replaceChildren(h('section',{class:'card auth-card'},h('b',{},status),h('p',{class:'sub'},detail),h('button',{class:'btn',onclick:()=>signOut()},'Keluar')));
     $('#sw').style.display='none';
     document.body.classList.remove('open');
     return;

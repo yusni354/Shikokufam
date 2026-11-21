@@ -39,6 +39,8 @@ h1{font-size:26px;margin:8px 0 10px}
 .sub{color:var(--mut);margin:0 0 16px}
 .warn{color:var(--mut);font-size:14px}
 .storage-warning{padding:12px 14px;border:1px solid #e6b96b;border-radius:14px;background:#fff7e6;color:#805b13;line-height:1.5}
+.approved-banner{padding:12px 14px;border:1px solid #7fc8a9;border-radius:14px;background:#e8f7ef;line-height:1.5;font-weight:700}
+.warn.approved-banner{color:#065f46}
 .storage-import{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .storage-import>div{min-width:0}
 .storage-import b,.storage-import small{display:block}
@@ -168,6 +170,11 @@ input[type=checkbox]{width:20px;height:20px;margin:0;flex:none;accent-color:var(
 .member-editor-actions .btn{flex:2}
 .member-editor-actions .btn.s{flex:1}
 .home-region-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+/* Susunan daftar anggota di Home mengikuti pola pemilih wilayah absensi:
+   2 kolom di HP, 3 kolom di desktop (layar >= 1024px); hanya layar sangat
+   sempit (<= 340px) yang turun ke 1 kolom agar kartu tetap terbaca. */
+@media (min-width:1024px){.home-region-list{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (max-width:340px){.home-region-list{grid-template-columns:1fr}}
 .home-region-card{min-width:0;padding:12px;background:var(--card);border:1px solid var(--line);border-top:4px solid var(--region-color,#718096);border-radius:18px;box-shadow:0 4px 14px rgba(47,134,184,.07)}
 .home-region-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;color:var(--region-color,#718096)}
 .home-region-heading>b,.home-region-heading>span,.member-region-tag{text-transform:uppercase}
@@ -309,7 +316,7 @@ input[type=checkbox]{width:20px;height:20px;margin:0;flex:none;accent-color:var(
 @media (max-width:560px){.benefits{grid-template-columns:1fr}.hero{padding:24px 18px}.hero .btn{margin-bottom:8px}}
 @media (max-width:430px){.home-shortcuts{grid-template-columns:repeat(2,minmax(0,1fr))}.home-shortcut{min-height:76px}.home-welcome{padding:18px 14px}.home-welcome h1{font-size:21px}}
 @media (max-width:560px){.member-page-heading{align-items:flex-start}.member-page-heading>.btn{padding:9px 12px;font-size:13px}.member-card{align-items:flex-start;flex-wrap:wrap}.member-card-info{padding-top:2px}.member-card-actions{width:100%;padding-left:66px;justify-content:flex-start}.member-detail-grid{grid-template-columns:1fr 1fr}.member-editor-heading{gap:8px}.member-editor-heading>.btn{padding:7px 10px}.member-form-grid{grid-template-columns:1fr}.member-form-grid .lb:has(textarea){grid-column:auto}}
-@media (max-width:560px){.home-region-list{grid-template-columns:1fr}.member-id-main{gap:11px;padding:15px 12px}.member-id-photo{width:90px;height:112px}.member-id-info h1{font-size:19px}.member-profile-page{padding-left:12px;padding-right:12px}}
+@media (max-width:560px){.member-id-main{gap:11px;padding:15px 12px}.member-id-photo{width:90px;height:112px}.member-id-info h1{font-size:19px}.member-profile-page{padding-left:12px;padding-right:12px}}
 @media (max-width:560px){.visitor-page-heading{align-items:flex-start}.visitor-page-heading>.btn{padding:8px 10px}.visitor-japan-map{height:55vh;min-height:300px}.visitor-place-row{align-items:flex-start}.visitor-place-row strong{font-size:12px}.visitor-visit-row{align-items:flex-start;flex-wrap:wrap}.visitor-visit-row>div:last-child{text-align:left;width:100%;padding-left:0}}
 #ov{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;z-index:9}
 #dr{position:fixed;top:0;bottom:0;left:0;width:78%;max-width:320px;background:var(--card);z-index:10;transform:translateX(-100%);padding:calc(16px + env(safe-area-inset-top,0px)) 12px 16px;overflow:auto;border-radius:0 26px 26px 0;box-shadow:0 0 40px rgba(0,0,0,.2);transition:transform .22s ease}

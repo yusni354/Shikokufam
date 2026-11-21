@@ -137,6 +137,10 @@ function mulaiHidupMaskotVideo(stage,video){
 }
 /* Halaman Home dan Ringkasan */
 function vHome(){
+  /* Spanduk satu kali 'Selamat, akun Anda telah disetujui.' bagi akun yang
+     pernah terlihat menunggu persetujuan di perangkat ini (authOnSignedIn
+     di auth.js yang memutuskan & menandainya sudah tampil). */
+  const approvedBanner=(typeof authOnSignedIn==='function'&&authOnSignedIn())?h('p',{class:'warn approved-banner'},'Selamat, akun Anda telah disetujui.'):null;
   const today=new Date(),todayKey=[today.getFullYear(),String(today.getMonth()+1).padStart(2,'0'),String(today.getDate()).padStart(2,'0')].join('-');
   const upcomingDuties=[...S.cleaningDuties].filter(duty=>duty.tanggal&&duty.tanggal>=todayKey).sort((a,b)=>a.tanggal.localeCompare(b.tanggal)).slice(0,2);
   const recentEvents=[...S.events].sort((a,b)=>(b.at||0)-(a.at||0)).slice(0,2);
@@ -159,6 +163,7 @@ function vHome(){
     )];
   });
   return [
+    approvedBanner,
     h('section',{class:'home-welcome'},
       h('div',{class:'home-welcome-text'},h('small',{},today.toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'})),h('h1',{},'Selamat datang'+(S.name?', '+S.name.split(' ')[0]:'')+'!'),h('p',{},welcomeMessage()),h('button',{class:'btn home-welcome-cta',onclick:()=>go('kegiatan')},'Lihat Kegiatan')),
       homeMascot()
