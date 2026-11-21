@@ -112,10 +112,39 @@ async function signOut(){
   S.view='landing';S.adminMenuOpen=false;document.body.classList.remove('open');
   render();
 }
+/* Pesan galat untuk halaman masuk/daftar: galat mentah Supabase tidak
+   pernah ditampilkan apa adanya. Khusus batas pengiriman email
+   (over_email_send_rate_limit) — batas sisi Supabase yang tidak bisa
+   dihapus dari aplikasi — tampilkan pesan sederhana bahasa Indonesia
+   tanpa kode galat. Jalur MASUK tidak mengirim email sama sekali, jadi
+   galat ini hanya mungkin muncul pada jalur daftar / lupa password. */
+const EMAIL_RATE_LIMIT_MESSAGE='Email konfirmasi sedang dibatasi. Tunggu beberapa menit lalu coba lagi, atau hubungi admin.';
+function isEmailRateLimitError(error){
+  const raw=[error&&error.message,error&&error.code,error&&error.details,error&&error.hint]
+    .filter(Boolean).join(' ');
+  return /over_email_send_rate_limit|email rate limit/i.test(raw);
+}
+function friendlyAuthError(error,fallback){
+  if(isEmailRateLimitError(error))return EMAIL_RATE_LIMIT_MESSAGE;
+  return (error&&error.message)||fallback;
+}
 /* Formulir masuk / daftar / lupa password */
 function accountForm(){
   const email=h('input',{type:'email',placeholder:'Email',autocomplete:'email'});
   const password=h('input',{type:'password',placeholder:'Password minimal 6 karakter',autocomplete:'current-password'});
+  /* Tombol mata di tepi kanan field kata sandi: mengalihkan field antara
+     tersembunyi (type=password) dan terlihat (type=text); nilai yang sudah
+     diketik tidak berubah, ikon & aria-label mengikuti keadaan. */
+  let passwordVisible=false;
+  const eyeButton=h('button',{type:'button',class:'pw-eye','aria-label':'Tampilkan kata sandi'},icon('eye',20));
+  eyeButton.addEventListener('click',()=>{
+    passwordVisible=!passwordVisible;
+    password.type=passwordVisible?'text':'password';
+    eyeButton.setAttribute('aria-label',passwordVisible?'Sembunyikan kata sandi':'Tampilkan kata sandi');
+    eyeButton.replaceChildren(icon(passwordVisible?'eyeOff':'eye',20));
+    password.focus();
+  });
+  const passwordWrap=h('span',{class:'pw-wrap'},password,eyeButton);
   const name=h('input',{placeholder:'Nama lengkap',autocomplete:'name'});
   const notice=h('p',{class:'warn'});
   let signup=false;
@@ -123,7 +152,7 @@ function accountForm(){
   const submitLabel=h('span',{},'Masuk');
   const lockTap=h('button',{type:'button',id:'login-lock',class:'login-lock-tap','aria-label':'Masuk ke Shikoku Family'},icon('lock',20));
   const title=h('b',{},lockTap,titleText);
-  const forgot=h('button',{class:'btn s',onclick:async()=>{
+  const forgot=h('button',{type:'button',class:'btn s',onclick:async()=>{
     const emailValue=email.value.trim();
     if(!emailValue){notice.textContent='Masukkan email terlebih dahulu untuk menerima tautan reset password.';email.focus();return}
     if(!S.supabase){
@@ -136,12 +165,12 @@ function accountForm(){
     const {error}=await S.supabase.auth.resetPasswordForEmail(emailValue);
     forgot.disabled=false;
     notice.className=error?'warn auth-error':'warn auth-success';
-    notice.textContent=error?'Gagal mengirim tautan reset password: '+error.message:'Tautan reset password sudah dikirim ke email Anda.';
+    notice.textContent=error?(isEmailRateLimitError(error)?EMAIL_RATE_LIMIT_MESSAGE:'Gagal mengirim tautan reset password: '+friendlyAuthError(error,'')):'Tautan reset password sudah dikirim ke email Anda.';
   }},'Lupa password?');
   const forgotWrap=h('div',{class:'auth-forgot'},forgot);
   const nameLabel=h('label',{class:'lb'},'Nama lengkap',name);
-  const loginTab=h('button',{class:'auth-tab on',onclick:()=>setMode(false)},'Masuk');
-  const signupTab=h('button',{class:'auth-tab',onclick:()=>setMode(true)},'Daftar');
+  const loginTab=h('button',{type:'button',class:'auth-tab on',onclick:()=>setMode(false)},'Masuk');
+  const signupTab=h('button',{type:'button',class:'auth-tab',onclick:()=>setMode(true)},'Daftar');
   const setMode=next=>{
     signup=next;nameLabel.style.display=signup?'':'none';
     submitLabel.textContent=signup?'Daftar':'Masuk';
@@ -163,14 +192,17 @@ function accountForm(){
       const {error}=await S.supabase.auth.signInWithOAuth({provider:'google',options:{redirectTo:window.location.origin+window.location.pathname}});
       if(error){
         notice.className='warn auth-error';
-        notice.textContent='Gagal masuk dengan Google: '+error.message;
+        notice.textContent='Gagal masuk dengan Google: '+friendlyAuthError(error,'periksa koneksi');
       }
     }catch(e){
       notice.className='warn auth-error';
-      notice.textContent='Gagal masuk dengan Google: '+(e.message||'periksa koneksi');
+      notice.textContent='Gagal masuk dengan Google: '+friendlyAuthError(e,'periksa koneksi');
     }
   }},'Masuk dengan Google');
-  return h('div',{class:'card auth-card'},title,h('div',{class:'auth-tabs'},loginTab,signupTab),nameLabel,h('label',{class:'lb'},'Email',email),h('label',{class:'lb'},'Password',password),forgotWrap,notice,h('button',{class:'btn',onclick:async()=>{
+  /* Penangan kirim formulir: dipakai tombol Masuk/Daftar (type=submit)
+     DAN tombol Enter di field mana pun, karena seluruh isian dibungkus
+     <form> sungguhan — Enter memicu submit formulir yang sama. */
+  const submitAuth=async()=>{
     const emailValue=email.value.trim();
     notice.className='warn';
     notice.textContent='Memproses...';
@@ -242,13 +274,17 @@ function accountForm(){
         :await S.supabase.auth.signInWithPassword({email:emailValue,password:password.value});
     }catch(e){
       notice.className='warn auth-error';
-      notice.textContent=e.message||'Terjadi kesalahan. Silakan coba lagi.';
+      notice.textContent=friendlyAuthError(e,'Terjadi kesalahan. Silakan coba lagi.');
       return;
     }
     if(result.error){
       notice.className='warn auth-error';
-      const errorText=[result.error.message,result.error.details,result.error.hint,result.error.code]
-        .filter(Boolean).join(' | ');
+      /* Galat batas email (daftar) tampil sebagai pesan sederhana Indonesia;
+         teks/kode mentah Supabase tidak pernah ditampilkan. */
+      const errorText=isEmailRateLimitError(result.error)
+        ?EMAIL_RATE_LIMIT_MESSAGE
+        :[result.error.message,result.error.details,result.error.hint,result.error.code]
+          .filter(part=>part&&!/over_email_send_rate_limit/i.test(part)).join(' | ');
       notice.textContent=!signup&&['invalid_credentials','invalid_grant'].includes(result.error.code)
         ?'Email atau password salah. Silakan coba lagi.'
         :errorText||'Pendaftaran gagal. Periksa konfigurasi database Supabase.';
@@ -286,7 +322,18 @@ function accountForm(){
       await loadMessages();
       if(!S.messageChannel)await subscribeToMessages();
     }
-  }},submitLabel),google);
+  };
+  /* Formulir sungguhan: Enter di field mana pun (termasuk kata sandi)
+     mengirim formulir yang sama seperti menekan tombol Masuk/Daftar.
+     Formulir tidak pernah dikunci oleh keadaan email apa pun — tombol
+     kirim selalu aktif dan masuk selalu bisa dicoba. */
+  const submitButton=h('button',{type:'submit',class:'btn'},submitLabel);
+  const form=h('form',{class:'auth-form',novalidate:'',onsubmit:event=>{event.preventDefault();submitAuth();}},
+    nameLabel,
+    h('label',{class:'lb'},'Email',email),
+    h('label',{class:'lb'},'Password',passwordWrap),
+    forgotWrap,notice,submitButton);
+  return h('div',{class:'card auth-card'},title,h('div',{class:'auth-tabs'},loginTab,signupTab),form,google);
 }
 /* Jalan pintas ketuk 3x pada tulisan SHIKOKU FAMILY (header & hero halaman
    masuk): mengetuknya 3 kali berturut-turut dengan jeda singkat langsung
