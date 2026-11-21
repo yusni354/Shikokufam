@@ -939,6 +939,12 @@ body.auth-locked .landing{padding-top:0}
 .peta-map-head h2{margin:0;font-size:16px;color:#16283a}
 .peta-map-head p{margin:3px 0 0;font-size:12.5px;color:#3d5568;line-height:1.45}
 .peta-count-badge{display:inline-flex;align-items:center;background:linear-gradient(145deg,#3d9db0,#2b7a8c);color:#fff;font-size:12.5px;font-weight:700;padding:5px 11px;border-radius:999px;white-space:nowrap}
+.peta-map-head-side{display:flex;flex-direction:column;align-items:flex-end;gap:7px;flex:none}
+.peta-style-switch{display:flex;gap:3px;background:#e4edf3;border:1px solid #cfdde7;border-radius:999px;padding:3px}
+.peta-style-btn{border:0;background:transparent;font-family:inherit;font-size:12.5px;font-weight:700;color:#3d5568;padding:5px 12px;border-radius:999px;cursor:pointer;line-height:1.2;white-space:nowrap}
+.peta-style-btn.on{background:#354b64;color:#fff;box-shadow:0 2px 6px rgba(50,75,95,.25)}
+@media (max-width:640px){.peta-map-head-side{align-items:flex-start}.peta-style-btn{padding:5px 10px;font-size:12px}}
+.peta-geo-status{padding:7px 15px;background:#eef6f8;border-top:1px solid #dcebf0;font-size:12px;color:#2b7a8c;font-weight:600}
 #peta-map{height:480px;width:100%;background:#dbe5ee;z-index:1}
 @media (max-width:640px){#peta-map{height:400px}}
 .peta-notice{padding:10px 15px;background:#fdf3d7;border-top:1px solid #f0dfa0;font-size:12.5px;color:#6b5410;line-height:1.55}
@@ -988,18 +994,27 @@ body.auth-locked .landing{padding-top:0}
 .peta-chip.on .peta-count{background:rgba(255,255,255,.18);color:#fff}
 /* Daftar anggota di bawah peta */
 .peta-h2{font-size:17px;margin:0 0 6px;color:#16283a}
-.peta-member-list{list-style:none;margin:12px 0 0;padding:0;display:grid;grid-template-columns:1fr;gap:8px}
-@media (min-width:640px){.peta-member-list{grid-template-columns:1fr 1fr}}
-@media (min-width:1024px){.peta-member-list{grid-template-columns:1fr 1fr 1fr}}
-.peta-member-item{width:100%;text-align:left;background:#f4f8fa;border:1.5px solid #e3ecf2;border-radius:16px;padding:11px 12px;cursor:pointer;display:flex;gap:11px;align-items:flex-start;font-family:inherit;color:#111827}
+.peta-member-list{list-style:none;margin:12px 0 0;padding:0;display:grid;grid-template-columns:minmax(0,1fr);gap:8px}
+@media (min-width:640px){.peta-member-list{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (min-width:1024px){.peta-member-list{grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}}
+.peta-member-item{width:100%;min-width:0;box-sizing:border-box;text-align:left;background:#f4f8fa;border:1.5px solid #e3ecf2;border-radius:16px;padding:11px 12px;cursor:pointer;display:flex;gap:11px;align-items:flex-start;font-family:inherit;color:#111827}
 .peta-member-item:hover{border-color:#b9cbd8}
 .peta-member-item.on{border-color:#354b64;background:#fff;box-shadow:0 4px 14px rgba(50,75,95,.12)}
 .peta-avatar{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:14px;flex:none}
 .peta-member-main{flex:1;min-width:0}
 .peta-member-main strong{font-size:14.5px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#111827}
-.peta-member-main span{font-size:12.5px;color:#3d5568;display:block;margin-top:2px;line-height:1.4}
+.peta-member-main span{font-size:12.5px;color:#3d5568;display:block;margin-top:2px;line-height:1.4;overflow-wrap:anywhere}
 .peta-mini-badge{font-size:11px;font-weight:700;color:#fff;padding:3px 7px;border-radius:999px;white-space:nowrap;margin-top:2px;flex:none}
 .peta-empty{padding:18px;text-align:center;color:#3d5568;font-size:13.5px;line-height:1.6;background:#f4f8fa;border-radius:14px;border:1px dashed #b9cbd8;margin-top:12px}
+/* Desktop: kartu daftar anggota dirampingkan supaya 3 sebaris tetap muat
+   rapi di dalam kartu wadahnya (1024–1280px) tanpa meluber keluar */
+@media (min-width:1024px){
+  .peta-member-item{padding:8px 9px;gap:8px;border-radius:13px}
+  .peta-member-item .peta-avatar{width:32px;height:32px;font-size:12px}
+  .peta-member-main strong{font-size:13.5px}
+  .peta-member-main span{font-size:11.5px;margin-top:1px}
+  .peta-mini-badge{font-size:10px;padding:2px 6px}
+}
 /* Pin & popup Leaflet */
 .peta-pin-wrap{background:transparent;border:none}
 .peta-pin{width:30px;height:38px;position:relative;display:flex;justify-content:center}

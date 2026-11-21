@@ -109,12 +109,15 @@ function vApprovals(){
    Pin dibuat langsung dari daftar anggota asli aplikasi (S.members) dan
    ikut berubah setiap data berubah / halaman digambar ulang. Warna pin =
    warna wilayah aplikasi (wilayahEfektif, termasuk wilayah tambahan dari
-   pilihan terkelola). Posisi pin dari alamat anggota: kota/prefektur
-   dikenali lewat inferJapanLocation (cara yang sama dengan penentuan
-   wilayah), lalu dipasangkan ke kamus koordinat kota di bawah, ditambah
-   geseran kecil yang stabil per anggota. Anggota yang alamat/kotanya
-   tidak dikenal TIDAK dibuatkan pin — mereka dihitung dan diberi
-   keterangan di bawah peta.
+   pilihan terkelola). Posisi pin PRESISI di alamat anggota: koordinat
+   dicari lewat geocoding Nominatim atas alamat lengkap (termasuk kode
+   pos, dibatasi ke Jepang) dan dipakai apa adanya — TANPA jitter, tanpa
+   penyebaran di layar, tanpa pembulatan — jadi pin beralamat sama
+   berimpit persis di titik yang sama dan ujung pin menunjuk titik yang
+   sama di semua tingkat zoom. Selama geocoding belum selesai / gagal,
+   pin sementara memakai koordinat kota dari kamus di bawah (tanpa
+   geseran). Anggota yang alamat/kotanya tidak dikenal TIDAK dibuatkan
+   pin — mereka dihitung dan diberi keterangan di bawah peta.
    Peta dasar dicoba berurutan dari beberapa penyedia ubin gratis; bila
    satu gagal, otomatis pindah ke berikutnya. Bila semuanya gagal, tampil
    peta dasar cadangan lokal (assets/japan-basemap.svg) supaya tidak
@@ -134,45 +137,147 @@ const PETA_KOTA={
   okayama:[34.6618,133.9344],kurashiki:[34.585,133.772],tsuyama:[35.069,134.004],tamano:[34.493,133.948],soja:[34.672,133.745],bizen:[34.738,134.188],setouchi:[34.660,134.095],kasaoka:[34.507,133.507],ibara:[34.598,133.461],akaiwa:[34.755,133.955]
 };
 const PETA_PREF={tokushima:[34.0658,134.5593],kagawa:[34.3401,134.0434],ehime:[33.8392,132.7657],kochi:[33.5586,133.5311],okayama:[34.6618,133.9344]};
-function petaHash(s){let x=0;for(let i=0;i<s.length;i++)x=((x<<5)-x+s.charCodeAt(i))|0;return Math.abs(x)}
-function petaJitter(base,m){
-  const x=petaHash(String(m.id||m.nama||'')+'|'+String(m.alamat_jp||''));
-  return [base[0]+(((x%160)-80)/10000),base[1]+((((x>>3)%160)-80)/10000)];
-}
-/* Koordinat anggota dari alamatnya; null bila kota & prefektur tidak dikenal */
+/* Koordinat cadangan tingkat kota dari kamus; null bila kota & prefektur
+   tidak dikenal. Dikembalikan apa adanya (salinan) — tidak digeser. */
 function petaCoords(m){
   const loc=inferJapanLocation(m.alamat_jp,m.kota,m.kec_jp,m.kodepos,m.pref,m.wilayah);
   const calon=[loc&&loc.kota,m.kota,m.kec_jp];
-  for(const k of calon){const c=k&&PETA_KOTA[petaNormKey(k)];if(c)return petaJitter(c,m)}
+  for(const k of calon){const c=k&&PETA_KOTA[petaNormKey(k)];if(c)return [c[0],c[1]]}
   const pref=(loc&&loc.pref)||m.pref;
   const pc=pref&&PETA_PREF[petaNormKey(pref)];
-  return pc?petaJitter(pc,m):null;
+  return pc?[pc[0],pc[1]]:null;
 }
-/* Bagi anggota menjadi yang terpetakan (punya koordinat) dan yang belum */
+/* Bagi anggota menjadi yang terpetakan (punya koordinat) dan yang belum.
+   Bila alamat lengkap anggota sudah pernah ter-geocode (cache), koordinat
+   presisinya langsung dipakai; selain itu mulai dari koordinat kota. */
 function petaEntries(){
   const entries=[],belum=[];
+  const cache=petaGeoCacheLoad();
   (S.members||[]).forEach((m,i)=>{
-    const coords=petaCoords(m);
+    let coords=petaCoords(m);
+    const tersimpan=cache[petaGeoKey(m)];
+    if(tersimpan)coords=[tersimpan[0],tersimpan[1]];
     if(coords)entries.push({m,region:memberRegion(m),coords,key:String(m.id||('idx'+i))});
     else belum.push(m);
   });
   return {entries,belum};
 }
+/* ===== Geocoding alamat lengkap — Nominatim (gratis, tanpa API key) =====
+   Satu permintaan per alamat, berurutan dengan jeda sopan (±1,1 detik,
+   sesuai aturan pemakaian Nominatim). Hasil disimpan per alamat persis:
+   cermin in-memory selalu ada; localStorage dicoba sebisa mungkin —
+   bila terblokir (mis. pratinjau), kegagalan simpan diabaikan dan proses
+   tetap jalan dari cermin in-memory. Koordinat hasil dipakai APA ADANYA:
+   tidak dibulatkan, tidak digeser. Alamat tak ditemukan mundur ke query
+   tanpa alamat jalan/nomor rumah, lalu tetap di koordinat kota kamus.
+   Kegagalan jaringan TIDAK menghalangi peta/daftar: pin bertahan di
+   koordinat kota dan antrean berhenti sesudah 3 kegagalan beruntun. */
+const PETA_GEO={cache:null,running:false};
+function petaGeoCacheLoad(){
+  if(PETA_GEO.cache)return PETA_GEO.cache;
+  PETA_GEO.cache={};
+  try{const raw=localStorage.getItem('sf_peta_geo_v1');if(raw){const j=JSON.parse(raw);if(j&&typeof j==='object')PETA_GEO.cache=j}}catch(e){}
+  return PETA_GEO.cache;
+}
+function petaGeoCacheSave(){try{localStorage.setItem('sf_peta_geo_v1',JSON.stringify(PETA_GEO.cache))}catch(e){}}
+function petaGeoKey(m){return alamatJp(m,true)}
+const petaTunggu=ms=>new Promise(r=>setTimeout(r,ms));
+async function petaGeocode(query){
+  const url='https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=jp&q='+encodeURIComponent(query);
+  const res=await fetch(url,{headers:{'Accept':'application/json'}});
+  if(!res.ok)throw new Error('Geocoding HTTP '+res.status);
+  const j=await res.json();
+  if(j&&j[0]&&isFinite(+j[0].lat)&&isFinite(+j[0].lon))return [+j[0].lat,+j[0].lon];
+  return null;
+}
+function petaSetGeoStatus(txt){
+  const el=document.getElementById('peta-geo-status');if(!el)return;
+  if(txt){el.textContent=txt;el.style.display='block'}else{el.style.display='none';el.textContent=''}
+}
+/* Tempatkan pin anggota satu per satu dari alamat lengkapnya. Berjalan di
+   latar sesudah peta tampil; pin yang selesai langsung berpindah ke titik
+   alamatnya (progresif). gen = penanda sesi peta; bila halaman diganti /
+   peta dibangun ulang, antrean berhenti dengan aman. */
+async function petaGeocodeEntries(gen){
+  if(PETA_GEO.running){
+    /* Antrean sesi sebelumnya masih menuntaskan permintaan terakhirnya;
+       jadwalkan ulang sebentar lagi untuk sesi peta yang sekarang. */
+    setTimeout(()=>{if(gen===PM.gen)petaGeocodeEntries(gen)},1600);
+    return;
+  }
+  const cache=petaGeoCacheLoad();
+  const todo=PM.entries.filter(en=>en.m.alamat_jp&&!(petaGeoKey(en.m) in cache));
+  if(!todo.length)return;
+  PETA_GEO.running=true;
+  let selesai=0,gagalJaringan=0;
+  try{
+    for(const en of todo){
+      if(gen!==PM.gen)break;
+      petaSetGeoStatus('Menempatkan pin dari alamat… ('+selesai+'/'+todo.length+')');
+      const key=petaGeoKey(en.m);
+      let coords=null,errorJaringan=false;
+      try{coords=await petaGeocode(key)}catch(e){errorJaringan=true}
+      if(!coords&&!errorJaringan){
+        await petaTunggu(1100);
+        if(gen!==PM.gen)break;
+        try{coords=await petaGeocode(alamatJp(en.m,false))}catch(e){errorJaringan=true}
+      }
+      if(errorJaringan){gagalJaringan++;if(gagalJaringan>=3)break}
+      else gagalJaringan=0;
+      cache[key]=coords||null;petaGeoCacheSave();
+      if(coords){
+        en.coords=[coords[0],coords[1]];
+        const mk=PM.markers[en.key];
+        if(mk&&gen===PM.gen)mk.setLatLng(en.coords);
+      }
+      selesai++;
+      if(gen!==PM.gen)break;
+      await petaTunggu(1100);
+    }
+  }catch(e){console.error('Geocoding pin berhenti:',e)}
+  PETA_GEO.running=false;
+  if(gen===PM.gen)petaSetGeoStatus('');
+}
 function petaEsc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function petaInisial(nama){const p=String(nama||'?').trim().split(/\s+/);return ((p[0]||'?')[0]+((p[1]||'')[0]||'')).toUpperCase()}
-/* Keadaan peta yang sedang hidup (satu instance Leaflet dalam satu waktu) */
-const PM={map:null,layer:null,markers:{},entries:[],tileLayer:null,tileOk:0,tileErr:0,tileTimer:null,basemapIdx:0,fallback:false,fallbackLayer:null};
-/* Rantai peta dasar: hanya penyedia yang benar-benar gratis tanpa API key.
-   CARTO (light & Voyager) SENGAJA dikeluarkan: sejak 2026 servernya
-   mengembalikan ubin placeholder bertuliskan "API KEY REQUIRED" dengan
-   status HTTP sukses, jadi ubin watermark itu lolos deteksi tileerror/
-   timeout, rantai tidak pernah berpindah, dan peta tampil coretan.
-   Esri World Street Map terbukti menyajikan ubin peta asli tanpa kunci;
-   OpenStreetMap standar cadangan kedua; terakhir peta lokal (SVG). */
-const PETA_BASEMAPS=[
-  {name:'Esri World Street Map',url:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',opts:{maxZoom:19,attribution:'Tiles &copy; Esri'}},
-  {name:'OpenStreetMap',url:'https://tile.openstreetmap.org/{z}/{x}/{y}.png',opts:{maxZoom:19,attribution:'&copy; OpenStreetMap contributors'}}
-];
+/* Keadaan peta yang sedang hidup (satu instance Leaflet dalam satu waktu).
+   gen bertambah setiap peta dibangun ulang — antrean geocoding sesi lama
+   berhenti sendiri. style = pilihan tampilan peta sesi ini. */
+const PM={map:null,layer:null,markers:{},entries:[],tileLayer:null,tileOk:0,tileErr:0,tileTimer:null,basemapIdx:0,fallback:false,fallbackLayer:null,gen:0,style:'jalan',chain:null};
+try{const tersimpan=sessionStorage.getItem('sf_peta_style');if(tersimpan&&(tersimpan==='jalan'||tersimpan==='satelit'||tersimpan==='terang'))PM.style=tersimpan}catch(e){}
+/* Pilihan tampilan peta dasar — semua gratis tanpa API key. CARTO SENGAJA
+   tidak dipakai: sejak 2026 servernya mengembalikan ubin placeholder
+   bertuliskan "API KEY REQUIRED" dengan status HTTP sukses, jadi ubin
+   watermark itu lolos deteksi tileerror/timeout dan peta tampil coretan. */
+const PETA_STYLES={
+  jalan:{label:'Jalan',name:'Esri World Street Map',url:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',opts:{maxZoom:19,attribution:'Tiles &copy; Esri'}},
+  satelit:{label:'Satelit',name:'Esri World Imagery',url:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',opts:{maxZoom:19,attribution:'Tiles &copy; Esri — Source: Esri, Maxar, Earthstar Geographics'}},
+  terang:{label:'Terang',name:'OpenStreetMap',url:'https://tile.openstreetmap.org/{z}/{x}/{y}.png',opts:{maxZoom:19,attribution:'&copy; OpenStreetMap contributors'}}
+};
+/* Rantai untuk gaya terpilih: gaya itu dulu; bila gagal, kembali ke Jalan
+   (Esri Street); bila itu pun gagal, peta dasar cadangan lokal (SVG). */
+function petaChain(){
+  const urutan=[PM.style||'jalan'];
+  if(urutan[0]!=='jalan')urutan.push('jalan');
+  return urutan.map(k=>Object.assign({key:k},PETA_STYLES[k]));
+}
+/* Ganti tampilan peta: hanya lapisan dasar yang diganti — pin, pilihan
+   anggota, dan posisi peta tidak berubah. Pilihan diingat selama sesi. */
+function petaSetStyle(key){
+  if(!PETA_STYLES[key])return;
+  PM.style=key;
+  try{sessionStorage.setItem('sf_peta_style',key)}catch(e){}
+  document.querySelectorAll('.peta-style-btn').forEach(b=>b.classList.toggle('on',b.getAttribute('data-style')===key));
+  if(!PM.map||typeof L==='undefined')return;
+  if(PM.fallback){
+    PM.fallback=false;
+    if(PM.fallbackLayer){try{PM.map.removeLayer(PM.fallbackLayer)}catch(e){}PM.fallbackLayer=null}
+    const el=document.getElementById('peta-map');if(el)el.style.background='';
+    const nt=document.getElementById('peta-notice');if(nt)nt.style.display='none';
+  }
+  PM.chain=petaChain();
+  petaTryBasemap(0);
+}
 function petaSetAttrib(txt){const el=document.getElementById('peta-attrib');if(el)el.textContent=txt}
 function petaActivateFallback(){
   if(PM.fallback)return;PM.fallback=true;
@@ -199,11 +304,12 @@ function petaTryBasemap(idx){
   PM.basemapIdx=idx;PM.tileOk=0;PM.tileErr=0;
   if(PM.tileTimer){clearTimeout(PM.tileTimer);PM.tileTimer=null}
   if(PM.tileLayer){try{PM.map.removeLayer(PM.tileLayer)}catch(e){}PM.tileLayer=null}
-  if(idx>=PETA_BASEMAPS.length){petaActivateFallback();return}
-  const bp=PETA_BASEMAPS[idx];
+  const chain=PM.chain||petaChain();PM.chain=chain;
+  if(idx>=chain.length){petaActivateFallback();return}
+  const bp=chain[idx];
   petaSetAttrib('Memuat peta dasar: '+bp.name+' …');
   PM.tileLayer=L.tileLayer(bp.url,bp.opts);
-  PM.tileLayer.on('tileload',()=>{PM.tileOk++;if(PM.tileOk===1){if(PM.tileTimer){clearTimeout(PM.tileTimer);PM.tileTimer=null}petaSetAttrib('Peta dasar: '+bp.name+' • Leaflet')}});
+  PM.tileLayer.on('tileload',()=>{PM.tileOk++;if(PM.tileOk===1){if(PM.tileTimer){clearTimeout(PM.tileTimer);PM.tileTimer=null}petaSetAttrib(idx>0?('Tampilan pilihan tidak terjangkau — memakai '+bp.name+' • Leaflet'):('Peta dasar: '+bp.name+' • Leaflet'))}});
   PM.tileLayer.on('tileerror',()=>{PM.tileErr++;petaCheckTiles()});
   PM.tileLayer.addTo(PM.map);
   PM.tileTimer=setTimeout(()=>{if(PM.tileOk===0)petaNextBasemap()},6000);
@@ -263,35 +369,8 @@ function petaRenderMarkers(){
     mk.on('click',()=>{if(mk.closeTooltip)mk.closeTooltip();petaSelect(en,{popup:true})});
     mk.addTo(PM.layer);PM.markers[en.key]=mk;
   });
-  petaLayoutPins();
-}
-/* Sebar pin yang berdekatan dalam ruang layar supaya tidak saling menutupi.
-   Posisi dasar (kota anggota) tidak berubah — geseran dihitung ulang dari
-   posisi dasar setiap kali peta digambar atau zoom berubah. */
-function petaLayoutPins(){
-  if(!PM.map||typeof L==='undefined')return;
-  const zoom=PM.map.getZoom(),pts=[];
-  petaFiltered().forEach(en=>{
-    const mk=PM.markers[en.key];if(!mk)return;
-    const p=PM.map.project(L.latLng(en.coords[0],en.coords[1]),zoom);
-    pts.push({mk,x:p.x,y:p.y});
-  });
-  if(pts.length<2)return;
-  const MIN=37;
-  for(let it=0;it<90;it++){
-    let moved=false;
-    for(let i=0;i<pts.length;i++)for(let j=i+1;j<pts.length;j++){
-      const a=pts[i],b=pts[j];
-      let dx=b.x-a.x,dy=b.y-a.y,d=Math.sqrt(dx*dx+dy*dy);
-      if(d<MIN){
-        if(d<0.01){dx=(j+1)*0.6;dy=0.4;d=Math.sqrt(dx*dx+dy*dy)}
-        const push=(MIN-d)/2,ux=dx/d,uy=dy/d;
-        a.x-=ux*push;a.y-=uy*push;b.x+=ux*push;b.y+=uy*push;moved=true;
-      }
-    }
-    if(!moved)break;
-  }
-  pts.forEach(o=>o.mk.setLatLng(PM.map.unproject(L.point(o.x,o.y),zoom)));
+  /* Pin TIDAK disebar/digeser dalam ruang layar: posisinya persis di
+     koordinat alamatnya pada semua zoom, walau pin lain berimpit. */
 }
 function petaRenderList(){
   const ul=document.getElementById('peta-list');if(!ul)return;
@@ -341,11 +420,15 @@ function petaSelect(en,opts){
 function vPeta(){
   const {entries,belum}=petaEntries();
   const stat=(id,val,label)=>h('div',{class:'peta-stat'},h('b',{id},String(val)),h('span',{},label));
+  const styleBtn=(key,label)=>h('button',{type:'button',class:'peta-style-btn'+(PM.style===key?' on':''),'data-style':key,'aria-label':'Tampilan peta '+label},label);
   const mapCard=h('section',{class:'peta-map-card'},
     h('div',{class:'peta-map-head'},
       h('div',{},h('h2',{},'Peta Jepang — Shikoku & sekitarnya'),h('p',{},'Ketuk pin untuk melihat nama anggota • Geser & zoom bebas')),
-      h('span',{class:'peta-count-badge',id:'peta-count'},entries.length+' pin tampil')),
+      h('div',{class:'peta-map-head-side'},
+        h('div',{class:'peta-style-switch',role:'group','aria-label':'Pilihan tampilan peta'},styleBtn('jalan','Jalan'),styleBtn('satelit','Satelit'),styleBtn('terang','Terang')),
+        h('span',{class:'peta-count-badge',id:'peta-count'},entries.length+' pin tampil'))),
     h('div',{id:'peta-map',role:'application','aria-label':'Peta anggota Shikoku Family'}),
+    h('div',{id:'peta-geo-status',class:'peta-geo-status',style:'display:none'}),
     h('div',{id:'peta-notice',class:'peta-notice',style:'display:none'},'Server peta luar sedang tidak terjangkau, jadi yang tampil adalah ',h('b',{},'peta dasar cadangan lokal'),'. Pencarian, saringan wilayah, dan detail anggota tetap bekerja.'),
     h('div',{class:'peta-map-foot'},h('span',{id:'peta-attrib'},'Memuat peta dasar… • Leaflet'),h('span',{id:'peta-hint'},'Menampilkan semua wilayah')));
   const stats=h('div',{class:'peta-stats'},
@@ -367,9 +450,7 @@ function vPeta(){
     h('div',{class:'peta-empty',id:'peta-empty',style:'display:none'},'Tidak ada anggota yang cocok. Coba kata pencarian lain atau tampilkan semua wilayah.'));
   const out=[h('h1',{},'Peta & Wilayah'),mapCard,stats];
   if(belum.length)out.push(h('p',{class:'warn peta-belum'},belum.length+' anggota belum tampil di peta karena alamat/kota Jepangnya belum dikenal. Lengkapi alamat mereka lewat menu Daftar Anggota supaya pin mereka muncul.'));
-  out.push(detail,controls,listCard,
-    h('h2',{class:'peta-h2',style:'margin:20px 4px 10px'},'Sebaran per Wilayah'),
-    ...sebaran());
+  out.push(detail,controls,listCard);
   return out;
 }
 /* Dipanggil render() sesudah halaman Peta terpasang di DOM: bangun (ulang)
@@ -382,7 +463,9 @@ function initPetaMap(){
   try{
     if(PM.tileTimer){clearTimeout(PM.tileTimer);PM.tileTimer=null}
     if(PM.map){try{PM.map.remove()}catch(e){}PM.map=null;PM.layer=null;PM.markers={};PM.tileLayer=null;PM.fallbackLayer=null;PM.fallback=false}
+    PM.gen=(PM.gen||0)+1;
     PM.entries=petaEntries().entries;
+    document.querySelectorAll('.peta-style-btn').forEach(b=>{b.classList.toggle('on',b.getAttribute('data-style')===PM.style);b.onclick=()=>petaSetStyle(b.getAttribute('data-style'))});
     const search=document.getElementById('peta-search');
     if(search){search.value=S.petaSearch||'';search.oninput=()=>{S.petaSearch=search.value.trim();petaRenderMarkers();petaRenderList();petaRenderStats()}}
     const reset=document.getElementById('peta-reset');
@@ -397,9 +480,11 @@ function initPetaMap(){
     PM.map=L.map(el,{scrollWheelZoom:true}).setView([33.9,133.7],window.innerWidth<640?7:8);
     PM.layer=L.layerGroup().addTo(PM.map);
     PM.map.on('click',()=>{S.petaSelected=null;petaHideDetail();petaRenderMarkers();petaRenderList()});
-    PM.map.on('zoomend',()=>petaLayoutPins());
+    PM.chain=petaChain();
     petaTryBasemap(0);
     petaRefresh();
+    /* Penempatan pin presisi dari alamat lengkap berjalan di latar */
+    petaGeocodeEntries(PM.gen);
     if(S.petaSelected){const en=PM.entries.find(x=>x.key===String(S.petaSelected));if(en)petaShowDetail(en)}
   }catch(e){
     console.error('Peta anggota gagal dimulai (halaman lain tidak terpengaruh):',e);
