@@ -9,70 +9,111 @@ function eventAttendanceCount(event){
 function activityMemberIds(event,key){
   return Array.isArray(event[key])?event[key].map(String):[];
 }
+/* ===== Absensi per wilayah: empat status =====
+   Status tersimpan di field 'absensi_status' pada dokumen kegiatan yang
+   sama (peta id anggota -> 'hadir'|'izin'|'alpha'|'cuti'). Dua field lama
+   tetap dirawat persis seperti sebelumnya supaya rekap & grafik tetap
+   terbaca: 'peserta_anggota' = anggota yang sudah dicatat statusnya,
+   'hadir_anggota' = yang berstatus hadir. Data lama tanpa 'absensi_status'
+   tetap terbaca: anggota di 'hadir_anggota' = Hadir, peserta lama yang
+   tidak tercatat hadir = Alpha. */
+const ABSENSI_STATUS=[['hadir','Hadir'],['izin','Izin'],['alpha','Alpha'],['cuti','Cuti']];
+function activityStatusMap(event){
+  const map={};
+  if(event.absensi_status&&typeof event.absensi_status==='object'&&!Array.isArray(event.absensi_status)){
+    Object.entries(event.absensi_status).forEach(([id,status])=>{
+      if(ABSENSI_STATUS.some(([key])=>key===status))map[String(id)]=status;
+    });
+  }
+  const attendees=new Set(activityMemberIds(event,'hadir_anggota'));
+  activityMemberIds(event,'peserta_anggota').forEach(id=>{if(!map[id])map[id]=attendees.has(id)?'hadir':'alpha'});
+  attendees.forEach(id=>{if(!map[id])map[id]='hadir'});
+  return map;
+}
+function activityStatusOf(event,memberId){
+  return activityStatusMap(event)[String(memberId)]||'';
+}
 async function updateActivityMember(eventId,memberId,action){
   if(!S.admin)throw new Error('Hanya admin yang dapat mengelola peserta kegiatan.');
   if(!S.db)throw new Error('Penyimpanan belum tersedia.');
   const event=S.events.find(item=>String(item.id)===String(eventId));
   if(!event)throw new Error('Kegiatan tidak ditemukan.');
   const id=String(memberId),participants=new Set(activityMemberIds(event,'peserta_anggota')),attendees=new Set(activityMemberIds(event,'hadir_anggota'));
+  const statusMap=activityStatusMap(event);
   if(action==='add')participants.add(id);
-  else if(action==='present'){participants.add(id);attendees.add(id)}
-  else if(action==='absent'){participants.add(id);attendees.delete(id)}
-  else if(action==='remove'){participants.delete(id);attendees.delete(id)}
+  else if(action==='present'){participants.add(id);attendees.add(id);statusMap[id]='hadir'}
+  else if(action==='absent'){participants.add(id);attendees.delete(id);statusMap[id]='alpha'}
+  else if(action==='remove'){participants.delete(id);attendees.delete(id);delete statusMap[id]}
   else throw new Error('Tindakan peserta tidak dikenal.');
-  await S.db.collection('events').doc(eventId).update({peserta_anggota:[...participants],hadir_anggota:[...attendees]});
+  await S.db.collection('events').doc(eventId).update({peserta_anggota:[...participants],hadir_anggota:[...attendees],absensi_status:statusMap});
 }
-
+/* Anggota aktif satu wilayah, urut nama — daftar yang diabsen di tahap 2 */
+function absensiRegionMembers(region){
+  return S.members
+    .filter(member=>String(member.status||'aktif').toLowerCase()!=='nonaktif'&&memberRegion(member)===region)
+    .sort((a,b)=>(a.nama||'').localeCompare(b.nama||'','id'));
+}
+function buildAbsensiDraft(event,region){
+  const draft={};
+  absensiRegionMembers(region).forEach(member=>{
+    const status=activityStatusOf(event,member.id);
+    if(status)draft[String(member.id)]=status;
+  });
+  return draft;
+}
+/* Simpan absensi SATU wilayah: status wilayah lain pada kegiatan yang
+   sama dibiarkan utuh, jadi antarwilayah tidak saling menimpa. */
+async function saveRegionAttendance(eventId,region,draft){
+  if(!S.admin)throw new Error('Hanya admin yang dapat mengelola absensi kegiatan.');
+  if(!S.db)throw new Error('Penyimpanan belum tersedia.');
+  const event=S.events.find(item=>String(item.id)===String(eventId));
+  if(!event)throw new Error('Kegiatan tidak ditemukan.');
+  const map=activityStatusMap(event);
+  absensiRegionMembers(region).forEach(member=>{
+    const id=String(member.id);
+    if(draft&&draft[id])map[id]=draft[id];
+    else delete map[id];
+  });
+  const peserta=Object.keys(map);
+  const hadir=peserta.filter(id=>map[id]==='hadir');
+  await S.db.collection('events').doc(eventId).update({peserta_anggota:peserta,hadir_anggota:hadir,absensi_status:map});
+}
+/* Masuk tahap 2: halaman fokus mengabsen satu wilayah untuk satu kegiatan */
+function enterAbsensi(event,region){
+  S.absensiEvent=String(event.id);
+  S.absensiRegion=region;
+  S.absensiDraft=buildAbsensiDraft(event,region);
+  render();
+  window.scrollTo(0,0);
+}
+function leaveAbsensi(){
+  S.absensiEvent=null;
+  S.absensiRegion=null;
+  S.absensiDraft=null;
+  render();
+  window.scrollTo(0,0);
+}
 
 function activityCard(event){
   const participants=activityMemberIds(event,'peserta_anggota'),attendees=new Set(activityMemberIds(event,'hadir_anggota'));
   const registeredMembers=S.members.filter(member=>String(member.status||'aktif').toLowerCase()!=='nonaktif');
-  const memberById=new Map(S.members.map(member=>[String(member.id),member]));
-  const participantsByRegion=new Map(wilayahEfektif().map(([region])=>[region,[]]));
-  const unassignedParticipants=[];
-  participants.forEach(id=>{
-    const member=memberById.get(id),region=member&&memberRegion(member);
-    if(participantsByRegion.has(region))participantsByRegion.get(region).push(id);
-    else unassignedParticipants.push(id);
-  });
-  const participantRow=id=>{
-    const member=memberById.get(id),present=attendees.has(id);
-    return h('div',{class:'activity-participant'},
-      h('div',{},h('b',{},member?.nama||'Anggota tidak ditemukan'),h('small',{},member?memberCode(member):'ID: '+id)),
-      S.admin&&h('div',{class:'activity-participant-actions'},
-        h('button',{class:'btn s',onclick:async()=>{
-          try{await updateActivityMember(event.id,id,present?'absent':'present')}catch(error){console.error(error);alert('Gagal memperbarui kehadiran: '+(error.message||'periksa koneksi'))}
-        }},present?'Batal hadir':'Tandai hadir'),
-        h('button',{class:'btn s btn-eh',onclick:async()=>{
-          if(!confirm('Keluarkan '+(member?.nama||'anggota ini')+' dari kegiatan?'))return;
-          try{await updateActivityMember(event.id,id,'remove')}catch(error){console.error(error);alert('Gagal menghapus peserta: '+(error.message||'periksa koneksi'))}
-        }},'Hapus')));
-  };
   const date=event.tanggal?new Date(event.tanggal+'T00:00:00'):null;
   const dateLabel=date&&!Number.isNaN(date.getTime())?date.toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'}):'Tanggal belum ditentukan';
   const legacyCount=Array.isArray(event.hadir_anggota)?0:(event.hadir||[]).length;
   const feedback=S.activityFeedback&&String(S.activityFeedback.eventId)===String(event.id)?S.activityFeedback.message:'';
   const status=h('p',{class:'activity-feedback','aria-live':'polite'},feedback);
-  const regionSection=(region,ids)=>{
-    const presentCount=ids.filter(id=>attendees.has(id)).length;
-    const contents=[
-      h('div',{class:'activity-region-heading'},h('div',{},icon('map',17),h('h4',{},region)),h('span',{},ids.length+' peserta · '+presentCount+' hadir')),
-      ids.length?h('div',{class:'activity-roster'},...ids.map(participantRow)):h('p',{class:'activity-empty'},'Belum ada peserta di wilayah ini.')
-    ];
-    if(S.admin){
-      const eligible=registeredMembers.filter(member=>memberRegion(member)===region&&!participants.includes(String(member.id)));
-      const select=h('select',{class:'activity-member-select'},h('option',{value:''},eligible.length?'Pilih anggota wilayah ini':'Tidak ada anggota lain di wilayah ini'),...eligible.map(member=>h('option',{value:member.id},(member.nama||'Tanpa nama')+' · '+memberCode(member))));
-      const addButton=h('button',{class:'btn s',onclick:async()=>{
-        if(!select.value){status.textContent='Pilih anggota dari wilayah '+region+'.';return}
-        try{await updateActivityMember(event.id,select.value,'add')}catch(error){console.error(error);alert('Gagal menambahkan peserta: '+(error.message||'periksa koneksi'))}
-      }},'Tambah peserta');
-      addButton.disabled=!eligible.length;
-      contents.push(h('div',{class:'activity-add-row'},select,addButton));
-    }
-    return h('section',{class:'activity-region-section'},...contents);
+  /* Tahap 1: pilih wilayah dulu. Daftar anggota BELUM tampil di sini;
+     admin mengetuk satu wilayah untuk masuk ke halaman pengabsenannya. */
+  const regionPick=(region,color)=>{
+    const membersInRegion=registeredMembers.filter(member=>memberRegion(member)===region);
+    const recorded=membersInRegion.filter(member=>activityStatusOf(event,member.id)).length;
+    const present=membersInRegion.filter(member=>activityStatusOf(event,member.id)==='hadir').length;
+    return h('button',{class:'activity-region-pick',style:'--region-color:'+color,onclick:()=>enterAbsensi(event,region)},
+      h('span',{class:'activity-region-pick-main'},h('b',{},region),h('small',{},membersInRegion.length+' anggota · '+recorded+' sudah dicatat · '+present+' hadir')),
+      h('span',{class:'activity-region-pick-arrow'},'›'));
   };
-  const regionSections=wilayahEfektif().map(([region])=>regionSection(region,participantsByRegion.get(region)));
-  if(unassignedParticipants.length)regionSections.push(regionSection('Wilayah belum ditentukan',unassignedParticipants));
+  const regionPicks=wilayahEfektif().map(([region,color])=>regionPick(region,color));
+  if(registeredMembers.some(member=>memberRegion(member)==='Belum dipilih'))regionPicks.push(regionPick('Belum dipilih','#718096'));
   const content=[
     h('div',{class:'activity-heading'},h('div',{},h('h2',{},event.judul||'Kegiatan komunitas'),h('p',{class:'activity-meta'},icon('calendar',15),h('span',{},dateLabel+(event.waktu?' · '+event.waktu:''))),event.lokasi&&h('p',{class:'activity-meta'},icon('pin',15),h('span',{},event.lokasi))),S.admin&&h('button',{class:'btn s btn-eh',onclick:async()=>{
       if(!confirm('Hapus kegiatan "'+(event.judul||'ini')+'"?'))return;
@@ -82,7 +123,8 @@ function activityCard(event){
     h('div',{class:'activity-counts'},h('b',{},participants.length+' peserta'),h('b',{},attendees.size+' hadir')),
     legacyCount>0&&h('p',{class:'warn'},legacyCount+' catatan absensi lama belum terhubung dengan data anggota.'),
     h('h3',{},'Absensi per wilayah'),
-    h('div',{class:'activity-region-list'},...regionSections)
+    h('p',{class:'activity-help'},'Pilih wilayah yang akan dikerjakan pengabsenannya:'),
+    h('div',{class:'activity-region-pick-grid'},...regionPicks)
   ];
   if(S.admin){
     const barcodeInput=h('input',{class:'activity-barcode-input',placeholder:'Pindai QR / masukkan ID anggota',autocomplete:'off'});
@@ -173,7 +215,77 @@ function activityCard(event){
   }
   return h('article',{class:'card activity-card'},...content);
 }
+/* Tahap 2: halaman fokus mengabsen anggota SATU wilayah untuk satu
+   kegiatan. Seluruh anggota wilayah tampil; di kanan tiap baris ada
+   checklist status Hadir / Izin / Alpha / Cuti (satu anggota satu status).
+   Pilihan bekerja pada draf lokal dan baru tersimpan lewat tombol
+   'Simpan absensi', jadi status lama tampil terpilih dan bisa diubah. */
+function vAbsensiFokus(event,region){
+  if(!S.absensiDraft)S.absensiDraft=buildAbsensiDraft(event,region);
+  const draft=S.absensiDraft;
+  const members=absensiRegionMembers(region);
+  const color=wilayahEfektif().find(([name])=>name===region)?.[1]||'#718096';
+  const date=event.tanggal?new Date(event.tanggal+'T00:00:00'):null;
+  const dateLabel=date&&!Number.isNaN(date.getTime())?date.toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'}):'Tanggal belum ditentukan';
+  const summary=h('p',{class:'activity-feedback absensi-summary','aria-live':'polite'},'');
+  const updateSummary=()=>{
+    const counts={hadir:0,izin:0,alpha:0,cuti:0};
+    members.forEach(member=>{const st=draft[String(member.id)];if(st&&counts[st]!=null)counts[st]++});
+    const done=counts.hadir+counts.izin+counts.alpha+counts.cuti;
+    summary.textContent=done+' dari '+members.length+' anggota sudah dicatat · '+counts.hadir+' hadir · '+counts.izin+' izin · '+counts.alpha+' alpha · '+counts.cuti+' cuti';
+  };
+  const feedback=h('p',{class:'activity-feedback','aria-live':'polite'},'');
+  const memberRow=member=>{
+    const id=String(member.id);
+    const info=h('div',{class:'absensi-info'},h('b',{},member.nama||'Tanpa nama'),h('small',{},memberCode(member)));
+    if(!S.admin){
+      const st=draft[id]||'';
+      const label=st?ABSENSI_STATUS.find(([key])=>key===st)[1]:'Belum dicatat';
+      return h('div',{class:'absensi-row'},info,h('span',{class:'absensi-chip'+(st?' st-'+st:'')},label));
+    }
+    const seg=h('div',{class:'absensi-seg',role:'radiogroup','aria-label':'Status kehadiran '+(member.nama||'anggota')},
+      ...ABSENSI_STATUS.map(([key,label])=>h('button',{type:'button',class:'absensi-opt'+(draft[id]===key?' on':''),'data-st':key,'aria-pressed':draft[id]===key?'true':'false',onclick:()=>{
+        if(draft[id]===key)delete draft[id];
+        else draft[id]=key;
+        seg.querySelectorAll('.absensi-opt').forEach(btn=>{
+          const on=draft[id]===btn.getAttribute('data-st');
+          btn.classList.toggle('on',on);
+          btn.setAttribute('aria-pressed',on?'true':'false');
+        });
+        feedback.textContent='';
+        updateSummary();
+      }},label)));
+    return h('div',{class:'absensi-row'},info,seg);
+  };
+  updateSummary();
+  return h('section',{class:'card absensi-card'},
+    h('button',{class:'btn s absensi-back',onclick:()=>leaveAbsensi()},icon('back',16),h('span',{},'Ganti wilayah')),
+    h('p',{class:'absensi-kicker'},'Absensi kegiatan'),
+    h('h2',{},event.judul||'Kegiatan komunitas'),
+    h('p',{class:'activity-meta'},icon('calendar',15),h('span',{},dateLabel+(event.waktu?' · '+event.waktu:''))),
+    event.lokasi&&h('p',{class:'activity-meta'},icon('pin',15),h('span',{},event.lokasi)),
+    h('div',{class:'absensi-region-title'},h('span',{class:'absensi-dot',style:'background:'+color}),h('h3',{},'Wilayah '+region)),
+    summary,
+    members.length?h('div',{class:'absensi-list'},...members.map(memberRow)):h('p',{class:'activity-empty'},'Belum ada anggota di wilayah ini.'),
+    S.admin&&h('p',{class:'activity-help'},'Ketuk salah satu status di kanan nama anggota. Ketuk status yang sama sekali lagi untuk membatalkan pilihan.'),
+    S.admin&&h('div',{class:'absensi-savebar'},
+      h('button',{class:'btn',onclick:async()=>{
+        try{
+          await saveRegionAttendance(event.id,region,draft);
+          feedback.textContent='Absensi wilayah '+region+' tersimpan.';
+        }catch(error){console.error(error);feedback.textContent='Gagal menyimpan absensi: '+(error.message||'periksa koneksi')}
+      }},'Simpan absensi'),
+      h('button',{class:'btn s',onclick:()=>leaveAbsensi()},'Ganti wilayah')),
+    feedback
+  );
+}
 function vKegiatan(){
+  /* Tahap 2 aktif: tampilkan hanya halaman pengabsenan wilayah terpilih */
+  if(S.absensiRegion){
+    const focused=S.events.find(item=>String(item.id)===String(S.absensiEvent));
+    if(focused)return [h('h1',{},'Absensi Kegiatan'),guard(),vAbsensiFokus(focused,S.absensiRegion)];
+    S.absensiEvent=null;S.absensiRegion=null;S.absensiDraft=null;
+  }
   const title=h('input',{placeholder:'Nama kegiatan',maxlength:'150'});
   const date=h('input',{type:'date'});
   const time=h('input',{type:'time'});

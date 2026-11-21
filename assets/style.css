@@ -388,6 +388,40 @@ body.admin-dark .card .e{background:#293946;color:var(--acc)}
 .activity-scanner-video{width:100%;max-height:300px;margin-top:10px;border-radius:14px;background:#111}
 .activity-feedback{min-height:1.3em;color:var(--mut);font-size:14px}
 .activity-empty{color:var(--mut);margin:8px 0}
+/* Absensi dua tahap: tahap 1 pemilih wilayah, tahap 2 halaman fokus satu wilayah */
+.activity-region-pick-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.activity-region-pick{display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:0;padding:12px;text-align:left;background:var(--card);border:1px solid var(--line);border-top:4px solid var(--region-color,#718096);border-radius:16px;color:var(--ink);box-shadow:0 4px 14px rgba(47,134,184,.07)}
+.activity-region-pick-main{min-width:0}
+.activity-region-pick-main b{display:block;font-size:14px;text-transform:uppercase}
+.activity-region-pick-main small{display:block;margin-top:3px;color:var(--mut);font-size:11px;font-weight:700}
+.activity-region-pick-arrow{flex:none;font-size:20px;color:var(--mut)}
+.absensi-card{display:block}
+.absensi-back{align-self:flex-start;margin-bottom:10px}
+.absensi-kicker{margin:0 0 2px;color:var(--mut);font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.absensi-card h2{margin:0 0 6px;font-size:20px}
+.absensi-region-title{display:flex;align-items:center;gap:8px;margin:14px 0 4px}
+.absensi-region-title h3{margin:0;font-size:16px}
+.absensi-dot{width:12px;height:12px;flex:none;border-radius:999px}
+.absensi-summary{margin:2px 0 10px}
+.absensi-list{display:grid;gap:8px}
+.absensi-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 10px 9px 12px;border:1px solid var(--line);border-radius:14px;background:var(--card)}
+.absensi-info{min-width:0;flex:1}
+.absensi-info b{display:block;font-size:14px;overflow-wrap:anywhere}
+.absensi-info small{display:block;margin-top:2px;color:var(--mut)}
+.absensi-seg{display:flex;flex:none;border:1px solid var(--line);border-radius:999px;overflow:hidden;background:#fff}
+.absensi-opt{border:0;border-left:1px solid var(--line);background:transparent;padding:8px 9px;font-size:11px;font-weight:700;color:var(--mut)}
+.absensi-opt:first-child{border-left:0}
+.absensi-opt.on[data-st="hadir"]{background:#2e9e63;color:#fff}
+.absensi-opt.on[data-st="izin"]{background:#f2b544;color:#2a1c00}
+.absensi-opt.on[data-st="alpha"]{background:#d9534f;color:#fff}
+.absensi-opt.on[data-st="cuti"]{background:#2f8fc1;color:#fff}
+.absensi-chip{flex:none;padding:6px 10px;border-radius:999px;background:var(--line);color:var(--mut);font-size:11px;font-weight:700}
+.absensi-chip.st-hadir{background:#2e9e63;color:#fff}
+.absensi-chip.st-izin{background:#f2b544;color:#2a1c00}
+.absensi-chip.st-alpha{background:#d9534f;color:#fff}
+.absensi-chip.st-cuti{background:#2f8fc1;color:#fff}
+.absensi-savebar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:12px}
+@media(max-width:560px){.activity-region-pick-grid{grid-template-columns:1fr}.absensi-row{gap:8px;padding:8px 8px 8px 10px}.absensi-opt{padding:7px 6px;font-size:10px}.absensi-info b{font-size:13px}}
 @media(max-width:560px){.activity-create-grid{grid-template-columns:1fr;gap:0}.activity-heading{align-items:flex-start}.activity-region-list{grid-template-columns:1fr}.activity-participant{align-items:flex-start;flex-direction:column}.activity-participant-actions{width:100%;flex-wrap:wrap}.activity-add-row,.activity-scanner-row{align-items:stretch}.activity-add-row{flex-direction:column}.activity-region-section .activity-add-row{flex-direction:row}.activity-region-section .activity-add-row .btn{white-space:nowrap}.activity-scanner-row .btn{white-space:nowrap}}
 
 /* ===== Musyawarah: buku catatan rapat (dari file musyawarah.html) =====
