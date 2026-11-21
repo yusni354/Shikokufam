@@ -273,6 +273,15 @@ create policy "Main admins can approve profiles"
   using (public.is_main_admin())
   with check (public.is_main_admin());
 
+-- Hapus akun dari halaman Persetujuan: TANPA kebijakan ini, perintah
+-- delete dari aplikasi selalu terblokir RLS (0 baris terhapus tanpa
+-- pesan error) sehingga tombol Hapus tampak tidak berfungsi.
+drop policy if exists "Main admins can delete profiles" on public.profiles;
+create policy "Main admins can delete profiles"
+  on public.profiles for delete
+  to authenticated
+  using (public.is_main_admin());
+
 drop policy if exists "Admins can read messages" on public.messages;
 create policy "Admins can read messages"
   on public.messages for select
@@ -305,6 +314,7 @@ grant insert on public.messages to authenticated;
 revoke insert on public.messages from anon;
 grant select on public.profiles to authenticated;
 grant update on public.profiles to authenticated;
+grant delete on public.profiles to authenticated;
 grant select, update, delete on public.messages to authenticated;
 grant select, insert on public.message_replies to authenticated;
 

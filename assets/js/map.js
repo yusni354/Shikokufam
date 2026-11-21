@@ -62,8 +62,16 @@ async function hapusAkun(id){
     await loadPendingUsers();render();
     return;
   }
-  const {error}=await S.supabase.from('profiles').delete().eq('id',id);
+  /* .select('id') wajib ada: tanpa itu PostgREST melaporkan sukses walau
+     RLS memblokir penghapusan dan 0 baris terhapus — akun tampak tidak
+     bisa dihapus tanpa pesan apa pun. Baris yang benar-benar terhapus
+     kini diperiksa, dan kegagalan ditampilkan dengan jelas. */
+  const {data,error}=await S.supabase.from('profiles').delete().eq('id',id).select('id');
   if(error){alert('Gagal menghapus akun: '+error.message);return}
+  if(!data||!data.length){
+    alert('Akun tidak terhapus: penghapusan terblokir oleh database. Jalankan ulang berkas supabase/schema.sql terbaru di Supabase SQL Editor (kebijakan hapus akun untuk admin utama ada di sana), lalu coba lagi.');
+    return;
+  }
   await loadPendingUsers();render();
 }
 /* Jadikan akun terpilih sebagai admin utama (khusus admin utama yang
