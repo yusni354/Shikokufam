@@ -185,7 +185,13 @@ function activityCard(event){
     h('div',{class:'activity-heading'},h('div',{},h('h2',{},event.judul||'Kegiatan komunitas'),h('p',{class:'activity-meta'},icon('calendar',15),h('span',{},dateLabel+(event.waktu?' · '+event.waktu:'')))),h('span',{class:'activity-heading-side'},h('span',{class:'activity-chevron','aria-hidden':'true'},'›'))),
     totalsView.pills,
     chart,
-    chartLegend
+    chartLegend,
+    /* Keterangan penyebut grafik: jumlah total anggota aktif yang menjadi
+       dasar perhitungan batang & legenda di atas, supaya proporsinya
+       terbaca utuh ("dari total N anggota"). Angka yang sama persis
+       dengan penyebut grafik (totalAnggota). Tidak tampil bila belum
+       ada anggota sama sekali. */
+    totalAnggota>0&&h('p',{class:'activity-total-note'},'dari total '+totalAnggota+' anggota')
   ];
   if(expanded)content.push(
     event.lokasi&&h('p',{class:'activity-meta'},icon('pin',15),h('span',{},event.lokasi)),
@@ -418,7 +424,63 @@ function vRingkasan(){
     });
     return card;
   };
-  return [...head,summaryCard,h('div',{class:'activity-list'},...events.map(item))];
+  /* ===== Laporan rekap per anggota: tabel lengkap setahun =====
+     Satu baris per anggota aktif (urut wilayah mengikuti urutan resmi
+     wilayahEfektif, lalu nama), satu kolom per kegiatan tahun terpilih
+     (urut tanggal menaik seperti buku laporan), sel berisi huruf status
+     dari peta status yang sama dengan kartu kegiatan — H/I/C/A, atau
+     strip bila anggota belum tercatat pada kegiatan itu (berbeda dari
+     Alpha tersimpan). Ujung kanan: total tiap status sepanjang tahun
+     dan persen kehadiran = Hadir ÷ jumlah kegiatan tahun itu × 100. */
+  const REKAP_HURUF={hadir:'H',izin:'I',cuti:'C',alpha:'A'};
+  const rekapEvents=[...events].sort((a,b)=>(a.tanggal||'').localeCompare(b.tanggal||'')||(a.at||0)-(b.at||0));
+  const regionOrder=new Map(wilayahEfektif().map(([name],index)=>[name,index]));
+  const rekapMembers=S.members
+    .filter(member=>String(member.status||'aktif').toLowerCase()!=='nonaktif')
+    .sort((a,b)=>{
+      const ra=memberRegion(a),rb=memberRegion(b);
+      const oa=regionOrder.has(ra)?regionOrder.get(ra):regionOrder.size;
+      const ob=regionOrder.has(rb)?regionOrder.get(rb):regionOrder.size;
+      if(oa!==ob)return oa-ob;
+      if(ra!==rb)return ra.localeCompare(rb,'id');
+      return (a.nama||'').localeCompare(b.nama||'','id');
+    });
+  const shortDate=event=>{
+    const d=event.tanggal?new Date(event.tanggal+'T00:00:00'):null;
+    return d&&!Number.isNaN(d.getTime())?d.toLocaleDateString('id-ID',{day:'numeric',month:'short'}):'—';
+  };
+  const rekapHead=h('thead',{},h('tr',{},
+    h('th',{class:'rekap-name-head'},'Nama'),
+    ...rekapEvents.map(event=>h('th',{class:'rekap-ev',title:(event.judul||'Kegiatan komunitas')+' · '+shortDate(event)},h('small',{},shortDate(event)),h('span',{},event.judul||'Kegiatan komunitas'))),
+    h('th',{class:'rekap-sum-start',title:'Total Hadir sepanjang tahun'},'Hadir'),
+    h('th',{title:'Total Izin sepanjang tahun'},'Izin'),
+    h('th',{title:'Total Cuti sepanjang tahun'},'Cuti'),
+    h('th',{title:'Total Alpha sepanjang tahun'},'Alpha'),
+    h('th',{title:'Persen kehadiran sepanjang tahun'},'% Hadir')));
+  const rekapBody=h('tbody',{},...rekapMembers.map(member=>{
+    const totals={hadir:0,izin:0,cuti:0,alpha:0};
+    const cells=rekapEvents.map(event=>{
+      const st=activityStatusOf(event,member.id);
+      if(st&&totals[st]!=null){totals[st]++;return h('td',{class:'rekap-st st-'+st},REKAP_HURUF[st])}
+      return h('td',{class:'rekap-none'},'–');
+    });
+    const pct=rekapEvents.length?Math.round(totals.hadir/rekapEvents.length*100):0;
+    return h('tr',{},
+      h('td',{class:'rekap-name'},h('b',{},member.nama||'Tanpa nama'),h('small',{},memberRegion(member))),
+      ...cells,
+      h('td',{class:'rekap-num rekap-sum-start'},String(totals.hadir)),
+      h('td',{class:'rekap-num'},String(totals.izin)),
+      h('td',{class:'rekap-num'},String(totals.cuti)),
+      h('td',{class:'rekap-num'},String(totals.alpha)),
+      h('td',{class:'rekap-num'},pct+'%'));
+  }));
+  const rekapCard=h('section',{class:'card ringkasan-rekap'},
+    h('h2',{},'Rekap absensi per anggota'),
+    h('p',{class:'activity-meta'},h('span',{},'H = Hadir · I = Izin · C = Cuti · A = Alpha · – = belum tercatat')),
+    rekapMembers.length
+      ?h('div',{class:'rekap-wrap'},h('table',{class:'rekap-table'},rekapHead,rekapBody))
+      :h('p',{class:'warn'},'Belum ada anggota aktif.'));
+  return [...head,summaryCard,rekapCard,h('div',{class:'activity-list'},...events.map(item))];
 }
 function vKegiatan(){
   /* Tahap 2 aktif: tampilkan hanya halaman pengabsenan wilayah terpilih */

@@ -48,6 +48,28 @@ render();
     S.supabase = window.supabase.createClient(window.SUPABASE_CONFIG.url, window.SUPABASE_CONFIG.anonKey);
     S.db = createSupabaseDb(S.supabase);
 
+    /* Id pengguna dari sesi yang SUDAH diterapkan pada muatan halaman ini
+       (undefined = belum ada sesi yang diterapkan, null = keadaan belum
+       masuk sudah diterapkan). Pendengar sesi memakainya untuk membedakan
+       kejadian yang benar-benar mengubah siapa yang masuk dari kejadian
+       pengulangan / penyegaran token yang tidak mengubah apa pun. */
+    let appliedUid;
+    /* Sesi awal dari kejadian INITIAL_SESSION: sumber pemulihan KEDUA di
+       samping getSession(). Keduanya membaca penyimpanan sesi yang sama,
+       tetapi getSession() bisa sesaat mengembalikan sesi kosong ketika
+       token tersimpan sedang diperbarui (balapan penyegaran token — mis.
+       situs yang sama terbuka di tab/jendela lain pada peramban laptop),
+       sementara INITIAL_SESSION membawa sesi hasil pemulihan yang benar.
+       Muat ulang tidak boleh menyimpulkan "belum masuk" hanya dari satu
+       sumber yang sedang kosong sesaat. */
+    let bootSessionSettled = false, bootSessionValue = null, settleBootSession = () => {};
+    const bootSessionPromise = new Promise(resolve => {
+      settleBootSession = session => {
+        if (bootSessionSettled) return;
+        bootSessionSettled = true; bootSessionValue = session; resolve(session);
+      };
+    });
+
     // Dipanggil setiap kali status login berubah (masuk / keluar)
     const applySession = async session => {
       try {
@@ -64,11 +86,21 @@ render();
           S.storageErrors = {}; S.memberMediaUrls.clear(); S.memberMediaPending.clear();
           S.memberMediaFailed.clear(); S.legacyMediaPaths.clear(); S.memberMediaError = '';
         }
-        S.uid = nextUid; S.email = session?.user?.email || '';
+        S.uid = nextUid; appliedUid = nextUid; S.email = session?.user?.email || '';
         S.admin = false; S.mainAdmin = false; S.approvalStatus = 'approved';
         if (session?.user) {
-          const { data: profile, error } = await S.supabase.from('profiles').select('name,role,is_main_admin,approval_status').eq('id', session.user.id).maybeSingle();
-          if (error) console.error('Profil tidak dapat dibaca:', error);
+          /* Baca profil dengan satu kali pengulangan bila bacaan pertama
+             gagal (jaringan/token sesaat): kegagalan baca TIDAK boleh
+             menurunkan pengguna yang sebenarnya sudah disetujui ke
+             layar menunggu hanya karena satu permintaan gagal. */
+          let profile = null, profileError = null;
+          for (let attempt = 0; attempt < 2; attempt++) {
+            const res = await S.supabase.from('profiles').select('name,role,is_main_admin,approval_status').eq('id', session.user.id).maybeSingle();
+            profile = res.data; profileError = res.error;
+            if (!profileError) break;
+            console.error('Profil tidak dapat dibaca:', profileError);
+            await new Promise(r => setTimeout(r, 700));
+          }
           S.admin = profile?.role === 'admin';
           S.name = profile?.name || session.user.email || '';
           S.mainAdmin = S.admin && profile?.is_main_admin === true;
@@ -87,13 +119,42 @@ render();
       }
     };
 
-    const { data: { session } } = await S.supabase.auth.getSession();
-    await applySession(session);
-    // Abaikan kejadian yang tidak mengubah siapa yang login (hindari muat ulang data berulang)
+    /* Pendengar sesi dipasang SEBELUM sesi awal dibaca, supaya tidak ada
+       kejadian sesi yang terlewat selama pembacaan awal berjalan. */
     S.supabase.auth.onAuthStateChange((event, next) => {
-      if (event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') return;
-      applySession(next);
+      if (event === 'INITIAL_SESSION') { settleBootSession(next); return; }
+      if (event === 'TOKEN_REFRESHED') {
+        /* Penyegaran token untuk pengguna yang sama tidak mengubah apa
+           pun. Tetapi bila aplikasi sedang berada di gerbang masuk (belum
+           ada sesi yang diterapkan) dan penyegaran token di latar
+           menghasilkan sesi — keadaan yang sebelumnya membuat pengguna
+           terkunci di gerbang masuk walau sesinya masih berlaku — sesi
+           itulah yang memulihkannya. */
+        if (next?.user && appliedUid === null) applySession(next);
+        return;
+      }
+      if (event === 'SIGNED_OUT') { applySession(null); return; }
+      if (next?.user) {
+        /* SIGNED_IN / pemulihan sesi untuk pengguna yang belum diterapkan */
+        if (appliedUid !== next.user.id) applySession(next);
+        return;
+      }
+      /* Kejadian tanpa sesi selain SIGNED_OUT tidak meruntuhkan sesi yang
+         sedang berjalan; keadaan belum masuk hanya diterapkan dari
+         pembacaan awal di bawah. */
+      if (appliedUid === undefined) applySession(null);
     });
+    const { data: { session } } = await S.supabase.auth.getSession();
+    /* Ambil sesi pertama yang tidak kosong dari kedua sumber pemulihan
+       (getSession + INITIAL_SESSION). Hanya bila keduanya kosong pengguna
+       benar-benar belum masuk. Batas tunggu 6 detik hanya berjalan bila
+       INITIAL_SESSION belum juga tiba; biasanya ia tiba seketika. */
+    let initialSession = session;
+    if (!initialSession) {
+      initialSession = bootSessionSettled ? bootSessionValue
+        : await Promise.race([bootSessionPromise, new Promise(resolve => setTimeout(() => resolve(null), 6000))]);
+    }
+    await applySession(initialSession || null);
     // Daftar pendaftar baru diperiksa berkala; pesan memakai realtime (tanpa polling)
     setInterval(() => { if (S.mainAdmin) loadPendingUsers().then(() => renderDariData()); }, 60000);
   } catch (error) {
