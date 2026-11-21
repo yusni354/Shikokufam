@@ -54,20 +54,15 @@ function renderDrawer(){
       icon(x[4],19),h('span',{},x[1]),x[0]==='pesan'&&S.unreadMessages>0&&h('span',{class:'nav-badge'},String(S.unreadMessages)))),
     h('button',{class:'menu-logout',onclick:()=>signOut()},icon('logout',17),h('span',{},'Keluar')));
 }
-/* Gerbang awal: kerangka (header, drawer, navigasi bawah, maskot) hanya
-   tampil untuk pengguna yang sudah masuk dan disetujui. Selama terkunci,
-   body ber-class auth-locked dan CSS menyembunyikan semua kerangka —
-   yang terlihat hanya halaman login / menunggu persetujuan di #app.
-   Kelas bottom-nav-hidden ikut dikelola di sini: CSS menguncinya dengan
-   display:none!important pada #tb dan TIDAK ada kode lain yang pernah
-   melepasnya, jadi bila tidak dilepas saat kunci dibuka, navigasi bawah
-   tidak akan pernah muncul walau render() sudah memasang display:flex.
-   Selama terkunci kelas itu terpasang (gerbang tetap polos); sesudah
-   masuk & disetujui kelas itu dilepas bersama auth-locked, sehingga
-   header dan semua tombol navigasi tampil lagi. */
+/* Gerbang awal: kerangka (header, drawer, maskot) hanya tampil untuk
+   pengguna yang sudah masuk dan disetujui. Selama terkunci, body
+   ber-class auth-locked dan CSS menyembunyikan semua kerangka — yang
+   terlihat hanya halaman login / menunggu persetujuan di #app. Sesudah
+   masuk & disetujui class itu dilepas, sehingga header dan tombol
+   navigasi (hamburger → drawer) tampil lagi. Aplikasi tidak punya
+   navigasi bawah: semua perpindahan halaman lewat drawer. */
 function setAuthLocked(locked){
   document.body.classList.toggle('auth-locked',!!locked);
-  document.body.classList.toggle('bottom-nav-hidden',!!locked);
   if(locked){
     document.body.classList.remove('open');
     const pm=document.querySelector('#pm');if(pm)pm.remove();
@@ -83,7 +78,6 @@ function render(){
     setAuthLocked(true);
     $('#dr').replaceChildren();
     $('#app').replaceChildren(h('p',{class:'warn',style:'text-align:center;padding:40px 16px'},'Memeriksa sesi login...'));
-    $('#tb').style.display='none';
     $('#pet').style.display='none';
     $('#sw').style.display='none';
     return;
@@ -96,7 +90,6 @@ function render(){
       h('h1',{},'Selamat datang!'),
       accountForm()
     )));
-    $('#tb').style.display='none';
     $('#pet').style.display='none';
     $('#sw').style.display='none';
     document.body.classList.remove('open');
@@ -107,7 +100,6 @@ function render(){
     $('#dr').replaceChildren();
     const status=S.approvalStatus==='rejected'?'Akun ini ditolak admin.':'Akun ini belum disetujui admin.';
     $('#app').replaceChildren(h('section',{class:'card auth-card'},h('b',{},status),h('p',{class:'sub'},'Data anggota, kegiatan, dan wilayah hanya dimuat setelah akun disetujui. Hubungi admin utama untuk memeriksa status akun.'),h('button',{class:'btn',onclick:()=>signOut()},'Keluar')));
-    $('#tb').style.display='none';
     $('#pet').style.display='none';
     $('#sw').style.display='none';
     document.body.classList.remove('open');
@@ -128,8 +120,8 @@ function render(){
   $('#app').replaceChildren(...content);
   hydrateMemberQrCodes();
   hydrateMemberMedia();
-  const tb=$('#tb');tb.style.display=S.form?'none':'flex';$('#pet').style.display=S.form?'none':'block';
-  tb.replaceChildren(...[['landing','home','Home'],['members','users','Anggota'],['kegiatan','calendar','Kegiatan'],['piket','brush','Piket'],['musyawarah','meeting','Musyawarah'],['susunan','team','Kepengurusan'],['pesan','inbox','Pesan Masuk']].map(x=>h('a',{class:S.view===x[0]?'on':'',href:'#',onclick:navTo(x[0]),...(x[0]==='pesan'?{'data-message-tab':'true'}:{})},icon(x[1],19),h('span',{},x[2]),x[0]==='pesan'&&S.unreadMessages>0&&h('span',{class:'tab-badge'},String(S.unreadMessages)))));
+  if(typeof rapikanGarisBagan==='function')rapikanGarisBagan();
+  $('#pet').style.display=S.form?'none':'block';
 }
 function sub(name,key){
   return S.db.collection(name).onSnapshot(s=>{

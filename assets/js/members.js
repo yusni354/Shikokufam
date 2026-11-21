@@ -715,7 +715,7 @@ function susunanPilihInduk(nodes,currentId,excludeSet){
 function susunanPanelRender(nodes){
   const panel=S.susunanPanel;
   if(!panel)return null;
-  if(panel.jenis==='tambah')return susunanPanelTambah(nodes);
+  if(panel.jenis==='tambah')return susunanPanelTambah(nodes,panel.id);
   const node=susunanCari(nodes,panel.id);
   if(!node)return null;
   if(panel.jenis==='nama')return susunanPanelNama(node);
@@ -787,10 +787,16 @@ function susunanPanelGeser(nodes,node){
       }},'Pindahkan'),
       h('button',{class:'btn s',onclick:tutupPanelSusunan},'Selesai')));
 }
-function susunanPanelTambah(nodes){
+/* Panel Tambah Jabatan: nama jabatan baru, induk tempat ia berada
+   (terpilih awal mengikuti tombol yang membuka panel: tombol besar
+   '+ Tambah Jabatan Baru' memilih jabatan puncak; tombol '＋ Bawahan'
+   pada sebuah jabatan memilih jabatan itu), dan pemegang lewat field
+   combobox anggota yang sama seperti panel Tetapkan. */
+function susunanPanelTambah(nodes,indukAwal){
   const root=susunanAkar(nodes);
+  const awal=indukAwal&&susunanCari(nodes,indukAwal)?indukAwal:(root?root.id:'');
   const input=h('input',{type:'text',maxlength:'60',placeholder:'Nama jabatan baru'});
-  const selInduk=susunanPilihInduk(nodes,root?root.id:'',null);
+  const selInduk=susunanPilihInduk(nodes,awal,null);
   const selPemegang=susunanPilihAnggota('');
   return box(h('b',{},'Tambah jabatan baru'),
     h('p',{class:'sub'},'Nama jabatan:'),input,
@@ -824,35 +830,61 @@ function orgAlat(nodes,node){
   return h('div',{class:'org-tools'},
     h('button',{class:'btn s',onclick:()=>bukaPanelSusunan('nama',node.id)},'Nama'),
     h('button',{class:'btn s',onclick:()=>bukaPanelSusunan('pemegang',node.id)},pemegangJabatan(node)?'Pemegang':'Tetapkan'),
+    h('button',{class:'btn s',onclick:()=>bukaPanelSusunan('tambah',node.id)},'＋ Bawahan'),
     !isRoot&&h('button',{class:'btn s',onclick:()=>bukaPanelSusunan('geser',node.id)},'Geser'),
     !isRoot&&orgTombolHapus(nodes,node));
 }
 /* ===== Seret jabatan di Bagan (khusus mode atur, desktop & sentuh).
-   Seret dimulai dari pegangan pada kartu — bukan seluruh kartu — supaya
-   gulir halaman di HP tidak terganggu. Lepas di atas saudara menyusun
-   ulang urutan; lepas di atas jabatan lain menjadikannya anak jabatan
-   itu. Target yang sah berbingkai teal, yang terlarang (diri sendiri /
-   keturunan) berbingkai merah. ===== */
-function mulaiSeretSusunan(event,node){
-  const wrap=event.currentTarget.closest('.org-node');
+   Seret bisa dimulai dari DUA tempat: pegangan pil '⠿ Seret' di atas
+   kartu (seret langsung aktif) ATAU dari kartu jabatan itu sendiri —
+   di kartu, seret baru aktif sesudah penunjuk bergerak melewati ambang
+   10px, jadi ketukan biasa tetap membuka kartu ID anggota seperti
+   semula dan hanya gerakan menyeret yang memindah jabatan. Selama
+   menyeret, kartu bayangan mengikuti penunjuk; melepas di paruh
+   atas/bawah (desktop: kiri/kanan) saudara menyusun ulang urutan,
+   melepas di atas jabatan lain menjadikannya anak jabatan itu. Target
+   sah bertanda teal (garis sisip di sisi lepas untuk urutan, bingkai
+   penuh untuk menjadi anak), target terlarang (diri sendiri/keturunan)
+   berbingkai merah. Penunjuk ditangkap (pointer capture) pada elemen
+   sumber supaya gerakan tetap terlacak walau keluar dari kartu, dan
+   halaman ikut bergulir bila penunjuk mendekati tepi atas/bawah.
+   Klik susulan sesudah seret dari kartu ditelan sekali supaya kartu
+   ID tidak ikut terbuka. ===== */
+function mulaiSeretSusunan(event,node,opsi){
+  opsi=opsi||{};
+  const sumber=event.currentTarget;
+  const wrap=sumber&&sumber.closest?sumber.closest('.org-node'):null;
   const main=wrap&&wrap.querySelector('.org-node-main');
   if(!main)return;
-  event.preventDefault();
+  if(event.button!=null&&event.button>0)return;
   const nodes=susunanSimpul();
   const keturunan=susunanKeturunan(nodes,node.id);
-  const rect=main.getBoundingClientRect();
-  const ghost=main.cloneNode(true);
-  ghost.classList.add('org-ghost');
-  ghost.style.width=rect.width+'px';
-  ghost.style.left=rect.left+'px';
-  ghost.style.top=rect.top+'px';
-  document.body.appendChild(ghost);
-  wrap.classList.add('org-dragging');
-  let targetEl=null,targetId=null,targetMode=null;
-  const clearTarget=()=>{if(targetEl)targetEl.classList.remove('org-drop-ok','org-drop-bad');targetEl=null;targetId=null;targetMode=null};
+  const mulaiX=event.clientX,mulaiY=event.clientY;
+  const ambang=opsi.langsung?0:10;
+  let aktif=false,ghost=null,targetEl=null,targetId=null,targetMode=null;
+  try{if(sumber.setPointerCapture)sumber.setPointerCapture(event.pointerId)}catch(e){/* tangkapan tidak tersedia: pendengar jendela tetap bekerja */}
+  const clearTarget=()=>{if(targetEl)targetEl.classList.remove('org-drop-ok','org-drop-bad','org-drop-before','org-drop-after');targetEl=null;targetId=null;targetMode=null};
+  const buatGhost=()=>{
+    const rect=main.getBoundingClientRect();
+    ghost=main.cloneNode(true);
+    ghost.classList.add('org-ghost');
+    ghost.style.width=rect.width+'px';
+    ghost.style.left=rect.left+'px';
+    ghost.style.top=rect.top+'px';
+    document.body.appendChild(ghost);
+    wrap.classList.add('org-dragging');
+    document.body.classList.add('org-drag-on');
+  };
   const onMove=ev=>{
-    ghost.style.left=(ev.clientX-rect.width/2)+'px';
+    if(!aktif){
+      if(Math.hypot(ev.clientX-mulaiX,ev.clientY-mulaiY)<ambang)return;
+      aktif=true;
+      buatGhost();
+    }
+    ghost.style.left=(ev.clientX-ghost.offsetWidth/2)+'px';
     ghost.style.top=(ev.clientY-28)+'px';
+    if(ev.clientY<90)window.scrollBy(0,-14);
+    else if(ev.clientY>window.innerHeight-90)window.scrollBy(0,14);
     ghost.style.display='none';
     const under=document.elementFromPoint(ev.clientX,ev.clientY);
     ghost.style.display='';
@@ -866,21 +898,32 @@ function mulaiSeretSusunan(event,node){
     if(!targetNode)return;
     const terlarang=tid===node.id||keturunan.has(tid);
     const menyamping=window.innerWidth>720;
-    const sesudah=menyamping?(ev.clientX>tmain.getBoundingClientRect().left+tmain.getBoundingClientRect().width/2):(ev.clientY>tmain.getBoundingClientRect().top+tmain.getBoundingClientRect().height/2);
+    const r=tmain.getBoundingClientRect();
+    const sesudah=menyamping?(ev.clientX>r.left+r.width/2):(ev.clientY>r.top+r.height/2);
     targetMode=targetNode.induk===node.induk?(sesudah?'after':'before'):'child';
     targetEl=tmain;
-    tmain.classList.add(terlarang?'org-drop-bad':'org-drop-ok');
+    tmain.classList.add(terlarang?'org-drop-bad':(targetMode==='child'?'org-drop-ok':(targetMode==='before'?'org-drop-before':'org-drop-after')));
     if(!terlarang)targetId=tid;
   };
-  const onUp=async()=>{
+  const onUp=async ev=>{
     window.removeEventListener('pointermove',onMove);
     window.removeEventListener('pointerup',onUp);
     window.removeEventListener('pointercancel',onUp);
-    ghost.remove();
+    if(!aktif)return;
+    const dilepas=!!ev&&ev.type==='pointerup';
+    if(dilepas){
+      /* Telan satu klik susulan dari kartu (klik pada elemen yang sama
+         sesudah seret) supaya kartu ID anggota tidak ikut terbuka. */
+      const telan=e=>{e.stopPropagation();e.preventDefault()};
+      document.addEventListener('click',telan,{capture:true,once:true});
+      setTimeout(()=>document.removeEventListener('click',telan,{capture:true}),500);
+    }
+    if(ghost)ghost.remove();
     wrap.classList.remove('org-dragging');
+    document.body.classList.remove('org-drag-on');
     const tid=targetId,mode=targetMode;
     clearTarget();
-    if(tid&&mode){
+    if(dilepas&&tid&&mode){
       try{await seretJabatan(node.id,tid,mode);render()}
       catch(error){console.error(error);alert('Gagal memindah jabatan: '+(error.message||'periksa koneksi'))}
     }
@@ -888,6 +931,7 @@ function mulaiSeretSusunan(event,node){
   window.addEventListener('pointermove',onMove);
   window.addEventListener('pointerup',onUp);
   window.addEventListener('pointercancel',onUp);
+  if(opsi.langsung)event.preventDefault();
 }
 /* Satu simpul bagan (rekursif): kartu jabatan + foto/nama pemegang dari
    data anggota; anak-anaknya digambar sebagai baris berkonektor di
@@ -910,8 +954,11 @@ function orgNode(nodes,node,root){
     :h('div',{class:'org-node-main org-node-empty'},...isi);
   const parts=[];
   if(atur&&node.induk!==null){
-    const grip=h('div',{class:'org-grip',title:'Seret untuk memindah posisi jabatan ini','aria-label':'Seret untuk memindah '+node.nama},'⠿');
-    grip.onpointerdown=ev=>mulaiSeretSusunan(ev,node);
+    const grip=h('div',{class:'org-grip',title:'Seret untuk memindah posisi jabatan ini','aria-label':'Seret untuk memindah '+node.nama},'⠿ Seret');
+    grip.onpointerdown=ev=>mulaiSeretSusunan(ev,node,{langsung:true});
+    /* Kartu sendiri juga bisa diseret: seret aktif sesudah gerakan
+       melewati ambang, ketukan biasa tetap membuka kartu ID. */
+    main.onpointerdown=ev=>mulaiSeretSusunan(ev,node,{});
     parts.push(grip);
   }
   parts.push(main);
@@ -936,7 +983,14 @@ function orgNode(nodes,node,root){
   }else{
     el=h('div',{class:'org-node'+(root?' org-node-root':''),'data-susunan-id':node.id},...parts);
   }
-  if(bawahKids.length)el.append(h('ul',{class:'org-kids'},...bawahKids.map(k=>h('li',{},orgNode(nodes,k,false)))));
+  if(bawahKids.length){
+    /* Baris puncak berpasangan: garis turun ke tingkat bawah berangkat
+       dari tengah baris puncak lewat elemen .org-join, dan batang
+       mendatar anak digambar oleh baris anak itu sendiri — jadi jalur
+       garisnya: baris puncak → join → batang → tiap anak. */
+    if(wakilKids.length)el.append(h('div',{class:'org-join','aria-hidden':'true'}));
+    el.append(h('ul',{class:'org-kids'+(wakilKids.length?' org-kids-joined':'')},...bawahKids.map(k=>h('li',{},orgNode(nodes,k,false)))));
+  }
   return el;
 }
 /* Tipe HIERARKI: pohon digambar dari akar dengan garis penghubung;
@@ -944,8 +998,50 @@ function orgNode(nodes,node,root){
 function orgBagan(nodes){
   const root=susunanAkar(nodes);
   if(!root)return h('p',{class:'warn'},'Susunan kepengurusan belum tersedia.');
-  return h('div',{class:'org-tree'},orgNode(nodes,root,true));
+  const atur=!!(S.admin&&S.susunanAtur);
+  return h('div',{class:'org-tree'+(atur?' org-tree-atur':'')},orgNode(nodes,root,true));
 }
+/* Rapikan garis bagan desktop sesudah bagan digambar: kelompok anak
+   yang lebar membungkus ke baris kedua/ketiga (mis. Koordinator
+   Wilayah dengan sembilan koordinatornya), dan segmen batang bawaan
+   CSS untuk baris lanjutan itu melayang tanpa sambungan ke garis
+   induk — urutan hierarki jadi kabur. Fungsi ini mengelompokkan
+   kartu anak menurut baris nyatanya (offsetTop), lalu: (1) menggambar
+   tulang vertikal di sumbu tengah kelompok (CSS var --spine-top/
+   --spine-h pada .org-kids-wrapped::after) dari batang baris pertama
+   turun ke batang baris terakhir, jadi semua baris tersambung ke
+   garis turun induk; (2) anak yang sendirian di barisnya kehilangan
+   segmen batang menyampingnya (kelas org-li-solo) — cukup garis lurus
+   di sumbu tengah dari tulang ke kartunya. Di HP tidak dipakai:
+   bagan HP memakai rel kiri. Dijalankan dari render() dan saat
+   ukuran jendela berubah; aman berulang (kelas dibersihkan dulu). */
+function rapikanGarisBagan(){
+  const tree=document.querySelector('.org-tree');
+  if(!tree)return;
+  const desktop=window.innerWidth>720;
+  tree.querySelectorAll('.org-kids').forEach(ul=>{
+    ul.classList.remove('org-kids-wrapped');
+    ul.style.removeProperty('--spine-top');
+    ul.style.removeProperty('--spine-h');
+    [...ul.children].forEach(li=>li.classList.remove('org-li-solo'));
+    if(!desktop)return;
+    const lis=[...ul.children];
+    if(lis.length<2)return;
+    const rows=[];
+    lis.forEach(li=>{
+      const t=li.offsetTop;
+      const row=rows.find(r=>Math.abs(r.t-t)<4);
+      if(row)row.items.push(li);else rows.push({t,items:[li]});
+    });
+    if(rows.length<2)return;
+    ul.classList.add('org-kids-wrapped');
+    ul.style.setProperty('--spine-top',rows[0].t+'px');
+    ul.style.setProperty('--spine-h',(rows[rows.length-1].t-rows[0].t)+'px');
+    rows.forEach(row=>{if(row.items.length===1)row.items[0].classList.add('org-li-solo')});
+  });
+}
+let orgSpineTimer=null;
+window.addEventListener('resize',()=>{clearTimeout(orgSpineTimer);orgSpineTimer=setTimeout(rapikanGarisBagan,180)});
 /* Tipe TABEL: satu baris per jabatan, berkelompok mengikuti cabang
    pohon — kelompok pertama berisi jabatan puncak beserta anak-anaknya,
    lalu satu kelompok per cabang yang mempunyai anak. */
@@ -995,13 +1091,13 @@ function vSusunan(){
   if(S.admin){
     out.push(h('div',{class:'org-atur-bar'},
       h('button',{class:'btn s',onclick:()=>{S.susunanAtur=!S.susunanAtur;if(!S.susunanAtur)S.susunanPanel=null;render()}},atur?'Selesai Mengatur':'Atur Struktur'),
-      atur&&h('button',{class:'btn s',onclick:()=>bukaPanelSusunan('tambah',null)},'+ Tambah Jabatan'),
+      atur&&h('button',{class:'btn',onclick:()=>bukaPanelSusunan('tambah',null)},'+ Tambah Jabatan Baru'),
       atur&&h('button',{class:'btn s',onclick:async()=>{
         if(!confirm('Kembalikan susunan ke jabatan bawaan? Jabatan tambahan akan hilang dan susunan hierarki kembali seperti semula; pemegang jabatan bawaan dipertahankan sebisa mungkin.'))return;
         try{await kembalikanSusunanAwal();S.susunanPanel=null;render()}
         catch(error){console.error(error);alert('Gagal mengembalikan susunan awal: '+(error.message||'periksa koneksi'))}
       }},'Kembalikan Susunan Awal'),
-      atur&&h('p',{class:'sub org-atur-note'},'Mode atur aktif: pakai tombol Nama, Pemegang, Geser, dan Hapus pada tiap jabatan. Di tampilan Bagan, jabatan juga bisa diseret lewat pegangan ⠿ pada kartunya untuk memindah induk atau menggeser urutan.')
+      atur&&h('p',{class:'sub org-atur-note'},'Mode atur aktif: pakai tombol Nama, Pemegang, Geser, Hapus, dan ＋ Bawahan pada tiap jabatan; tombol + Tambah Jabatan Baru di atas menambah posisi di bawah jabatan mana pun. Di tampilan Bagan, jabatan juga bisa diseret — tahan kartunya atau pegangan ⠿ Seret, lalu geser ke jabatan tujuan untuk memindah induk atau menggeser urutan.')
     ));
   }
   if(S.admin&&S.susunanPanel){

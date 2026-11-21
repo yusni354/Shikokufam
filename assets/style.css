@@ -27,7 +27,7 @@ body.admin-dark .home-duty-date,body.admin-dark .duty-date{background:linear-gra
 body.admin-dark .home-duty-info span,body.admin-dark .duty-assignment span{color:var(--mut)}
 .approval-row{align-items:flex-start}
 .approval-row small{display:block;color:var(--mut);margin-top:4px}
-main{padding:16px 16px 110px;max-width:720px;margin:auto}
+main{padding:16px 16px 28px;max-width:720px;margin:auto}
 h1{font-size:26px;margin:8px 0 10px}
 .sub{color:var(--mut);margin:0 0 16px}
 .warn{color:var(--mut);font-size:14px}
@@ -307,11 +307,6 @@ body.open #dr{transform:none}body.open #ov{display:block}
 .nav-badge,.icon-badge{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 5px;border-radius:999px;background:#d9455f;color:#fff;font-size:11px;font-weight:700;line-height:1}
 .nav-badge{margin-left:auto}
 .icon-badge{position:absolute;top:-7px;right:-7px;border:2px solid var(--card)}
-/* Lencana pada tombol navigasi bawah: pil merah kecil menempel di sudut
-   kanan atas ikon, dengan cincin warna kartu supaya tetap terbaca di atas
-   permukaan navigasi terang maupun slate. Ukuran tombol tidak berubah. */
-.tab-badge{position:absolute;top:0;left:calc(50% + 2px);display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:#d9455f;color:#fff;font-size:10px;font-weight:700;line-height:1;border:2px solid var(--card);pointer-events:none}
-#tb a .tab-badge{color:#fff}
 .chat-card{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:12px;margin-bottom:12px;box-shadow:0 4px 16px rgba(47,134,184,.1);height:clamp(280px,calc(100vh - 170px),720px);height:clamp(280px,calc(100dvh - 170px),720px);display:flex;flex-direction:column;overflow:hidden}
 .chat-head{display:flex;align-items:center;gap:10px;padding:4px 4px 12px;border-bottom:1px solid var(--line)}
 .chat-avatar{width:40px;height:40px;border-radius:50%;background:var(--g);color:#fff;display:grid;place-items:center;font-weight:700;flex:none}
@@ -344,24 +339,14 @@ body.open #dr{transform:none}body.open #ov{display:block}
 .chat-bubble img,.chat-image{display:block;max-width:220px;max-height:220px;border-radius:12px;margin-top:6px}
 .chat-file{display:block;color:var(--acc);margin-top:6px;font-weight:600;overflow-wrap:anywhere}
 .chat-bubble audio{display:block;max-width:220px;margin-top:6px}
-#tb{position:fixed;left:12px;right:12px;bottom:calc(10px + env(safe-area-inset-bottom,0px));background:var(--card);border-radius:24px;box-shadow:0 8px 30px rgba(47,134,184,.28);display:flex;justify-content:space-around;padding:8px;z-index:6}
-#tb a{position:relative;flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;font-size:11px;color:var(--mut);padding:6px 0;border-radius:16px;cursor:pointer}
-#tb a span{max-width:100%;line-height:1.15;overflow-wrap:anywhere}
-#tb a>.app-icon{color:var(--mut)}
-#tb a.on{color:var(--acc);background:var(--line);font-weight:700}
-#tb a.on>.app-icon{color:var(--acc)}
 body.admin-dark .home-shortcut-icon{background:#293946}
 body.admin-dark .card .e{background:#293946;color:var(--acc)}
-@media (max-width:390px){#tb{left:6px;right:6px;padding:6px 3px}#tb a{font-size:9.5px;gap:3px;padding:5px 0}}
 @media (max-width:560px){.duty-card{align-items:flex-start;flex-wrap:wrap}.duty-info{padding-top:2px}.duty-actions{width:100%;padding-left:72px;justify-content:flex-start}.duty-heading{align-items:flex-start}.duty-count{margin-top:14px}}
-#pet{position:fixed;right:12px;bottom:calc(92px + env(safe-area-inset-bottom,0px));z-index:7;cursor:grab;touch-action:none;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
+#pet{position:fixed;right:12px;bottom:calc(10px + env(safe-area-inset-bottom,0px));z-index:7;cursor:grab;touch-action:none;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
 #pet img{display:block;height:96px;pointer-events:none;-webkit-user-drag:none}
-#pm{position:fixed;left:16px;right:16px;bottom:calc(200px + env(safe-area-inset-bottom,0px));max-width:360px;margin:auto;background:var(--card);border:1px solid var(--line);border-radius:22px;padding:16px;display:flex;flex-direction:column;gap:10px;box-shadow:0 12px 40px rgba(47,134,184,.3);z-index:11}
+#pm{position:fixed;left:16px;right:16px;bottom:calc(118px + env(safe-area-inset-bottom,0px));max-width:360px;margin:auto;background:var(--card);border:1px solid var(--line);border-radius:22px;padding:16px;display:flex;flex-direction:column;gap:10px;box-shadow:0 12px 40px rgba(47,134,184,.3);z-index:11}
 #pm .btn{text-align:center;text-decoration:none;display:flex}
 #qm{position:fixed;inset:0;background:rgba(23,50,77,.45);display:grid;place-items:center;padding:16px;z-index:12}
-body.bottom-nav-hidden #tb{display:none!important}
-body.bottom-nav-hidden main{padding-bottom:16px}
-body.bottom-nav-hidden #pet{bottom:calc(10px + env(safe-area-inset-bottom,0px))}
 .activity-create,.activity-card{display:block}
 .activity-create h2,.activity-card h2{margin:0 0 8px;font-size:20px}
 .activity-create-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -526,7 +511,7 @@ body.bottom-nav-hidden #pet{bottom:calc(10px + env(safe-area-inset-bottom,0px))}
 .musy-root[data-style="fresh"] .musy-pages .musy-empty{color:rgba(232,240,246,.7)}
 .musy-root[data-style="fresh"] .musy-toast{color:var(--bg)}
 .musy-root[data-style="fresh"] .musy-pop,.musy-root[data-style="fresh"] .musy-tp{background:var(--bg)}
-@media print{header,#tb,#dr,#pet,#ov,#pm{display:none!important}main{padding:0!important;max-width:none!important}body{background:#fff!important}.musy-root{--card:#fff;--tx:#000;--mu:#444;--bd:#ccc;margin:0}.musy-root .musy-top,.musy-root .musy-tabs,.musy-root .musy-pages,.musy-root .musy-tools,.musy-root .noprint{display:none!important}.musy-root .musy-app{display:block;padding:0;border:0}.musy-root .musy-wrap{border:0!important;box-shadow:none!important;border-radius:0!important;background:#fff!important}}
+@media print{header,#dr,#pet,#ov,#pm{display:none!important}main{padding:0!important;max-width:none!important}body{background:#fff!important}.musy-root{--card:#fff;--tx:#000;--mu:#444;--bd:#ccc;margin:0}.musy-root .musy-top,.musy-root .musy-tabs,.musy-root .musy-pages,.musy-root .musy-tools,.musy-root .noprint{display:none!important}.musy-root .musy-app{display:block;padding:0;border:0}.musy-root .musy-wrap{border:0!important;box-shadow:none!important;border-radius:0!important;background:#fff!important}}
 
 /* Aksesibilitas: tanda fokus jelas untuk pengguna keyboard */
 a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,[role="button"]:focus-visible{outline:3px solid #f59e0b;outline-offset:2px}
@@ -563,8 +548,6 @@ header .logo{background:#e8f3fa;color:#000000}
 #dr a{color:#000000}
 #dr a>.app-icon,#dr a.on>.app-icon{color:#000000}
 #dr a.on{background:#bfe6f7;color:#000000;box-shadow:none}
-#tb a,#tb a>.app-icon{color:#222222}
-#tb a.on,#tb a.on>.app-icon{color:#000000;background:#e8f3fa}
 .home-duty-date,.duty-date{background:#bfe6f7;color:#000000;box-shadow:none}
 .home-duty-date b,.home-duty-date small,.duty-date b,.duty-date small{color:#000000}
 .duty-count{background:#e8f3fa;color:#000000}
@@ -592,10 +575,10 @@ body.admin-dark .home-shortcut-icon,body.admin-dark .card .e{background:#e8f3fa;
 
 /* ===== Adaptasi claymorphism (referensi dashboard musik Putro) =====
    Hanya tampilan kerangka aplikasi: latar biru-abu lembut, kartu pastel
-   membulat besar dengan bayangan clay lembut, sidebar & navigasi bawah
-   slate gelap, hero Home slate gelap, tombol utama teal.
+   membulat besar dengan bayangan clay lembut, sidebar slate gelap,
+   hero Home slate gelap, tombol utama teal.
    Teks di permukaan terang tetap hitam/gelap; teks di permukaan gelap
-   (sidebar, hero, navigasi bawah) terang agar kontras.
+   (sidebar, hero) terang agar kontras.
    Musyawarah (.musy-root) memakai palet yang sama lewat aturan khususnya
    sendiri di bagian Musyawarah, jadi seluruh aplikasi satu tema. */
 body{background:linear-gradient(160deg,#c7d5df,#aebfd0) fixed}
@@ -623,13 +606,6 @@ input,textarea,select{background:#f4f8fa;border-color:#bfcfdb}
 #dr a.on>.app-icon{color:#2b7a8c}
 #dr a span:not(.nav-badge){color:inherit}
 .menu-logout{color:#f2bda9;border-top-color:rgba(255,255,255,.16)}
-/* Navigasi bawah: slate gelap, ikon terang, pil aktif */
-#tb{background:linear-gradient(160deg,#354b64,#26374c);border-radius:26px;box-shadow:0 12px 30px rgba(20,35,50,.4)}
-#tb a{color:#b9cbd9;border-radius:18px}
-#tb a>.app-icon{color:#b9cbd9}
-#tb a span{color:inherit}
-#tb a.on{background:rgba(255,255,255,.15);color:#ffffff;font-weight:700}
-#tb a.on>.app-icon{color:#8fd8c7}
 /* Hero Home: slate gelap membulat + maskot + tombol teal */
 .home-welcome{background:linear-gradient(140deg,#3a5069,#24344a);color:#eef5f9;border-radius:28px;box-shadow:0 16px 34px rgba(20,35,50,.35),inset 0 1px 0 rgba(255,255,255,.18);align-items:center}
 .home-welcome-text{flex:1;min-width:0}
@@ -794,9 +770,14 @@ input,textarea,select{background:#f4f8fa;border-color:#bfcfdb}
 .musy-root .musy-ta button.x{padding:1px 6px;font-size:10px}
 
 /* ===== Kepengurusan: pemilih tampilan, bagan hierarki & tabel =====
-   Bagan memakai garis penghubung CSS murni: di desktop tingkat kedua
-   membentang menyamping ala bagan organisasi; di HP pohon mengalir ke
-   bawah bertumpuk dengan garis vertikal, tanpa geser menyamping. */
+   Bagan memakai garis penghubung CSS murni warna slate tegas (3px):
+   di desktop pola bagan organisasi baku — garis vertikal turun dari
+   induk ke batang mendatar yang membagi ke tiap anak; baris puncak
+   Ketua–Wakil yang sejajar menyambung ke tingkat bawah lewat garis
+   .org-join dari tengah baris puncak. Di HP pohon menumpuk ke bawah
+   dengan rel vertikal di sisi kiri tiap kelompok anak: siku dari
+   bawah kartu induk masuk ke rel, dan tiap anak terhubung ke rel
+   lewat garis pendek, tanpa geser menyamping. */
 .org-toggle{display:inline-flex;gap:4px;padding:4px;background:var(--card);border:1px solid var(--line);border-radius:999px;margin-bottom:14px;box-shadow:0 4px 14px rgba(47,134,184,.08)}
 .org-toggle-btn{border:0;background:transparent;padding:8px 24px;border-radius:999px;font-weight:700;font-size:14px;color:var(--mut);cursor:pointer;font-family:inherit}
 .org-toggle-btn.on{background:var(--g);color:#ffffff;box-shadow:0 4px 10px rgba(43,122,140,.25)}
@@ -811,27 +792,29 @@ button.org-node-main:hover{border-color:var(--acc)}
 .org-node-empty .org-node-name{color:var(--mut);text-transform:none;font-weight:600;font-size:13px}
 .org-avatar{width:46px;height:46px;flex:none;border-radius:15px;object-fit:cover}
 .org-avatar-ph{display:grid;place-items:center;background:linear-gradient(145deg,#dff2e7,#dceef8);color:#000000;font-size:19px;font-weight:700}
-.org-kids{display:flex;flex-wrap:wrap;justify-content:center;list-style:none;margin:0;padding:26px 0 0;position:relative;max-width:100%}
-.org-kids::before{content:'';position:absolute;top:0;left:50%;height:26px;border-left:2px solid #9db8c8}
-.org-kids>li{position:relative;padding:26px 10px 0;display:flex;justify-content:center}
-.org-kids>li::before,.org-kids>li::after{content:'';position:absolute;top:0;right:50%;width:50%;height:26px;border-top:2px solid #9db8c8}
-.org-kids>li::after{right:auto;left:50%;border-left:2px solid #9db8c8}
+.org-kids{display:flex;flex-wrap:wrap;justify-content:center;list-style:none;margin:0;padding:28px 0 0;position:relative;max-width:100%}
+.org-kids::before{content:'';position:absolute;top:0;left:50%;height:28px;border-left:3px solid #527f9f}
+.org-kids>li{position:relative;padding:28px 10px 0;display:flex;justify-content:center}
+.org-kids>li::before,.org-kids>li::after{content:'';position:absolute;top:0;right:50%;width:50%;height:28px;border-top:3px solid #527f9f}
+.org-kids>li::after{right:auto;left:50%;border-left:3px solid #527f9f}
 .org-kids>li:only-child::before,.org-kids>li:only-child::after{display:none}
 .org-kids>li:only-child{padding-top:0}
 .org-kids>li:first-child::before,.org-kids>li:last-child::after{border-top:0}
-.org-kids>li:last-child::before{border-right:2px solid #9db8c8;border-radius:0 10px 0 0}
+.org-kids>li:last-child::before{border-right:3px solid #527f9f;border-radius:0 10px 0 0}
 .org-kids>li:first-child::after{border-radius:10px 0 0 0}
+.org-kids-joined{padding-top:0}
+.org-kids-joined::before{display:none}
 .org-top-row{display:flex;align-items:flex-start;justify-content:center;max-width:100%}
 .org-node-head{display:flex;flex-direction:column;align-items:center;gap:6px}
 .org-top-row .org-node-main{width:160px}
-.org-pair-link{flex:none;width:34px;height:2px;background:#9db8c8;margin-top:64px}
-.org-join{width:2px;height:24px;background:#9db8c8;flex:none}
+.org-pair-link{flex:none;width:34px;height:3px;background:#527f9f;margin-top:64px}
+.org-join{width:3px;height:22px;background:#527f9f;flex:none}
 .org-group{display:flex;flex-direction:column;align-items:center;width:100%}
 .org-group-title{padding:7px 18px;border-radius:999px;background:#dcebf3;color:#000000;font-weight:700;font-size:13px;letter-spacing:.04em;text-transform:uppercase}
 .org-grid{position:relative;display:flex;flex-wrap:wrap;justify-content:center;width:100%}
-.org-grid::before{content:'';position:absolute;top:0;left:16px;right:16px;border-top:2px solid #9db8c8}
+.org-grid::before{content:'';position:absolute;top:0;left:16px;right:16px;border-top:3px solid #527f9f}
 .org-cell{position:relative;padding:18px 6px 12px}
-.org-cell::before{content:'';position:absolute;top:0;left:50%;height:18px;border-left:2px solid #9db8c8}
+.org-cell::before{content:'';position:absolute;top:0;left:50%;height:18px;border-left:3px solid #527f9f}
 .org-table-group{margin-bottom:18px}
 .org-group-heading{font-size:16px;margin:0 0 8px}
 .org-table{background:var(--card);border:1px solid var(--line);border-radius:18px;overflow:hidden;box-shadow:0 4px 14px rgba(47,134,184,.08)}
@@ -849,12 +832,19 @@ span.org-mini{display:grid;place-items:center;font-size:14px}
 @media (max-width:720px){
   .org-top-row .org-node-main{width:auto;max-width:41vw}
   .org-pair-link{width:16px;margin-top:58px}
-  .org-kids{flex-direction:column;align-items:center;padding-top:0}
-  .org-kids::before{display:none}
-  .org-kids>li{padding:24px 0 0}
-  .org-kids>li::before{display:none}
-  .org-kids>li::after{left:50%;right:auto;width:0;height:24px;border-top:0;border-left:2px solid #9db8c8;border-radius:0}
-  .org-kids>li:last-child::before{display:none}
+  .org-join{height:10px}
+  /* HP: bagan menjadi rel kiri — tiap kelompok anak punya garis
+     vertikal di sisi kirinya, siku dari bawah kartu induk masuk ke
+     rel itu, dan tiap anak terhubung ke rel lewat garis pendek,
+     jadi jelas anak-anak ini milik induk yang mana. */
+  .org-tree .org-kids{flex-direction:column;flex-wrap:nowrap;align-items:stretch;width:100%;padding:20px 0 0 30px}
+  .org-tree .org-kids::before{display:block;left:15px;top:0;width:calc(50% - 15px);height:20px;border-left:0;border-right:3px solid #527f9f;border-bottom:3px solid #527f9f;border-bottom-right-radius:12px}
+  .org-tree .org-kids .org-kids::before{width:calc(min(86px,22vw) - 15px)}
+  .org-tree .org-kids>li{display:block;width:100%;padding:14px 0 0}
+  .org-tree .org-kids>li>.org-node{align-items:flex-start}
+  .org-tree .org-kids>li::before{display:block;left:-15px;right:auto;top:40px;width:15px;height:0;border-top:3px solid #527f9f;border-right:0;border-radius:0}
+  .org-tree .org-kids>li::after{display:block;left:-15px;right:auto;top:0;width:0;height:100%;border-top:0;border-left:3px solid #527f9f;border-radius:0}
+  .org-tree .org-kids>li:last-child::after{height:40px}
   .org-row-head{display:none}
   .org-table .org-row,.org-table-admin .org-row{display:flex;flex-direction:column;align-items:flex-start;gap:5px;padding:13px 14px}
   .org-c-aksi{align-self:flex-end}
@@ -865,8 +855,10 @@ span.org-mini{display:grid;place-items:center;font-size:14px}
 .org-atur-note{flex-basis:100%;margin:2px 0 0}
 .org-tools{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;max-width:230px}
 .org-c-aksi .org-tools{justify-content:flex-end;max-width:260px}
-.org-grip{cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;color:var(--mut);font-size:15px;line-height:1;letter-spacing:2px;padding:3px 12px;border-radius:8px}
+.org-grip{cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;display:inline-flex;align-items:center;gap:6px;min-height:30px;padding:5px 16px;border-radius:999px;background:#e8f1f7;border:1px solid #b9d2e2;color:#33566e;font-size:13px;font-weight:700;letter-spacing:.04em}
 .org-grip:active{cursor:grabbing}
+.org-tree-atur .org-node-main{touch-action:none}
+body.org-drag-on,body.org-drag-on *{cursor:grabbing!important}
 .anggota-picker{position:relative;display:block}
 .anggota-saran{position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:30;background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:0 14px 34px rgba(31,58,80,.22);max-height:264px;overflow-y:auto;padding:6px}
 .anggota-opt{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:11px;cursor:pointer;color:var(--ink)}
@@ -879,16 +871,26 @@ span.org-mini{display:grid;place-items:center;font-size:14px}
 .anggota-opt-info small{display:block;color:var(--mut);font-size:12px;margin-top:1px}
 .org-node.org-dragging{opacity:.45}
 .org-ghost{position:fixed;z-index:300;pointer-events:none;opacity:.88;margin:0;box-shadow:0 14px 34px rgba(31,58,80,.35)}
+/* Tulang vertikal untuk kelompok anak yang membungkus multi-baris
+   (diatur JS lewat rapikanGarisBagan): menyambung batang baris
+   pertama ke batang baris terakhir pada sumbu tengah kelompok.
+   Anak yang sendirian di barisnya tidak menggambar segmen batang
+   menyamping — garis lurus tulang → kartunya yang berbicara. */
+.org-kids-wrapped::after{content:'';position:absolute;left:50%;top:var(--spine-top,28px);height:var(--spine-h,0);border-left:3px solid #527f9f}
+.org-kids>li.org-li-solo::before{display:none}
 .org-node-main.org-drop-ok{outline:3px solid var(--acc);outline-offset:2px}
+.org-node-main.org-drop-before{outline:2px solid var(--acc);outline-offset:2px;box-shadow:inset 0 7px 0 var(--acc)}
+.org-node-main.org-drop-after{outline:2px solid var(--acc);outline-offset:2px;box-shadow:inset 0 -7px 0 var(--acc)}
 .org-node-main.org-drop-bad{outline:3px solid #d95763;outline-offset:2px}
 @media (max-width:720px){
   .org-c-aksi .org-tools{justify-content:flex-start}
+  .org-tree .org-kids-wrapped::after{display:none}
 }
 
 /* ===== Gerbang awal: hanya halaman login tanpa kerangka =====
    Selama body ber-class auth-locked (belum masuk, sesi masih diperiksa,
    atau akun menunggu persetujuan), SEMUA kerangka aplikasi disembunyikan:
-   header atas, drawer/navigasi samping, navigasi bawah, maskot, lapisan
+   header atas, drawer/navigasi samping, maskot, lapisan
    gelap drawer, dan menu maskot. Yang tampil hanya isi #app (halaman
    login / menunggu persetujuan). Class ini sudah ada di HTML sejak awal
    muat, jadi tidak ada kilasan header/navigasi sebelum login tampil.
@@ -896,7 +898,6 @@ span.org-mini{display:grid;place-items:center;font-size:14px}
    tampil persis seperti sebelumnya. */
 body.auth-locked header,
 body.auth-locked #dr,
-body.auth-locked #tb,
 body.auth-locked #pet,
 body.auth-locked #ov,
 body.auth-locked #pm{display:none!important}
