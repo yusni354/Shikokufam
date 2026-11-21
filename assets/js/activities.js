@@ -149,7 +149,7 @@ function activityCard(event){
   const feedback=S.activityFeedback&&String(S.activityFeedback.eventId)===String(event.id)?S.activityFeedback.message:'';
   const status=h('p',{class:'activity-feedback','aria-live':'polite'},feedback);
   /* Kartu ringkas (akordeon): keadaan bawaan hanya menampilkan nama,
-     keterangan, tanggal, dan TOTAL absensi gabungan semua wilayah
+     keterangan, tanggal & lokasi, dan TOTAL absensi gabungan semua wilayah
      (Hadir/Izin/Cuti/Alpha dari peta status tersimpan, dengan pemetaan
      data lama yang sama seperti di tempat lain). Pemilih wilayah baru
      muncul sesudah badan kartu diklik; membuka satu kartu menutup
@@ -182,7 +182,11 @@ function activityCard(event){
   const regionPicks=wilayahEfektif().map(([region,color])=>regionPick(region,color));
   if(registeredMembers.some(member=>memberRegion(member)==='Belum dipilih'))regionPicks.push(regionPick('Belum dipilih','#718096'));
   const content=[
-    h('div',{class:'activity-heading'},h('div',{},h('h2',{},event.judul||'Kegiatan komunitas'),h('p',{class:'activity-meta'},icon('calendar',15),h('span',{},dateLabel+(event.waktu?' · '+event.waktu:'')))),h('span',{class:'activity-heading-side'},h('span',{class:'activity-chevron','aria-hidden':'true'},'›'))),
+    /* Lokasi tampil BERSEBELAHAN dengan tanggal & waktu pada baris
+       meta kepala kartu (mis. '29 Nov 2026 · 09:00 · Aula Takamatsu'),
+       jadi terlihat pada keadaan kartu tertutup maupun terbuka —
+       tidak ada lagi baris lokasi tersendiri di badan kartu. */
+    h('div',{class:'activity-heading'},h('div',{},h('h2',{},event.judul||'Kegiatan komunitas'),h('p',{class:'activity-meta'},icon('calendar',15),h('span',{},dateLabel+(event.waktu?' · '+event.waktu:'')+(event.lokasi?' · '+event.lokasi:'')))),h('span',{class:'activity-heading-side'},h('span',{class:'activity-chevron','aria-hidden':'true'},'›'))),
     totalsView.pills,
     chart,
     chartLegend,
@@ -194,7 +198,6 @@ function activityCard(event){
     totalAnggota>0&&h('p',{class:'activity-total-note'},'dari total '+totalAnggota+' anggota')
   ];
   if(expanded)content.push(
-    event.lokasi&&h('p',{class:'activity-meta'},icon('pin',15),h('span',{},event.lokasi)),
     legacyCount>0&&h('p',{class:'warn'},legacyCount+' catatan absensi lama belum terhubung dengan data anggota.'),
     h('h3',{},'Absensi per wilayah'),
     h('div',{class:'activity-region-pick-grid'},...regionPicks)
@@ -758,6 +761,16 @@ function vRingkasan(){
      Alpha tersimpan). Ujung kanan: total tiap status sepanjang tahun
      dan persen kehadiran = Hadir ÷ jumlah kegiatan tahun itu × 100. */
   const REKAP_HURUF={hadir:'H',izin:'I',cuti:'C',alpha:'A'};
+  /* Singkatan nama kegiatan untuk kepala kolom: inisial huruf pertama
+     tiap kata, huruf besar ('Sambung Kebaikan' → 'SK', 'Ngaji 2' →
+     'N2'). Nama satu kata yang pendek (≤4 huruf, mis. 'dsf') tampil
+     apa adanya supaya tetap terbaca wajar. */
+  const singkatanKegiatan=nama=>{
+    const kata=String(nama||'').trim().split(/\s+/).filter(Boolean);
+    if(!kata.length)return '–';
+    if(kata.length===1&&kata[0].length<=4)return kata[0].toUpperCase();
+    return kata.map(k=>k.charAt(0).toUpperCase()).join('');
+  };
   const rekapEvents=[...events].sort((a,b)=>(a.tanggal||'').localeCompare(b.tanggal||'')||(a.at||0)-(b.at||0));
   const regionOrder=new Map(wilayahEfektif().map(([name],index)=>[name,index]));
   const rekapMembers=S.members
@@ -776,13 +789,23 @@ function vRingkasan(){
   };
   const rekapHead=h('thead',{},h('tr',{},
     h('th',{class:'rekap-name-head'},'Nama'),
-    /* Kepala kolom kegiatan: khusus admin bisa diklik untuk membuka
-       panel pengaturan kegiatan itu (satu-satunya tempat hapus kegiatan
-       sekarang); anggota biasa tidak mendapat reaksi apa pun. */
+    /* Kepala kolom kegiatan: tanggal + SINGKATAN nama kegiatan saja
+       supaya kolom sempit dan seragam, tidak melebar mengikuti panjang
+       nama. Saat kursor berada di atasnya (hover desktop) singkatan
+       berganti menjadi nama asli selengkapnya dan kembali lagi saat
+       kursor pergi; atribut title memuat nama penuh sebagai cadangan.
+       Khusus admin bisa diklik untuk membuka panel pengaturan kegiatan
+       itu (satu-satunya tempat hapus kegiatan sekarang); anggota biasa
+       tidak mendapat reaksi klik apa pun. */
     ...rekapEvents.map(event=>{
-      const props={class:'rekap-ev'+(S.admin?' rekap-ev-admin':''),title:(event.judul||'Kegiatan komunitas')+' · '+shortDate(event)+(S.admin?' — ketuk untuk pengaturan kegiatan':'')};
-      if(S.admin)props.onclick=()=>{S.rekapDialog={id:event.id,judul:event.judul||'Kegiatan komunitas',tanggal:event.tanggal||'',tahap:'atur'};render()};
-      return h('th',props,h('small',{},shortDate(event)),h('span',{},event.judul||'Kegiatan komunitas'));
+      const namaPenuh=event.judul||'Kegiatan komunitas';
+      const singkatan=singkatanKegiatan(namaPenuh);
+      const label=h('span',{class:'rekap-ev-label'},singkatan);
+      const props={class:'rekap-ev'+(S.admin?' rekap-ev-admin':''),title:namaPenuh+' · '+shortDate(event)+(S.admin?' — ketuk untuk pengaturan kegiatan':''),
+        onmouseenter:()=>{label.textContent=namaPenuh},
+        onmouseleave:()=>{label.textContent=singkatan}};
+      if(S.admin)props.onclick=()=>{S.rekapDialog={id:event.id,judul:namaPenuh,tanggal:event.tanggal||'',tahap:'atur'};render()};
+      return h('th',props,h('small',{},shortDate(event)),label);
     }),
     h('th',{class:'rekap-sum-start',title:'Total Hadir sepanjang tahun'},'Hadir'),
     h('th',{title:'Total Izin sepanjang tahun'},'Izin'),
