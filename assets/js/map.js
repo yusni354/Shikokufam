@@ -615,7 +615,7 @@ function petaFiltered(){
 }
 function petaIcon(en,selected){
   const c=regionColor(en.region);
-  return L.divIcon({className:'peta-pin-wrap'+(selected?' peta-pin-selected':'')+(en&&en.manual?' peta-pin-manual':''),html:'<div class="peta-pin"><div class="peta-pin-body" style="background:'+c+'"></div></div>',iconSize:[30,38],iconAnchor:[15,36],popupAnchor:[0,-34]});
+  return L.divIcon({className:'peta-pin-wrap'+(selected?' peta-pin-selected':''),html:'<div class="peta-pin"><div class="peta-pin-body" style="background:'+c+'"></div></div>',iconSize:[30,38],iconAnchor:[15,36],popupAnchor:[0,-34]});
 }
 /* Isi popup pin sebagai elemen DOM (bukan teks HTML) supaya tombol
    admin di dalamnya — Perbaiki Posisi & Kembalikan Otomatis — bisa
@@ -1015,7 +1015,7 @@ function formPinSetMarker(coords){
   if(!FP.map||typeof L==='undefined')return;
   FP.temp=[coords[0],coords[1]];
   S.formPinTemp=FP.temp;
-  const icon=L.divIcon({className:'peta-pin-wrap peta-pin-manual',html:'<div class="peta-pin"><div class="peta-pin-body" style="background:#2b7a8c"></div></div>',iconSize:[30,38],iconAnchor:[15,36]});
+  const icon=L.divIcon({className:'peta-pin-wrap',html:'<div class="peta-pin"><div class="peta-pin-body" style="background:#2b7a8c"></div></div>',iconSize:[30,38],iconAnchor:[15,36]});
   if(FP.marker){FP.marker.setLatLng(FP.temp);FP.marker.setIcon(icon)}
   else{
     FP.marker=L.marker(FP.temp,{icon,draggable:true}).addTo(FP.map);

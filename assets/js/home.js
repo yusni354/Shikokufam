@@ -34,6 +34,37 @@ function vPengaturan(){
         catch(e){alert('Gagal menyimpan pesan: '+(e.message||'periksa koneksi'))}
       }},'Simpan')))];
 }
+/* Maskot Home berupa VIDEO (tanpa suara, berputar otomatis, berulang).
+   Sumbernya data URI base64 di assets/js/maskot-video.js — berkas teks
+   JavaScript yang SENGAJA tidak dimuat di index.html: berkas itu baru
+   dimuat di sini, saat Home benar-benar dibuka, supaya halaman lain
+   tidak ikut terbebani ±444 KB. Bentuk teks dipilih karena jalur unggah
+   repo hanya membawa berkas teks, jadi video tetap tampil di situs
+   asli. Bila pengguna mengaktifkan pengurangan gerak
+   (prefers-reduced-motion), video tidak dimuat sama sekali dan yang
+   tampil hanya poster diamnya (gambar maskot statis). */
+let maskotVideoSkripDimuat=false;
+const maskotVideoAntre=[];
+function pasangSumberVideoMaskot(vid){
+  if(window.MASKOT_VIDEO_SRC){vid.src=window.MASKOT_VIDEO_SRC;const p=vid.play();if(p&&p.catch)p.catch(()=>{})}
+  else maskotVideoAntre.push(vid);
+}
+function muatSumberVideoMaskot(vid){
+  if(window.MASKOT_VIDEO_SRC||maskotVideoSkripDimuat){pasangSumberVideoMaskot(vid);return}
+  maskotVideoSkripDimuat=true;
+  pasangSumberVideoMaskot(vid);
+  const sc=document.createElement('script');
+  sc.src='assets/js/maskot-video.js?v=20270122';
+  sc.onload=()=>{maskotVideoAntre.splice(0).forEach(v=>{if(v.isConnected)pasangSumberVideoMaskot(v)})};
+  document.head.appendChild(sc);
+}
+function homeMascotVideo(){
+  const gerakDikurangi=!!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  const vid=h('video',{class:'home-welcome-mascot',poster:'assets/mascot.webp',preload:'none','aria-label':'Video maskot Shikoku Family'});
+  vid.muted=true;vid.loop=true;vid.playsInline=true;vid.setAttribute('playsinline','');vid.setAttribute('disablepictureinpicture','');
+  if(!gerakDikurangi){vid.autoplay=true;muatSumberVideoMaskot(vid)}
+  return vid;
+}
 /* Halaman Home dan Ringkasan */
 function vHome(){
   const today=new Date(),todayKey=[today.getFullYear(),String(today.getMonth()+1).padStart(2,'0'),String(today.getDate()).padStart(2,'0')].join('-');
@@ -60,7 +91,7 @@ function vHome(){
   return [
     h('section',{class:'home-welcome'},
       h('div',{class:'home-welcome-text'},h('small',{},today.toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'})),h('h1',{},'Selamat datang'+(S.name?', '+S.name.split(' ')[0]:'')+'!'),h('p',{},welcomeMessage()),h('button',{class:'btn home-welcome-cta',onclick:()=>go('kegiatan')},'Lihat Kegiatan')),
-      h('img',{class:'home-welcome-mascot',src:'assets/mascot.webp',alt:'Maskot Shikoku Family'})
+      homeMascotVideo()
     ),
     h('div',{class:'stats home-stats'},...[['Anggota',S.members.length],['Kegiatan',S.events.length],['Wilayah',Object.keys(wilayah()).length],['Jadwal Piket',S.cleaningDuties.length]].map(item=>h('div',{},h('small',{},item[0]),h('b',{},String(item[1]))))),
     h('div',{class:'home-section-heading'},h('h2',{},'Daftar anggota'),S.admin&&h('button',{class:'btn s',onclick:()=>go('members')},'+ Tambah')),

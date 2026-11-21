@@ -101,6 +101,9 @@ function render(){
     return;
   }
   setAuthLocked(false);
+  /* Muat ulang: pulihkan halaman terakhir yang dibuka (satu kali,
+     hanya sesudah sesi terpulihkan & disetujui — lihat shell.js). */
+  pulihkanViewTerakhir();
   renderDrawer();
   $('#sw').style.display=S.mainAdmin?'flex':'none';
   updateApprovalBadges();
