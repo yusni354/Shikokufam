@@ -119,18 +119,36 @@ function activityCard(event){
   const expanded=String(S.activityExpanded)===String(event.id);
   const totals={hadir:0,izin:0,cuti:0,alpha:0};
   Object.values(activityStatusMap(event)).forEach(st=>{if(totals[st]!=null)totals[st]++});
-  /* Persentase tiap total dihitung dari TOTAL KESELURUHAN ANGGOTA
-     aktif (semua wilayah, populasi yang sama dengan daftar absensi).
-     Bila belum ada anggota sama sekali, persentase tidak ditampilkan
-     supaya tidak ada pembagian dengan nol. */
+  /* Pil total hanya menampilkan JUMLAH tiap status (tanpa teks
+     persen). Proporsi tiap status terhadap TOTAL KESELURUHAN ANGGOTA
+     aktif (semua wilayah, populasi yang sama dengan daftar absensi)
+     ditampilkan sebagai GRAFIK batang tumpuk mendatar di bawah pil:
+     tiap segmen berwarna sesuai status dan lebarnya sebanding dengan
+     bagiannya dari keseluruhan anggota; anggota yang belum tercatat
+     statusnya tampil sebagai sisa batang kosong, jadi batang selalu
+     utuh 100%. Bila belum ada anggota sama sekali, batang tampil
+     kosong tanpa label. */
   const totalAnggota=registeredMembers.length;
-  const pctOf=n=>totalAnggota?Math.round(n/totalAnggota*100):null;
-  const countPill=(cls,label,n)=>{
-    const p=pctOf(n);
-    return p===null
-      ?h('b',{class:cls},label+' '+n)
-      :h('b',{class:cls},label+' '+n,h('span',{class:'activity-pct'},'('+p+'%)'));
+  const countPill=(cls,label,n)=>h('b',{class:cls},label+' '+n);
+  const chartSeg=(cls,label,n)=>{
+    const pct=totalAnggota?n/totalAnggota*100:0;
+    return h('span',{class:'activity-chart-seg '+cls,style:'width:'+pct+'%',title:label+' '+n+' dari '+totalAnggota+' anggota ('+Math.round(pct)+'%)'},
+      pct>=14?h('small',{},Math.round(pct)+'%'):'');
   };
+  const recordedTotal=totals.hadir+totals.izin+totals.cuti+totals.alpha;
+  const unrecorded=totalAnggota?Math.max(0,totalAnggota-recordedTotal):0;
+  const chart=h('div',{class:'activity-chart',role:'img','aria-label':'Grafik absensi kegiatan dari '+totalAnggota+' anggota'},
+    chartSeg('s-hadir','Hadir',totals.hadir),
+    chartSeg('s-izin','Izin',totals.izin),
+    chartSeg('s-cuti','Cuti',totals.cuti),
+    chartSeg('s-alpha','Alpha',totals.alpha),
+    unrecorded>0&&h('span',{class:'activity-chart-seg s-sisa',style:'width:'+(unrecorded/totalAnggota*100)+'%',title:'Belum tercatat '+unrecorded+' dari '+totalAnggota+' anggota'})
+  );
+  const chartLegend=totalAnggota?h('div',{class:'activity-chart-legend'},
+    ...[['hadir','Hadir'],['izin','Izin'],['cuti','Cuti'],['alpha','Alpha']].map(([key,label])=>
+      h('span',{class:'lg-'+key},h('i',{'aria-hidden':'true'}),label+' '+Math.round(totals[key]/totalAnggota*100)+'%')),
+    unrecorded>0&&h('span',{class:'lg-sisa'},h('i',{'aria-hidden':'true'}),'Belum tercatat '+Math.round(unrecorded/totalAnggota*100)+'%')
+  ):null;
   /* Tahap 1: pilih wilayah dulu. Daftar anggota BELUM tampil di sini;
      admin mengetuk satu wilayah untuk masuk ke halaman pengabsenannya. */
   const regionPick=(region,color)=>{
@@ -149,7 +167,9 @@ function activityCard(event){
       if(!confirm('Hapus kegiatan "'+(event.judul||'ini')+'"?'))return;
       try{await S.db.collection('events').doc(event.id).delete()}catch(error){console.error(error);alert('Gagal menghapus kegiatan: '+(error.message||'periksa koneksi'))}
     }},'Hapus kegiatan'),h('span',{class:'activity-chevron','aria-hidden':'true'},'›'))),
-    h('div',{class:'activity-counts','aria-label':'Total absensi kegiatan'},countPill('c-hadir','Hadir',totals.hadir),countPill('c-izin','Izin',totals.izin),countPill('c-cuti','Cuti',totals.cuti),countPill('c-alpha','Alpha',totals.alpha))
+    h('div',{class:'activity-counts','aria-label':'Total absensi kegiatan'},countPill('c-hadir','Hadir',totals.hadir),countPill('c-izin','Izin',totals.izin),countPill('c-cuti','Cuti',totals.cuti),countPill('c-alpha','Alpha',totals.alpha)),
+    chart,
+    chartLegend
   ];
   if(expanded)content.push(
     event.lokasi&&h('p',{class:'activity-meta'},icon('pin',15),h('span',{},event.lokasi)),

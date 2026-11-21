@@ -376,7 +376,22 @@ body.admin-dark .card .e{background:#293946;color:var(--acc)}
 .activity-counts b.c-izin::before{background:#f2b544}
 .activity-counts b.c-cuti::before{background:#2f8fc1}
 .activity-counts b.c-alpha::before{background:#d9534f}
-.activity-counts .activity-pct{font-size:11px;font-weight:400;opacity:.75}
+.activity-chart{display:flex;height:16px;margin:10px 0 0;border-radius:999px;background:var(--line);overflow:hidden}
+.activity-chart-seg{display:flex;align-items:center;justify-content:center;min-width:0;overflow:hidden}
+.activity-chart-seg small{font-size:10px;font-weight:700;line-height:1;color:#fff;white-space:nowrap}
+.activity-chart-seg.s-hadir{background:#2e9e63}
+.activity-chart-seg.s-izin{background:#f2b544}
+.activity-chart-seg.s-izin small{color:#5a3d00}
+.activity-chart-seg.s-cuti{background:#2f8fc1}
+.activity-chart-seg.s-alpha{background:#d9534f}
+.activity-chart-seg.s-sisa{background:transparent}
+.activity-chart-legend{display:flex;flex-wrap:wrap;gap:3px 14px;margin:6px 0 0;font-size:11px;color:var(--mut)}
+.activity-chart-legend span{display:inline-flex;align-items:center;gap:5px}
+.activity-chart-legend i{flex:none;width:8px;height:8px;border-radius:3px;background:#c3ccd4}
+.activity-chart-legend .lg-hadir i{background:#2e9e63}
+.activity-chart-legend .lg-izin i{background:#f2b544}
+.activity-chart-legend .lg-cuti i{background:#2f8fc1}
+.activity-chart-legend .lg-alpha i{background:#d9534f}
 .activity-card{cursor:pointer}
 .activity-heading-side{display:flex;align-items:flex-start;gap:8px;flex:none}
 .activity-chevron{flex:none;font-size:24px;line-height:1;color:var(--mut);transition:transform .18s ease;transform:rotate(90deg)}
