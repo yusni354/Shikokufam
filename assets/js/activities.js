@@ -713,9 +713,8 @@ function vRingkasan(){
   if(ruang==='anggota')return [...head,...vRingkasanAnggota()];
   if(ruang==='keuangan')return [...head,...vRingkasanKeuangan(selected)];
   if(ruang==='piket')return [...head,...vRingkasanPiket(selected)];
-  /* Ruangan Kegiatan: isi persis seperti halaman Ringkasan Kegiatan
-     sebelumnya (ringkasan setahun + tabel rekap per anggota + daftar
-     kegiatan tahun terpilih). */
+  /* Ruangan Kegiatan: ringkasan setahun + tabel rekap per anggota.
+     Daftar kartu per kegiatan hanya ada di halaman Kegiatan. */
   const events=S.events.filter(event=>activityYear(event)===selected)
     .sort((a,b)=>(b.tanggal||'').localeCompare(a.tanggal||'')||(b.at||0)-(a.at||0));
   if(!events.length){
@@ -733,25 +732,6 @@ function vRingkasan(){
     h('h2',{},'Ringkasan tahun '+selected),
     h('p',{class:'activity-meta'},icon('calendar',15),h('span',{},events.length+' kegiatan pada tahun ini')),
     yearView.pills,yearView.chart,yearView.legend);
-  const item=event=>{
-    const view=activityTotalsView(activityTotals(event),totalAnggota);
-    const date=event.tanggal?new Date(event.tanggal+'T00:00:00'):null;
-    const dateLabel=date&&!Number.isNaN(date.getTime())?date.toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'}):'Tanggal belum ditentukan';
-    const card=h('article',{class:'card ringkasan-item',title:'Ketuk untuk membuka kegiatan ini di halaman Kegiatan'},
-      h('h2',{},event.judul||'Kegiatan komunitas'),
-      h('p',{class:'activity-meta'},icon('calendar',15),h('span',{},dateLabel+(event.waktu?' · '+event.waktu:''))),
-      view.pills,view.chart,view.legend);
-    /* Ketuk satu kegiatan: buka kegiatan itu dalam keadaan terbuka di
-       halaman Kegiatan memakai alur yang sudah ada (activityExpanded
-       + go). Keadaan fokus absensi dibersihkan dulu supaya daftar
-       kegiatan yang tampil, bukan halaman fokus wilayah lain. */
-    card.addEventListener('click',()=>{
-      S.absensiEvent=null;S.absensiRegion=null;S.absensiDraft=null;
-      S.activityExpanded=String(event.id);
-      go('kegiatan');
-    });
-    return card;
-  };
   /* ===== Laporan rekap per anggota: tabel lengkap setahun =====
      Satu baris per anggota aktif (urut wilayah mengikuti urutan resmi
      wilayahEfektif, lalu nama), satu kolom per kegiatan tahun terpilih
@@ -876,7 +856,7 @@ function vRingkasan(){
     rekapMembers.length
       ?h('div',{class:'rekap-wrap'},h('table',{class:'rekap-table'},rekapHead,rekapBody))
       :h('p',{class:'warn'},'Belum ada anggota aktif.'));
-  return [...head,summaryCard,rekapCard,h('div',{class:'activity-list'},...events.map(item)),dialogRekapKegiatan()];
+  return [...head,summaryCard,rekapCard,dialogRekapKegiatan()];
 }
 /* ===== Panel pengaturan kegiatan dari kepala kolom tabel rekap =====
    Dibuka dengan mengklik kepala kolom sebuah kegiatan di tabel rekap
