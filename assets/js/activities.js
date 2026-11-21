@@ -969,9 +969,10 @@ function vKegiatan(){
   const date=h('input',{type:'date'});
   const time=h('input',{type:'time'});
   const location=h('input',{placeholder:'Lokasi kegiatan',maxlength:'180'});
-  /* Pengulangan: pilihan utama di kolom KIRI baris ke-3 grid formulir;
-     sub-pemilihnya tampil di kolom KANAN baris yang sama, hanya sesuai
-     pilihan ('Sekali saja' / 'Setiap minggu' = kolom kanan kosong). */
+  /* Pengulangan: pilihan utama di kolom KETIGA baris ke-2 grid formulir;
+     sub-pemilihnya tampil tepat DI BAWAH field Pengulangan di kolom yang
+     sama, tersusun rapat ke bawah ('Sekali saja' / 'Setiap minggu' =
+     tidak ada tambahan apa pun di bawahnya). */
   const repeat=h('select',{'aria-label':'Pengulangan kegiatan'},
     h('option',{value:'sekali'},'Sekali saja'),
     h('option',{value:'mingguan'},'Setiap minggu'),
@@ -1010,19 +1011,21 @@ function vKegiatan(){
     repeatFeedback.textContent='';
   };
   const events=[...S.events].sort((a,b)=>(b.tanggal||'').localeCompare(a.tanggal||'')||(b.at||0)-(a.at||0));
-  /* Formulir TEPAT 3 baris dua kolom: baris 1 Nama | Lokasi, baris 2
-     Tanggal | Waktu, baris 3 Pengulangan | pemilih tambahan pengulangan
-     (keduanya dibungkus satu sel kolom kanan supaya berganti tempat di
-     baris yang sama, tidak pernah tampil di bawah formulir). */
-  const repeatExtra=h('div',{class:'activity-repeat-extra'},repeatDateWrap,repeatWeekWrap);
+  /* Formulir TEPAT 2 baris: baris 1 dua kolom Nama | Lokasi, baris 2
+     TIGA kolom Tanggal | Waktu | Pengulangan. Pemilih tambahan
+     pengulangan tinggal di dalam kolom ketiga, tepat di bawah field
+     Pengulangan, jadi tidak pernah melebar ke baris tersendiri. */
+  const repeatCell=h('div',{class:'activity-repeat-cell'},
+    h('label',{class:'activity-field activity-repeat-field'},'Pengulangan',repeat),
+    repeatDateWrap,repeatWeekWrap);
   const createForm=S.admin&&h('section',{class:'card activity-create'},h('h2',{},'Buat kegiatan'),
     h('div',{class:'activity-create-grid'},
       h('label',{class:'activity-field'},'Nama kegiatan *',title),
-      h('label',{class:'activity-field'},'Lokasi',location),
+      h('label',{class:'activity-field'},'Lokasi',location)),
+    h('div',{class:'activity-create-grid3'},
       h('label',{class:'activity-field'},'Tanggal *',date),
       h('label',{class:'activity-field'},'Waktu',time),
-      h('label',{class:'activity-field activity-repeat-field'},'Pengulangan',repeat),
-      repeatExtra),
+      repeatCell),
     h('button',{class:'btn',onclick:async()=>{
       const judul=title.value.trim();
       if(!judul||!date.value){alert('Isi nama dan tanggal kegiatan.');return}

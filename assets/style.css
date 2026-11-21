@@ -369,21 +369,22 @@ body.admin-dark .card .e{background:#293946;color:var(--acc)}
 .activity-create,.activity-card{display:block}
 .activity-create h2,.activity-card h2{margin:0 0 10px;font-size:20px}
 .activity-create-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 10px;align-items:start}
-.activity-create-grid .activity-field{margin:0;min-width:0}
+.activity-create-grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px 10px;align-items:start;margin-top:8px}
+.activity-create-grid .activity-field,.activity-create-grid3 .activity-field{margin:0;min-width:0}
 .activity-field{display:block;margin:10px 0;color:var(--mut);font-size:13px;font-weight:700}
 .activity-field input,.activity-field textarea{display:block;color:var(--ink);font-weight:400}
-.activity-create-grid .activity-field input,.activity-create-grid .activity-field textarea{margin:4px 0 0;min-width:0}
+.activity-create-grid .activity-field input,.activity-create-grid .activity-field textarea,.activity-create-grid3 .activity-field input,.activity-create-grid3 .activity-field textarea{margin:4px 0 0;min-width:0}
 .activity-create input,.activity-create textarea{padding:10px 12px;border-radius:14px}
 .activity-create select{padding:10px 40px 10px 12px;border-radius:14px}
 .activity-create>.btn{margin-top:10px}
 .activity-repeat-field{margin:8px 0 0}
-.activity-create-grid .activity-repeat-field{margin:0}
+.activity-create-grid3 .activity-repeat-field{margin:0}
 .activity-repeat-field select{display:block;width:100%;margin:4px 0 0;min-width:0;color:var(--ink);font-weight:400}
-.activity-repeat-extra{min-width:0}
-.activity-repeat-sub{margin-top:0}
+.activity-repeat-cell{min-width:0}
+.activity-repeat-sub{margin-top:6px}
 .activity-repeat-sub .activity-field{margin:0;min-width:0}
 .activity-repeat-sub select{display:block;width:100%;margin:4px 0 0;min-width:0;color:var(--ink);font-weight:400}
-.activity-repeat-week{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;align-items:start}
+.activity-repeat-week{display:grid;grid-template-columns:1fr;gap:6px;align-items:start}
 .activity-create .activity-feedback{margin:8px 0 0}
 .activity-list{display:grid;gap:12px}
 .activity-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
@@ -543,8 +544,8 @@ body.admin-dark .card .e{background:#293946;color:var(--acc)}
 .absensi-chip.st-cuti{background:#2f8fc1;color:#fff}
 .absensi-savebar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:12px}
 @media(max-width:560px){.activity-region-pick-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.activity-region-pick{padding:9px 10px;border-radius:14px}.activity-region-pick-main b{font-size:12px}.activity-region-pick-main small{font-size:10px}.activity-region-pick-arrow{font-size:17px}.absensi-row{gap:8px;padding:8px 8px 8px 10px}.absensi-opt{padding:7px 6px;font-size:10px}.absensi-info b{font-size:13px}}
-@media(max-width:560px){.activity-create-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.activity-create-grid .activity-field{font-size:12px}.activity-create input,.activity-create textarea{padding:9px 10px;font-size:14px}.activity-create select{padding:9px 34px 9px 10px;font-size:14px}.activity-repeat-field,.activity-repeat-sub .activity-field{font-size:12px}.activity-heading{align-items:flex-start}.activity-region-list{grid-template-columns:1fr}.activity-participant{align-items:flex-start;flex-direction:column}.activity-participant-actions{width:100%;flex-wrap:wrap}.activity-add-row,.activity-scanner-row{align-items:stretch}.activity-add-row{flex-direction:column}.activity-region-section .activity-add-row{flex-direction:row}.activity-region-section .activity-add-row .btn{white-space:nowrap}.activity-scanner-row .btn{white-space:nowrap}}
-@media(max-width:340px){.activity-create-grid{grid-template-columns:1fr}}
+@media(max-width:560px){.activity-create-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.activity-create-grid3{gap:8px}.activity-create-grid .activity-field,.activity-create-grid3 .activity-field{font-size:12px}.activity-create input,.activity-create textarea{padding:9px 10px;font-size:14px}.activity-create select{padding:9px 34px 9px 10px;font-size:14px}.activity-repeat-field,.activity-repeat-sub .activity-field{font-size:12px}.activity-heading{align-items:flex-start}.activity-region-list{grid-template-columns:1fr}.activity-participant{align-items:flex-start;flex-direction:column}.activity-participant-actions{width:100%;flex-wrap:wrap}.activity-add-row,.activity-scanner-row{align-items:stretch}.activity-add-row{flex-direction:column}.activity-region-section .activity-add-row{flex-direction:row}.activity-region-section .activity-add-row .btn{white-space:nowrap}.activity-scanner-row .btn{white-space:nowrap}}
+@media(max-width:340px){.activity-create-grid{grid-template-columns:1fr}.activity-create-grid3{grid-template-columns:1fr}}
 
 /* ===== Musyawarah: buku catatan rapat (dari file musyawarah.html) =====
    Semua aturan ter-scope di .musy-root supaya tidak mengganggu halaman lain.
