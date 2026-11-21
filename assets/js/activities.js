@@ -926,6 +926,19 @@ function activityMonthlyByWeek(y,m,week,weekday){
   if(day>dim)day-=7;
   return new Date(y,m,day);
 }
+/* Pengulangan mingguan: kejadian pertama adalah tanggal awal itu
+   sendiri, lalu tiap 7 hari sesudahnya (hari yang sama) sebanyak 12
+   kejadian. Hasilnya juga dokumen events biasa yang berdiri sendiri. */
+function activityWeeklyDates(startValue){
+  const parts=String(startValue).split('-').map(Number);
+  const start=new Date(parts[0],(parts[1]||1)-1,parts[2]||1);
+  const dates=[];
+  for(let i=0;i<12;i++)dates.push(new Date(start.getFullYear(),start.getMonth(),start.getDate()+i*7));
+  return dates;
+}
+function activityDateShort(d){
+  return d.toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'});
+}
 function activityRecurringDates(startValue,mode,opts){
   const parts=String(startValue).split('-').map(Number);
   const start=new Date(parts[0],(parts[1]||1)-1,parts[2]||1);
@@ -957,6 +970,7 @@ function vKegiatan(){
      field yang ada; sub-pemilihnya hanya tampil sesuai pilihan. */
   const repeat=h('select',{'aria-label':'Pengulangan kegiatan'},
     h('option',{value:'sekali'},'Sekali saja'),
+    h('option',{value:'mingguan'},'Setiap minggu'),
     h('option',{value:'bulanan-tanggal'},'Setiap bulan — tanggal tertentu'),
     h('option',{value:'bulanan-minggu'},'Setiap bulan — minggu tertentu'));
   const repeatDay=h('select',{'aria-label':'Tanggal pengulangan bulanan'},
@@ -1008,6 +1022,17 @@ function vKegiatan(){
       try{
         if(repeat.value==='sekali'){
           await S.db.collection('events').add({judul,tanggal:date.value,waktu:time.value,lokasi,peserta_anggota:[],hadir_anggota:[],at:Date.now()});
+        }else if(repeat.value==='mingguan'){
+          /* Setiap minggu pada hari yang sama dengan tanggal awal,
+             12 minggu berturut-turut mulai dari tanggal awal itu. */
+          const dates=activityWeeklyDates(date.value);
+          const baseAt=Date.now();
+          for(let i=0;i<dates.length;i++){
+            await S.db.collection('events').add({judul,tanggal:activityDateKey(dates[i]),waktu:time.value,lokasi,peserta_anggota:[],hadir_anggota:[],at:baseAt+i});
+          }
+          const pesan=dates.length+' kegiatan dibuat (setiap minggu, '+activityDateShort(dates[0])+' – '+activityDateShort(dates[dates.length-1])+')';
+          repeatFeedback.textContent=pesan;
+          alert(pesan);
         }else{
           const mode=repeat.value==='bulanan-tanggal'?'tanggal':'minggu';
           const dates=activityRecurringDates(date.value,mode,{
