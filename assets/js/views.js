@@ -103,7 +103,10 @@ function renderDariData(){
 }
 function render(){
   if(renderTertundaTimer){clearTimeout(renderTertundaTimer);renderTertundaTimer=null}
-  if(S.activityScannerStop)S.activityScannerStop();
+  /* Pemindai QR layar penuh TIDAK dihentikan oleh render: lapisannya
+     tinggal di <body> dan harus tetap hidup untuk memindai banyak QR
+     berturut-turut; ia berhenti hanya lewat tombol 'Tutup QR'. */
+  if(S.activityScannerStop&&!S.qrScannerOpen)S.activityScannerStop();
   if(S.view!=='musyawarah')window.__musyAlive=false;
   if(!S.mainAdmin)S.adminMenuOpen=false;
   syncAdminTheme();

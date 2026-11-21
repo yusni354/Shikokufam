@@ -244,21 +244,33 @@ function activityCard(event){
   );
   if(S.admin){
     const barcodeInput=h('input',{class:'activity-barcode-input',placeholder:'Pindai QR / masukkan ID anggota',autocomplete:'off'});
-    const scanButton=h('button',{class:'btn s',type:'button'},icon('camera',16),h('span',{},'Buka kamera'));
-    const scannerVideo=h('video',{class:'activity-scanner-video',autoplay:'',muted:'',playsinline:'true',style:'display:none'});
-    const processBarcode=async value=>{
+    const scanButton=h('button',{class:'btn s',type:'button'},icon('scan',16),h('span',{},'Absensi QR'));
+    /* Inti pencatatan dari kode QR/ID: dipakai kolom ketik manual DAN
+       pemindai kamera layar penuh. Mengembalikan hasil terstruktur
+       {ok,kind,message,member} supaya tiap pemanggil bisa menampilkan
+       umpan baliknya sendiri (teks status / animasi). Pemeriksaan
+       'sudah tercatat' membaca data kegiatan TERBARU dari S.events,
+       jadi QR yang sama tidak tercatat dobel dalam satu sesi pindai. */
+    const resolveBarcode=async value=>{
       const code=String(value||'').trim().replace(/^\*|\*$/g,'');
-      if(!code){status.textContent='Barcode kosong.';return}
+      if(!code)return{ok:false,kind:'empty',message:'Barcode kosong.'};
       const matches=registeredMembers.filter(member=>memberQrValue(member).toLowerCase()===code.toLowerCase());
-      if(matches.length===0){status.textContent='Barcode tidak cocok dengan anggota terdaftar.';return}
-      if(matches.length>1){status.textContent='Barcode cocok dengan beberapa anggota. Periksa nomor kartu terlebih dahulu.';return}
+      if(matches.length===0)return{ok:false,kind:'unknown',message:'QR tidak dikenal. Kode tidak cocok dengan anggota terdaftar.'};
+      if(matches.length>1)return{ok:false,kind:'multi',message:'Barcode cocok dengan beberapa anggota. Periksa nomor kartu terlebih dahulu.'};
       const member=matches[0];
-      if(attendees.has(String(member.id))){status.textContent=(member.nama||'Anggota')+' sudah tercatat hadir.';return}
+      const freshEvent=S.events.find(item=>String(item.id)===String(event.id))||event;
+      if(activityStatusOf(freshEvent,member.id)==='hadir')return{ok:true,kind:'already',member,message:(member.nama||'Anggota')+' sudah tercatat hadir.'};
       try{
         await updateActivityMember(event.id,member.id,'present');
-        S.activityFeedback={eventId:event.id,message:(member.nama||'Anggota')+' berhasil ditambahkan dan dicatat hadir.'};
+        return{ok:true,kind:'recorded',member,message:(member.nama||'Anggota')+' berhasil dicatat hadir.'};
+      }catch(error){console.error(error);return{ok:false,kind:'error',message:'Gagal mencatat kehadiran: '+(error.message||'periksa koneksi')}}
+    };
+    const processBarcode=async value=>{
+      const result=await resolveBarcode(value);
+      if(result.ok&&result.kind==='recorded'){
+        S.activityFeedback={eventId:event.id,message:(result.member?.nama||'Anggota')+' berhasil ditambahkan dan dicatat hadir.'};
         render();
-      }catch(error){console.error(error);status.textContent='Gagal mencatat kehadiran: '+(error.message||'periksa koneksi')}
+      }else status.textContent=result.message;
     };
     const submitBarcode=async()=>{
       const value=barcodeInput.value;
@@ -266,78 +278,149 @@ function activityCard(event){
       await processBarcode(value);
     };
     barcodeInput.onkeydown=event=>{if(event.key==='Enter'){event.preventDefault();submitBarcode()}};
-    scanButton.onclick=async()=>{
-      if(S.activityScannerStop){S.activityScannerStop();return}
-      if(!window.BarcodeDetector||typeof window.BarcodeDetector.getSupportedFormats!=='function'||!navigator.mediaDevices?.getUserMedia){
-        status.textContent='Pemindaian QR lewat kamera tidak didukung browser ini. Gunakan aplikasi pemindai QR dan ketik/pindai ID ke kolom.';
-        return;
-      }
-      let stream=null,active=false,frame=0,stopScanner=()=>{};
-      try{
-        const formats=await window.BarcodeDetector.getSupportedFormats();
-        if(!formats.includes('qr_code')){
-          status.textContent='Browser ini belum mendukung pembacaan QR. Gunakan aplikasi pemindai QR dan ketik/pindai ID ke kolom.';
+    /* ===== Pemindai QR LAYAR PENUH ('Absensi QR') =====
+       Mengetuk tombol langsung membuka kamera memenuhi layar dengan
+       bingkai bidik. Sesudah satu QR terbaca, animasi BERHASIL (centang
+       hijau membesar) atau GAGAL (silang merah bergetar) tampil singkat
+       di atas kamera TANPA menutupnya — pemindai langsung aktif lagi
+       untuk QR berikutnya. Kode yang sama diabaikan selama 4 detik
+       supaya tidak tercatat dobel karena terbaca berkali-kali. Kamera
+       hanya berhenti lewat tombol 'Tutup QR'. Lapisan pemindai tinggal
+       di <body> (di luar #app) dan render() dijaga supaya tidak
+       menghentikannya, jadi angka kartu di belakang ikut segar dari
+       data terbaru dan kartu tetap terbuka sesudah kamera ditutup. */
+    const openQrScanner=()=>{
+      if(S.qrScannerOpen)return;
+      const video=h('video',{class:'qr-full-video',autoplay:'',muted:'',playsinline:'true'});
+      const scanStatus=h('p',{class:'qr-full-status','aria-live':'polite'},'Menyiapkan kamera…');
+      const badge=h('div',{class:'qr-full-result','aria-hidden':'true'});
+      const closeButton=h('button',{class:'qr-full-close',type:'button'},icon('close',18),h('span',{},'Tutup QR'));
+      const overlay=h('div',{class:'qr-full',role:'dialog','aria-modal':'true','aria-label':'Pemindai QR absensi'},
+        video,
+        h('div',{class:'qr-full-top'},h('p',{class:'qr-full-title'},'Absensi QR'),h('p',{class:'qr-full-sub'},event.judul||'Kegiatan komunitas')),
+        h('div',{class:'qr-full-frame'},
+          h('span',{class:'qr-corner tl'}),h('span',{class:'qr-corner tr'}),h('span',{class:'qr-corner bl'}),h('span',{class:'qr-corner br'})),
+        badge,
+        h('div',{class:'qr-full-bottom'},scanStatus,closeButton)
+      );
+      document.body.appendChild(overlay);
+      document.body.classList.add('qr-full-lock');
+      S.qrScannerOpen=true;
+      let stream=null,active=true,frame=0,busy=false,lastCode='',lastTime=0,sessionCount=0,badgeTimer=0;
+      const closeScanner=()=>{
+        if(!active)return;
+        active=false;
+        if(frame)cancelAnimationFrame(frame);
+        if(badgeTimer)clearTimeout(badgeTimer);
+        if(stream)stream.getTracks().forEach(track=>track.stop());
+        video.srcObject=null;
+        overlay.remove();
+        document.body.classList.remove('qr-full-lock');
+        S.qrScannerOpen=false;
+        if(S.activityScannerStop===closeScanner)S.activityScannerStop=null;
+        render();
+      };
+      S.activityScannerStop=closeScanner;
+      closeButton.onclick=closeScanner;
+      const showResult=(ok,message)=>{
+        badge.replaceChildren(icon(ok?'check':'close',64));
+        badge.className='qr-full-result show '+(ok?'ok':'fail');
+        void badge.offsetWidth;
+        badge.classList.add('play');
+        scanStatus.textContent=message;
+        if(navigator.vibrate)navigator.vibrate(ok?80:[60,40,60]);
+        if(badgeTimer)clearTimeout(badgeTimer);
+        badgeTimer=setTimeout(()=>{badge.className='qr-full-result'},1200);
+      };
+      const failOpen=message=>{
+        video.style.display='none';
+        scanStatus.textContent=message;
+      };
+      (async()=>{
+        if(!window.BarcodeDetector||typeof window.BarcodeDetector.getSupportedFormats!=='function'||!navigator.mediaDevices?.getUserMedia){
+          failOpen('Pemindaian QR lewat kamera tidak didukung browser ini. Ketuk Tutup QR, lalu gunakan kolom ID anggota pada kartu kegiatan.');
           return;
         }
-        const detector=new window.BarcodeDetector({formats:['qr_code']});
-        stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'},audio:false});
-        active=true;
-        scannerVideo.srcObject=stream;scannerVideo.style.display='block';
-        scanButton.replaceChildren(icon('close',16),h('span',{},'Berhenti memindai'));
-        stopScanner=()=>{
-          active=false;
-          if(frame)cancelAnimationFrame(frame);
-          stream.getTracks().forEach(track=>track.stop());
-          scannerVideo.srcObject=null;scannerVideo.style.display='none';
-          scanButton.replaceChildren(icon('camera',16),h('span',{},'Buka kamera'));
-          if(S.activityScannerStop===stopScanner)S.activityScannerStop=null;
-        };
-        S.activityScannerStop=stopScanner;
-        await scannerVideo.play();
-        const detect=async()=>{
+        try{
+          const formats=await window.BarcodeDetector.getSupportedFormats();
           if(!active)return;
-          try{
-            const codes=await detector.detect(scannerVideo);
-            if(codes.length&&codes[0].rawValue){
-              const value=codes[0].rawValue;
-              stopScanner();
-              await processBarcode(value);
-              return;
-            }
-          }catch(error){
-            stopScanner();
-            console.error(error);
-            status.textContent='Gagal membaca QR melalui kamera: '+(error.message||'coba lagi atau masukkan ID anggota secara manual');
+          if(!formats.includes('qr_code')){
+            failOpen('Browser ini belum mendukung pembacaan QR. Ketuk Tutup QR, lalu gunakan kolom ID anggota pada kartu kegiatan.');
             return;
           }
-          if(active)frame=requestAnimationFrame(detect);
-        };
-        detect();
-      }catch(error){
-        stopScanner();
-        if(stream)stream.getTracks().forEach(track=>track.stop());
-        scannerVideo.srcObject=null;scannerVideo.style.display='none';
-        scanButton.replaceChildren(icon('camera',16),h('span',{},'Buka kamera'));
-        console.error(error);
-        status.textContent='Kamera tidak dapat dibuka: '+(error.message||'periksa izin kamera atau masukkan ID anggota secara manual');
-      }
+          const detector=new window.BarcodeDetector({formats:['qr_code']});
+          stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'},audio:false});
+          if(!active){stream.getTracks().forEach(track=>track.stop());return}
+          video.srcObject=stream;
+          await video.play();
+          if(!active)return;
+          scanStatus.textContent='Arahkan kamera ke QR pada kartu ID anggota.';
+          const detect=async()=>{
+            if(!active)return;
+            if(!busy){
+              try{
+                const codes=await detector.detect(video);
+                if(codes.length&&codes[0].rawValue){
+                  const value=String(codes[0].rawValue).trim();
+                  const now=Date.now();
+                  if(value&&!(value===lastCode&&now-lastTime<4000)){
+                    lastCode=value;lastTime=now;busy=true;
+                    const result=await resolveBarcode(value);
+                    if(active){
+                      if(result.ok&&result.kind==='recorded')sessionCount++;
+                      showResult(result.ok,result.message+(result.ok&&result.kind==='recorded'?' · Tercatat sesi ini: '+sessionCount:''));
+                      setTimeout(()=>{busy=false},1150);
+                    }
+                  }
+                }
+              }catch(error){
+                console.error(error);
+                busy=true;
+                scanStatus.textContent='Gagal membaca QR melalui kamera. Coba dekatkan QR ke bingkai bidik.';
+                setTimeout(()=>{busy=false},1500);
+              }
+            }
+            if(active)frame=requestAnimationFrame(detect);
+          };
+          detect();
+        }catch(error){
+          console.error(error);
+          if(active)failOpen('Kamera tidak dapat dibuka: '+(error.message||'izin kamera ditolak')+'. Periksa izin kamera, lalu ketuk Tutup QR untuk kembali.');
+        }
+      })();
     };
+    scanButton.onclick=()=>openQrScanner();
     if(expanded)content.push(
       h('div',{class:'activity-scanner',onclick:e=>e.stopPropagation()},
         h('h3',{},'Pemindaian QR'),
         h('div',{class:'activity-scanner-row'},barcodeInput,h('button',{class:'btn s',onclick:submitBarcode},'Catat hadir')),
         h('div',{class:'activity-scanner-row'},scanButton),
-        scannerVideo,status)
+        status)
     );
   }
-  const card=h('article',{class:'card activity-card'+(expanded?' open':''),style:'--activity-color:'+warnaAksen,'aria-expanded':expanded?'true':'false',title:expanded?'Ketuk untuk menutup':'Ketuk untuk melihat wilayah'},...content);
+  /* Animasi pegas ala ikon Mac: kartu yang baru saja dibuka/ditutup
+     lewat klik mendapat kelas 'spring-in' SATU kali (penanda
+     S.activitySpringId dipakai lalu dibersihkan di sini) supaya
+     melebar/menyusutnya terasa memantul lembut, bukan kaku seketika. */
+  const springIn=S.activitySpringId!=null&&String(S.activitySpringId)===String(event.id);
+  if(springIn)S.activitySpringId=null;
+  const card=h('article',{class:'card activity-card'+(expanded?' open':'')+(springIn?' spring-in':''),style:'--activity-color:'+warnaAksen,'aria-expanded':expanded?'true':'false',title:expanded?'Ketuk untuk menutup':'Ketuk untuk melihat wilayah'},...content);
   /* Klik pada badan kartu membuka/menutup daftar wilayah; klik pada
      tombol/field di dalam kartu (pemilih wilayah, pemindai)
-     tidak ikut membuka/menutup. */
+     tidak ikut membuka/menutup. Sebelum keadaan berganti, kartu yang
+     ditekan menyusut sebentar seperti ikon Mac yang ditekan
+     (.activity-press ±150 ms), lalu render menggambar keadaan baru
+     dengan animasi pegas masuk. prefers-reduced-motion: langsung
+     berganti tanpa animasi dan tanpa jeda. */
   card.addEventListener('click',e=>{
     if(e.target.closest('button,input,video,a,select,textarea,label'))return;
-    S.activityExpanded=expanded?null:String(event.id);
-    render();
+    const target=expanded?null:String(event.id);
+    const kurangiGerak=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if(kurangiGerak){S.activityExpanded=target;render();return}
+    if(card.dataset.springing)return;
+    card.dataset.springing='1';
+    card.classList.add('activity-press');
+    setTimeout(()=>{S.activityExpanded=target;S.activitySpringId=String(event.id);render()},150);
   });
   return card;
 }

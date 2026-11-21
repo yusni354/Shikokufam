@@ -551,6 +551,49 @@ body.admin-dark .card .e{background:#293946;color:var(--acc)}
 .activity-add-row select,.activity-scanner-row input{min-width:0}
 .activity-barcode-input{flex:1}
 .activity-scanner-video{width:100%;max-height:300px;margin-top:10px;border-radius:14px;background:#111}
+/* ===== Pemindai QR layar penuh (tombol 'Absensi QR') =====
+   Lapisan menempel di <body>, memenuhi layar di atas segalanya.
+   Kamera TIDAK menutup sendiri sesudah memindai: animasi hasil
+   (centang hijau membesar / silang merah bergetar) tampil ±1 detik
+   di tengah, lalu pemindai siap untuk QR berikutnya sampai admin
+   mengetuk 'Tutup QR'. */
+body.qr-full-lock{overflow:hidden}
+.qr-full{position:fixed;inset:0;z-index:1000;background:#0b141b;display:flex;flex-direction:column;align-items:center;justify-content:space-between}
+.qr-full-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.qr-full-top{position:relative;z-index:2;text-align:center;padding:calc(18px + env(safe-area-inset-top,0px)) 16px 0;color:#fff;text-shadow:0 1px 6px rgba(0,0,0,.45)}
+.qr-full-title{margin:0;font-size:21px;font-weight:700;letter-spacing:.01em}
+.qr-full-sub{margin:4px 0 0;font-size:13.5px;opacity:.88;overflow-wrap:anywhere}
+.qr-full-frame{position:relative;z-index:2;width:min(72vw,300px);height:min(72vw,300px);flex:none;border:1.5px solid rgba(255,255,255,.35);border-radius:20px;box-shadow:0 0 0 9999px rgba(4,12,18,.42)}
+.qr-full-frame::after{content:'';position:absolute;left:9%;right:9%;top:12%;height:2px;border-radius:2px;background:rgba(255,255,255,.85);box-shadow:0 0 10px rgba(255,255,255,.7);animation:qrLine 2.2s ease-in-out infinite}
+@keyframes qrLine{0%,100%{top:12%}50%{top:86%}}
+.qr-corner{position:absolute;width:36px;height:36px;border:0 solid #fff}
+.qr-corner.tl{top:-2px;left:-2px;border-top-width:4.5px;border-left-width:4.5px;border-top-left-radius:18px}
+.qr-corner.tr{top:-2px;right:-2px;border-top-width:4.5px;border-right-width:4.5px;border-top-right-radius:18px}
+.qr-corner.bl{bottom:-2px;left:-2px;border-bottom-width:4.5px;border-left-width:4.5px;border-bottom-left-radius:18px}
+.qr-corner.br{bottom:-2px;right:-2px;border-bottom-width:4.5px;border-right-width:4.5px;border-bottom-right-radius:18px}
+.qr-full-result{position:absolute;z-index:3;top:50%;left:50%;width:118px;height:118px;margin:-59px 0 0 -59px;border-radius:50%;display:none;place-items:center;color:#fff;pointer-events:none}
+.qr-full-result.show{display:grid}
+.qr-full-result.ok{background:#2e9e63;box-shadow:0 12px 36px rgba(46,158,99,.55)}
+.qr-full-result.fail{background:#d9534f;box-shadow:0 12px 36px rgba(217,83,79,.55)}
+.qr-full-result.ok.play{animation:qrPop 1.15s ease both}
+.qr-full-result.fail.play{animation:qrShake 1.15s ease both}
+@keyframes qrPop{0%{transform:scale(.35);opacity:0}30%{transform:scale(1.12);opacity:1}48%{transform:scale(.97)}62%{transform:scale(1)}82%{opacity:1}100%{transform:scale(1);opacity:0}}
+@keyframes qrShake{0%{transform:scale(.55);opacity:0}18%{transform:scale(1);opacity:1}30%{transform:translateX(-9px) scale(1)}42%{transform:translateX(8px)}54%{transform:translateX(-6px)}66%{transform:translateX(5px)}78%{transform:translateX(0)}88%{opacity:1}100%{transform:translateX(0);opacity:0}}
+.qr-full-bottom{position:relative;z-index:2;width:100%;display:flex;flex-direction:column;align-items:center;gap:14px;padding:0 20px calc(22px + env(safe-area-inset-bottom,0px))}
+.qr-full-status{margin:0;max-width:520px;min-height:1.3em;text-align:center;color:#fff;font-size:15px;font-weight:600;line-height:1.45;background:rgba(6,17,24,.74);padding:10px 16px;border-radius:14px;overflow-wrap:anywhere}
+.qr-full-close{display:inline-flex;align-items:center;gap:8px;background:#fff;color:#10222e;border:0;border-radius:999px;font-family:inherit;font-weight:700;font-size:16px;padding:13px 28px;box-shadow:0 8px 22px rgba(0,0,0,.35);cursor:pointer}
+.qr-full-close:active{transform:scale(.97)}
+/* ===== Animasi pegas kartu kegiatan (seperti ikon Mac ditekan) =====
+   .activity-press: kartu menyusut sebentar saat ditekan (±150 ms).
+   .spring-in: kartu hasil render sesudahnya masuk dengan pegas —
+   membesar melewati ukuran akhir sedikit (overshoot) lalu mantul
+   menetap, ±480 ms. Hanya transform/opacity yang bergerak, tata
+   letak grid tidak berubah sehingga tidak ada kedipan susunan. */
+.activity-press{animation:activityPress .16s ease-out both}
+@keyframes activityPress{0%{transform:scale(1)}55%{transform:scale(.962)}100%{transform:scale(.972)}}
+.activity-card.spring-in{animation:activitySpring .48s cubic-bezier(.22,1.32,.36,1) both;will-change:transform}
+@keyframes activitySpring{0%{transform:scale(.958) translateY(7px);opacity:.35}55%{transform:scale(1.013) translateY(0);opacity:1}76%{transform:scale(.9965)}100%{transform:scale(1) translateY(0);opacity:1}}
+@media(prefers-reduced-motion:reduce){.activity-press,.activity-card.spring-in{animation:none}.qr-full-frame::after{animation:none}.qr-full-result.ok.play,.qr-full-result.fail.play{animation-duration:.5s}}
 .activity-feedback{min-height:1.3em;color:var(--mut);font-size:14px}
 .activity-empty{color:var(--mut);margin:8px 0}
 /* Absensi dua tahap: tahap 1 pemilih wilayah, tahap 2 halaman fokus satu wilayah */
