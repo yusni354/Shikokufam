@@ -599,15 +599,33 @@ async function kembalikanSusunanAwal(){
    Simpan/Batal; satu panel tampil pada satu waktu di atas halaman) ===== */
 function bukaPanelSusunan(jenis,id){S.susunanPanel={jenis,id:id||null};render();window.scrollTo({top:0,behavior:'smooth'})}
 function tutupPanelSusunan(){S.susunanPanel=null;render()}
+/* Pemilih pemegang jabatan: kotak cari nama di atas dropdown anggota.
+   Mengetik menyaring isi dropdown (nama mengandung teks ketikan, tidak
+   peka huruf besar/kecil); mengosongkan kotak mengembalikan daftar
+   lengkap. Wadah meneruskan properti .value ke dropdown di dalamnya,
+   jadi pemanggil memakai .value seperti sebelumnya. */
 function susunanPilihAnggota(currentId){
+  const daftar=[...S.members].sort((a,b)=>(a.nama||'').localeCompare(b.nama||'','id'));
   const sel=h('select',{});
-  sel.replaceChildren(
-    h('option',{value:''},'— Belum ditetapkan —'),
-    ...[...S.members].sort((a,b)=>(a.nama||'').localeCompare(b.nama||'','id'))
-      .map(member=>h('option',{value:member.id},(member.nama||'Tanpa nama')+' · '+memberRegion(member)))
-  );
+  const catatan=h('p',{class:'sub anggota-cari-note',style:'display:none'},'Tidak ada anggota dengan nama itu.');
+  const isiDaftar=query=>{
+    const q=(query||'').trim().toLowerCase();
+    const pilihanSebelumnya=sel.value;
+    const cocok=daftar.filter(m=>!q||(m.nama||'').toLowerCase().includes(q));
+    sel.replaceChildren(
+      h('option',{value:''},'— Belum ditetapkan —'),
+      ...cocok.map(member=>h('option',{value:member.id},(member.nama||'Tanpa nama')+' · '+memberRegion(member)))
+    );
+    if(pilihanSebelumnya&&cocok.some(m=>m.id===pilihanSebelumnya))sel.value=pilihanSebelumnya;
+    catatan.style.display=(q&&!cocok.length)?'':'none';
+  };
+  isiDaftar('');
   sel.value=currentId||'';
-  return sel;
+  const cari=h('input',{type:'text',placeholder:'Cari nama anggota…',autocomplete:'off'});
+  cari.addEventListener('input',()=>isiDaftar(cari.value));
+  const wadah=h('div',{class:'anggota-picker'},cari,sel,catatan);
+  Object.defineProperty(wadah,'value',{get:()=>sel.value,set:v=>{sel.value=v||''}});
+  return wadah;
 }
 /* Pemilih induk: semua jabatan dalam urutan pohon, menjorok menurut
    kedalaman. Simpul dalam 'excludeSet' (diri + keturunan) tidak
@@ -640,7 +658,7 @@ function susunanPanelPemegang(node){
   const current=pemegangJabatan(node);
   const sel=susunanPilihAnggota(current?current.id:'');
   return box(h('b',{},'Tetapkan pengurus — '+node.nama),
-    h('p',{class:'sub'},'Pilih pemegang jabatan dari daftar anggota. Kosongkan bila jabatan belum ada pemegangnya.'),
+    h('p',{class:'sub'},'Ketik nama untuk mencari, atau pilih pemegang jabatan dari daftar anggota. Kosongkan bila jabatan belum ada pemegangnya.'),
     sel,
     h('div',{class:'fl'},
       h('button',{class:'btn',onclick:async()=>{
@@ -831,9 +849,26 @@ function orgNode(nodes,node,root){
   parts.push(main);
   if(atur)parts.push(orgAlat(nodes,node));
   else if(S.admin)parts.push(h('button',{class:'btn s',onclick:()=>bukaPanelSusunan('pemegang',node.id)},member?'Atur':'Tetapkan'));
-  const el=h('div',{class:'org-node'+(root?' org-node-root':''),'data-susunan-id':node.id},...parts);
   const kids=susunanAnak(nodes,node.id);
-  if(kids.length)el.append(h('ul',{class:'org-kids'},...kids.map(k=>h('li',{},orgNode(nodes,k,false)))));
+  /* Baris puncak sejajar: anak langsung puncak yang namanya mengandung
+     'Wakil' digambar berdampingan dengan kartu puncak pada tingkat yang
+     sama (garis penghubung menyamping di antaranya), bukan turun tingkat
+     seperti anak biasa. Murni cara menggambar di Bagan — di data, Wakil
+     tetap anak puncak. Anak lain tetap digambar di tingkat bawah. */
+  const wakilKids=root?kids.filter(k=>/wakil/i.test(k.nama)):[];
+  const bawahKids=root?kids.filter(k=>!/wakil/i.test(k.nama)):kids;
+  let el;
+  if(wakilKids.length){
+    const row=h('div',{class:'org-top-row'},h('div',{class:'org-node-head'},...parts));
+    wakilKids.forEach(k=>{
+      row.append(h('div',{class:'org-pair-link','aria-hidden':'true'}));
+      row.append(orgNode(nodes,k,false));
+    });
+    el=h('div',{class:'org-node org-node-root org-node-pair','data-susunan-id':node.id},row);
+  }else{
+    el=h('div',{class:'org-node'+(root?' org-node-root':''),'data-susunan-id':node.id},...parts);
+  }
+  if(bawahKids.length)el.append(h('ul',{class:'org-kids'},...bawahKids.map(k=>h('li',{},orgNode(nodes,k,false)))));
   return el;
 }
 /* Tipe HIERARKI: pohon digambar dari akar dengan garis penghubung;

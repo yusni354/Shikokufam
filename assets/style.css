@@ -815,6 +815,10 @@ button.org-node-main:hover{border-color:var(--acc)}
 .org-kids>li:first-child::before,.org-kids>li:last-child::after{border-top:0}
 .org-kids>li:last-child::before{border-right:2px solid #9db8c8;border-radius:0 10px 0 0}
 .org-kids>li:first-child::after{border-radius:10px 0 0 0}
+.org-top-row{display:flex;align-items:flex-start;justify-content:center;max-width:100%}
+.org-node-head{display:flex;flex-direction:column;align-items:center;gap:6px}
+.org-top-row .org-node-main{width:160px}
+.org-pair-link{flex:none;width:34px;height:2px;background:#9db8c8;margin-top:64px}
 .org-join{width:2px;height:24px;background:#9db8c8;flex:none}
 .org-group{display:flex;flex-direction:column;align-items:center;width:100%}
 .org-group-title{padding:7px 18px;border-radius:999px;background:#dcebf3;color:#000000;font-weight:700;font-size:13px;letter-spacing:.04em;text-transform:uppercase}
@@ -837,6 +841,8 @@ span.org-mini{display:grid;place-items:center;font-size:14px}
 .org-empty-text{color:var(--mut);font-weight:600}
 .org-c-kontak a{color:var(--acc);font-weight:600;text-decoration:none}
 @media (max-width:720px){
+  .org-top-row .org-node-main{width:auto;max-width:41vw}
+  .org-pair-link{width:16px;margin-top:58px}
   .org-kids{flex-direction:column;align-items:center;padding-top:0}
   .org-kids::before{display:none}
   .org-kids>li{padding:24px 0 0}
@@ -855,6 +861,8 @@ span.org-mini{display:grid;place-items:center;font-size:14px}
 .org-c-aksi .org-tools{justify-content:flex-end;max-width:260px}
 .org-grip{cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;color:var(--mut);font-size:15px;line-height:1;letter-spacing:2px;padding:3px 12px;border-radius:8px}
 .org-grip:active{cursor:grabbing}
+.anggota-picker{display:block}
+.anggota-picker .anggota-cari-note{margin:2px 0 0}
 .org-node.org-dragging{opacity:.45}
 .org-ghost{position:fixed;z-index:300;pointer-events:none;opacity:.88;margin:0;box-shadow:0 14px 34px rgba(31,58,80,.35)}
 .org-node-main.org-drop-ok{outline:3px solid var(--acc);outline-offset:2px}
