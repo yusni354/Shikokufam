@@ -162,11 +162,16 @@ function petaEsc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&am
 function petaInisial(nama){const p=String(nama||'?').trim().split(/\s+/);return ((p[0]||'?')[0]+((p[1]||'')[0]||'')).toUpperCase()}
 /* Keadaan peta yang sedang hidup (satu instance Leaflet dalam satu waktu) */
 const PM={map:null,layer:null,markers:{},entries:[],tileLayer:null,tileOk:0,tileErr:0,tileTimer:null,basemapIdx:0,fallback:false,fallbackLayer:null};
+/* Rantai peta dasar: hanya penyedia yang benar-benar gratis tanpa API key.
+   CARTO (light & Voyager) SENGAJA dikeluarkan: sejak 2026 servernya
+   mengembalikan ubin placeholder bertuliskan "API KEY REQUIRED" dengan
+   status HTTP sukses, jadi ubin watermark itu lolos deteksi tileerror/
+   timeout, rantai tidak pernah berpindah, dan peta tampil coretan.
+   Esri World Street Map terbukti menyajikan ubin peta asli tanpa kunci;
+   OpenStreetMap standar cadangan kedua; terakhir peta lokal (SVG). */
 const PETA_BASEMAPS=[
-  {name:'CARTO',url:'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',opts:{subdomains:'abcd',maxZoom:20,attribution:'&copy; OpenStreetMap contributors &copy; CARTO'}},
   {name:'Esri World Street Map',url:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',opts:{maxZoom:19,attribution:'Tiles &copy; Esri'}},
-  {name:'OpenStreetMap',url:'https://tile.openstreetmap.org/{z}/{x}/{y}.png',opts:{maxZoom:19,attribution:'&copy; OpenStreetMap contributors'}},
-  {name:'CARTO Voyager',url:'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',opts:{subdomains:'abcd',maxZoom:20,attribution:'&copy; OpenStreetMap contributors &copy; CARTO'}}
+  {name:'OpenStreetMap',url:'https://tile.openstreetmap.org/{z}/{x}/{y}.png',opts:{maxZoom:19,attribution:'&copy; OpenStreetMap contributors'}}
 ];
 function petaSetAttrib(txt){const el=document.getElementById('peta-attrib');if(el)el.textContent=txt}
 function petaActivateFallback(){

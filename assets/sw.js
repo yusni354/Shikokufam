@@ -3,7 +3,7 @@
    Catatan penempatan: berkas ini ada di assets/. Di situs produksi,
    salin berkas ini ke folder utama situs (di samping index.html)
    dengan nama sw.js supaya cakupannya meliputi seluruh aplikasi. */
-const CACHE = 'shikoku-family-v3';
+const CACHE = 'shikoku-family-v4';
 const CORE = [
   './',
   '../',
@@ -36,13 +36,17 @@ self.addEventListener('fetch', event => {
   const req = event.request;
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
-  // Data Supabase & CDN: selalu dari jaringan, jangan disimpan di cache
-  if (url.hostname.endsWith('supabase.co') || url.hostname.includes('jsdelivr') || url.hostname.includes('googleapis')) return;
+  // Semua permintaan lintas origin TIDAK disentuh service worker: data
+  // Supabase, CDN, font, dan terutama ubin peta (Esri/OpenStreetMap) harus
+  // langsung dari jaringan. Bila ubin gagal, peramban harus menerima error
+  // jaringan yang bersih supaya Leaflet bisa pindah ke penyedia berikutnya
+  // atau ke peta cadangan lokal — bukan jawaban halaman HTML dari sini.
+  if (url.origin !== self.location.origin) return;
   // Halaman & berkas aplikasi: jaringan dulu, cache sebagai cadangan offline
   event.respondWith(
     fetch(req)
       .then(res => {
-        if (res && res.ok && url.origin === self.location.origin) {
+        if (res && res.ok) {
           const copy = res.clone();
           caches.open(CACHE).then(cache => cache.put(req, copy)).catch(() => {});
         }
