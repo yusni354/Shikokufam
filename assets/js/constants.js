@@ -1,7 +1,7 @@
 /* Daftar wilayah, menu, prefektur, provinsi, dan aturan pengenal lokasi Jepang */
-const WILAYAH=[['Tokushima','#d95763'],['Takamatsu','#3985c6'],['Marugame','#e28b36'],['Zentsuji / Takuma','#8e68b5'],['Kagawa','#3985c6'],['Kochi','#24947e'],['Matsuyama','#d45e9f'],['Ehime','#6f9e3b'],['Niihama','#6073c4'],['Okayama','#c87945']];
-const ALL=[['landing','Home','','','home'],['members','Daftar Anggota','','','users'],['kegiatan','Kegiatan','','','calendar'],['piket','Jadwal Piket','','','brush'],['peta','Peta & Wilayah','','','map'],['musyawarah','Musyawarah','','','meeting'],['susunan','Kepengurusan','','','team'],['pesan','Pesan Masuk','','','inbox']];
-const ADMIN_MENU=[['map-settings','Pengaturan Peta','map'],['approvals','Persetujuan Akun','users']];
+const WILAYAH=[['Tokushima','#d95763'],['Takamatsu','#3985c6'],['Marugame','#e28b36'],['Zentsuji / Takuma','#8e68b5'],['Kochi','#24947e'],['Matsuyama','#d45e9f'],['Ehime','#6f9e3b'],['Niihama','#6073c4'],['Imazo','#4f772d']];
+const ALL=[['landing','Home','','','home'],['members','Daftar Anggota','','','users'],['kegiatan','Kegiatan','','','calendar'],['piket','Jadwal Piket','','','brush'],['peta','Peta & Wilayah','','','map'],['musyawarah','Musyawarah','','','meeting'],['susunan','Kepengurusan','','','team'],['pesan','Pesan Masuk','','','inbox'],['pengaturan','Pengaturan','admin','','settings']];
+const ADMIN_MENU=[['pengaturan','Pengaturan','settings'],['map-settings','Pengaturan Peta','map'],['approvals','Persetujuan Akun','users']];
 
 const PREF=['Tokushima','Kagawa','Ehime','Kochi','Okayama'];
 const PREFECTURE_ALIASES=[
@@ -20,15 +20,22 @@ const LOCALITY_ALIASES=[
   ['Tokushima','Tokushima','Tokushima',['mima','美馬市']],
   ['Tokushima','Tokushima','Tokushima',['miyoshi tokushima','三好市']],
   ['Kagawa','Takamatsu','Takamatsu',['takamatsu','高松市']],
+  ['Kagawa','Takamatsu','Sanuki',['sanuki','さぬき市']],
+  ['Kagawa','Takamatsu','Higashikagawa',['higashikagawa','東かがわ市']],
+  ['Kagawa','Takamatsu','Miki',['miki','三木町']],
+  ['Kagawa','Takamatsu','Naoshima',['naoshima','直島町','直島']],
+  ['Kagawa','Takamatsu','Shodoshima',['shodoshima','tonosho','小豆島','土庄町','小豆町']],
   ['Kagawa','Marugame','Marugame',['marugame','丸亀市']],
+  ['Kagawa','Marugame','Sakaide',['sakaide','坂出市']],
+  ['Kagawa','Marugame','Utazu',['utazu','宇多津町','宇多津']],
+  ['Kagawa','Marugame','Ayagawa',['ayagawa','綾川町','綾川']],
+  ['Kagawa','Marugame','Tadotsu',['tadotsu','多度津町']],
   ['Kagawa','Zentsuji / Takuma','Zentsuji / Takuma',['zentsuji','善通寺市']],
   ['Kagawa','Zentsuji / Takuma','Zentsuji / Takuma',['takuma','詫間']],
-  ['Kagawa','Kagawa','Tadotsu',['tadotsu','多度津町']],
-  ['Kagawa','Kagawa','Sakaide',['sakaide','坂出市']],
-  ['Kagawa','Kagawa','Mitoyo',['mitoyo','三豊市']],
-  ['Kagawa','Kagawa','Kanonji',['kanonji','観音寺市']],
-  ['Kagawa','Kagawa','Sanuki',['sanuki','さぬき市']],
-  ['Kagawa','Kagawa','Higashikagawa',['higashikagawa','東かがわ市']],
+  ['Kagawa','Zentsuji / Takuma','Mitoyo',['mitoyo','三豊市']],
+  ['Kagawa','Zentsuji / Takuma','Kanonji',['kanonji','kan-onji','観音寺市']],
+  ['Kagawa','Zentsuji / Takuma','Kotohira',['kotohira','琴平町','琴平']],
+  ['Kagawa','Zentsuji / Takuma','Manno',['manno','mannou','まんのう町','まんのう']],
   ['Ehime','Matsuyama','Matsuyama',['matsuyama','松山市']],
   ['Ehime','Niihama','Niihama',['niihama','nihama','新居浜市']],
   ['Ehime','Ehime','Imabari',['imabari','今治市']],
@@ -41,16 +48,16 @@ const LOCALITY_ALIASES=[
   ['Kochi','Kochi','Shimanto',['shimanto','四万十市']],
   ['Kochi','Kochi','Aki',['aki kochi','安芸市']],
   ['Kochi','Kochi','Susaki',['susaki','須崎市']],
-  ['Okayama','Okayama','Okayama',['okayama city','okayama','岡山市']],
-  ['Okayama','Okayama','Kurashiki',['kurashiki','倉敷市']],
-  ['Okayama','Okayama','Tsuyama',['tsuyama','津山市']],
-  ['Okayama','Okayama','Tamano',['tamano','玉野市']],
-  ['Okayama','Okayama','Soja',['soja','総社市']],
-  ['Okayama','Okayama','Bizen',['bizen','備前市']],
-  ['Okayama','Okayama','Setouchi',['setouchi','瀬戸内市']],
-  ['Okayama','Okayama','Kasaoka',['kasaoka','笠岡市']],
-  ['Okayama','Okayama','Ibara',['ibara','井原市']],
-  ['Okayama','Okayama','Akaiwa',['akaiwa','赤磐市']]
+  ['Okayama','Marugame','Okayama',['okayama city','okayama','岡山市']],
+  ['Okayama','Marugame','Kurashiki',['kurashiki','倉敷市']],
+  ['Okayama','Marugame','Tsuyama',['tsuyama','津山市']],
+  ['Okayama','Marugame','Tamano',['tamano','玉野市']],
+  ['Okayama','Marugame','Soja',['soja','総社市']],
+  ['Okayama','Marugame','Bizen',['bizen','備前市']],
+  ['Okayama','Marugame','Setouchi',['setouchi','瀬戸内市']],
+  ['Okayama','Marugame','Kasaoka',['kasaoka','笠岡市']],
+  ['Okayama','Marugame','Ibara',['ibara','井原市']],
+  ['Okayama','Marugame','Akaiwa',['akaiwa','赤磐市']]
 ];
 function inferJapanLocation(...values){
   const raw=values.filter(value=>value!==null&&value!==undefined&&String(value).trim()).map(String).join(' ');
@@ -76,7 +83,11 @@ function inferJapanLocation(...values){
   const pref=fromPref||locality?.[0]||fromPostal;
   if(!pref)return null;
   const matchingLocality=locality||null;
-  const wilayah=matchingLocality?.[1]||pref;
+  let wilayah=matchingLocality?.[1]||pref;
+  /* Okayama selalu masuk wilayah Marugame; Kagawa dipilih yang terdekat
+     (Marugame / Takamatsu / Zentsuji-Takuma dari kotanya), fallback Takamatsu */
+  if(pref==='Okayama'||wilayah==='Okayama')wilayah='Marugame';
+  else if(pref==='Kagawa'&&wilayah==='Kagawa')wilayah='Takamatsu';
   const kota=matchingLocality?.[2]||'';
   return {pref,wilayah,kota};
 }

@@ -2,7 +2,38 @@
 function regionColor(value){return WILAYAH.find(([name])=>name===value)?.[1]||'#718096'}
 function memberRegion(member){
   const known=value=>WILAYAH.find(([name])=>name.toLowerCase()===String(value||'').trim().toLowerCase())?.[0];
+  const legacy=legacyRegionTarget(member);
+  if(legacy)return legacy;
   return known(member.wilayah)||inferJapanLocation(member.alamat_jp,member.kota,member.kec_jp,member.kodepos,member.pref,member.wilayah)?.wilayah||'Belum dipilih';
+}
+/* Wilayah lama yang sudah dihapus: Okayama -> Marugame;
+   Kagawa -> wilayah terdekat dari alamat (fallback Takamatsu) */
+function legacyRegionTarget(member){
+  const current=String(member?.wilayah||'').trim().toLowerCase();
+  if(current==='okayama')return 'Marugame';
+  if(current==='kagawa'){
+    const inferred=inferJapanLocation(member.alamat_jp,member.kota,member.kec_jp,member.kodepos,member.pref)?.wilayah;
+    return ['Marugame','Takamatsu','Zentsuji / Takuma'].includes(inferred)?inferred:'Takamatsu';
+  }
+  return null;
+}
+/* Samakan wilayah tersimpan anggota lama saat data dimuat, lalu simpan seperti biasa */
+const regionMigrationPending=new Set();
+function migrateMemberRegions(){
+  if(!S.db||!Array.isArray(S.members))return;
+  S.members.forEach(member=>{
+    const target=legacyRegionTarget(member);
+    if(!target||!member.id||regionMigrationPending.has(member.id))return;
+    regionMigrationPending.add(member.id);
+    const stored=target.toUpperCase();
+    member.wilayah=stored;
+    setTimeout(()=>{
+      Promise.resolve()
+        .then(()=>S.db.collection('members').doc(member.id).update({wilayah:stored}))
+        .catch(error=>console.error('Migrasi wilayah anggota gagal:',error))
+        .finally(()=>regionMigrationPending.delete(member.id));
+    },0);
+  });
 }
 function wilayah(){const m={};S.members.forEach(x=>{const w=memberRegion(x);(m[w]=m[w]||[]).push(x)});return m}
 function openMember(member,origin){S.detail=member;S.detailOrigin=origin;S.view='members';render()}

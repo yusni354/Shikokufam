@@ -1,3 +1,39 @@
+/* Pesan sambutan Home: bisa diganti admin lewat halaman Pengaturan.
+   Tersimpan sebagai dokumen {id:'sambutan'} di koleksi 'pengaturan'
+   lewat lapisan data yang sama (Supabase app_data / lokal). */
+const SAMBUTAN_DEFAULT='Senang bisa berkumpul bersama keluarga Shikoku.';
+function welcomeMessage(){
+  const pesan=(S.sambutan||'').trim();
+  return pesan||SAMBUTAN_DEFAULT;
+}
+function subscribeSambutan(){
+  if(!S.db)return ()=>{};
+  try{
+    return S.db.collection('pengaturan').onSnapshot(snap=>{
+      const doc=(snap.docs||[]).find(d=>d.id==='sambutan');
+      const data=doc&&typeof doc.data==='function'?doc.data():null;
+      const next=data&&typeof data.pesan==='string'?data.pesan:'';
+      if(next!==S.sambutan){S.sambutan=next;if(S.view==='landing'&&S.uid)render()}
+    },error=>{console.error('Pesan sambutan gagal dimuat:',error)});
+  }catch(error){console.error('Pesan sambutan gagal dimuat:',error);return ()=>{}}
+}
+async function saveSambutanPesan(teks){
+  await S.db.collection('pengaturan').doc('sambutan').set({pesan:teks,at:Date.now()});
+  S.sambutan=teks;
+}
+/* Halaman Pengaturan: khusus admin & admin utama */
+function vPengaturan(){
+  if(!S.admin)return [h('p',{class:'warn'},'Halaman ini hanya dapat diakses admin.')];
+  const inp=h('textarea',{rows:3,maxlength:200,placeholder:SAMBUTAN_DEFAULT});
+  inp.value=S.sambutan||'';
+  return [h('h1',{},'Pengaturan'),
+    box(h('b',{},'Pesan sambutan di Home'),
+      inp,
+      h('div',{class:'fl'},h('button',{class:'btn',onclick:async()=>{
+        try{await saveSambutanPesan(inp.value.trim());alert('Pesan sambutan disimpan.');render()}
+        catch(e){alert('Gagal menyimpan pesan: '+(e.message||'periksa koneksi'))}
+      }},'Simpan')))];
+}
 /* Halaman Home dan Ringkasan */
 function vHome(){
   const today=new Date(),todayKey=[today.getFullYear(),String(today.getMonth()+1).padStart(2,'0'),String(today.getDate()).padStart(2,'0')].join('-');
@@ -23,35 +59,93 @@ function vHome(){
   });
   return [
     h('section',{class:'home-welcome'},
-      h('span',{class:'home-welcome-icon'},icon('users',25)),
-      h('div',{},h('small',{},today.toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'})),h('h1',{},'Selamat datang'+(S.name?', '+S.name.split(' ')[0]:'')+'!'),h('p',{},'Senang bisa berkumpul bersama keluarga Shikoku.'))
+      h('div',{class:'home-welcome-text'},h('small',{},today.toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'})),h('h1',{},'Selamat datang'+(S.name?', '+S.name.split(' ')[0]:'')+'!'),h('p',{},welcomeMessage()),h('button',{class:'btn home-welcome-cta',onclick:()=>go('kegiatan')},'Lihat Kegiatan')),
+      h('img',{class:'home-welcome-mascot',src:'assets/mascot.webp',alt:'Maskot Shikoku Family'})
     ),
-    h('div',{class:'stats home-stats'},...[['Anggota',S.members.length],['Kegiatan',S.events.length],['Wilayah',Object.keys(wilayah()).length]].map(item=>h('div',{},h('small',{},item[0]),h('b',{},String(item[1]))))),
+    h('div',{class:'stats home-stats'},...[['Anggota',S.members.length],['Kegiatan',S.events.length],['Wilayah',Object.keys(wilayah()).length],['Jadwal Piket',S.cleaningDuties.length]].map(item=>h('div',{},h('small',{},item[0]),h('b',{},String(item[1]))))),
     h('div',{class:'home-section-heading'},h('h2',{},'Daftar anggota'),S.admin&&h('button',{class:'btn s',onclick:()=>go('members')},'+ Tambah')),
-    h('p',{class:'home-member-intro'},'Pilih wilayah untuk melihat anggota di wilayah tersebut.'),
     h('div',{class:'home-region-list'},...regionCards),
-    h('div',{class:'home-section-heading'},h('h2',{},'Akses cepat'),h('small',{},'Yang sering dibuka')),
+    h('div',{class:'home-section-heading'},h('h2',{},'Akses cepat')),
     h('div',{class:'home-shortcuts'},...shortcuts.map(([glyph,label,view])=>h('button',{class:'home-shortcut',onclick:()=>go(view)},h('span',{class:'home-shortcut-icon'},icon(glyph,22)),h('b',{},label),h('span',{class:'home-shortcut-arrow'},'›')))),
     h('div',{class:'home-section-heading'},h('h2',{},'Jadwal piket terdekat'),h('button',{class:'btn s',onclick:()=>go('piket')},'Lihat semua')),
     upcomingDuties.length?h('div',{class:'home-agenda'},...dutyRows):h('div',{class:'home-empty'},icon('brush',23),h('p',{},'Belum ada jadwal piket mendatang.')),
     h('div',{class:'home-section-heading'},h('h2',{},'Kegiatan komunitas'),h('button',{class:'btn s',onclick:()=>go('kegiatan')},'Lihat kegiatan')),
     recentEvents.length?h('div',{class:'home-events'},...recentEvents.map(event=>h('div',{class:'home-event'},icon('calendar',19),h('div',{},h('b',{},event.judul||'Kegiatan komunitas'),h('small',{},eventParticipantCount(event)+' peserta · '+eventAttendanceCount(event)+' hadir'))))):h('div',{class:'home-empty'},icon('calendar',23),h('p',{},'Belum ada kegiatan komunitas.')),
+    homeAttendanceChart(),
     h('button',{class:'home-admin-link',onclick:askForm},icon('messages',17),' Butuh bantuan? Hubungi Admin')
   ];
 }
+/* Grafik kehadiran: batang SVG + donat, dihitung murni dari daftar hadir
+   kegiatan yang tampil (peserta & hadir per kegiatan). Skala mulai dari nol. */
+function homeAttendanceChart(){
+  const evs=[...S.events].filter(e=>eventParticipantCount(e)>0).sort((a,b)=>(b.at||0)-(a.at||0)).slice(0,6);
+  if(!evs.length)return null;
+  const NS='http://www.w3.org/2000/svg';
+  const rows=evs.map(e=>({judul:e.judul||'Kegiatan komunitas',tanggal:e.tanggal||'',peserta:eventParticipantCount(e),hadir:eventAttendanceCount(e)}));
+  const totalPeserta=rows.reduce((s,r)=>s+r.peserta,0);
+  const totalHadir=rows.reduce((s,r)=>s+r.hadir,0);
+  const belum=totalPeserta-totalHadir;
+  const pct=totalPeserta?Math.round(totalHadir/totalPeserta*100):0;
+  const maxV=Math.max(...rows.map(r=>r.peserta),1);
+  const W=340,H=176,base=140,top=18,plotH=base-top;
+  const slot=W/rows.length,barW=Math.min(30,slot*0.42);
+  const svg=document.createElementNS(NS,'svg');
+  svg.setAttribute('viewBox','0 0 '+W+' '+H);
+  svg.setAttribute('class','home-chart-svg');
+  svg.setAttribute('role','img');
+  svg.setAttribute('aria-label','Grafik batang kehadiran per kegiatan');
+  const mk=(tag,attrs,text)=>{const n=document.createElementNS(NS,tag);for(const k in attrs)n.setAttribute(k,attrs[k]);if(text!=null)n.textContent=text;svg.append(n);return n};
+  mk('line',{x1:8,y1:base,x2:W-8,y2:base,stroke:'#8fa6b5','stroke-width':1.5});
+  const barCols=['#57a891','#6d9ec4','#9a90cf','#7fb0c9'];
+  rows.forEach((r,i)=>{
+    const cx=slot*i+slot/2;
+    const hp=r.peserta/maxV*plotH,hh=r.hadir/maxV*plotH;
+    mk('rect',{x:cx-barW/2,y:base-hp,width:barW,height:hp,rx:Math.min(9,barW/2),fill:'#c9d8e2'});
+    if(r.hadir>0)mk('rect',{x:cx-barW/2,y:base-hh,width:barW,height:hh,rx:Math.min(9,barW/2),fill:barCols[i%barCols.length]});
+    mk('text',{x:cx,y:base-hp-5,'text-anchor':'middle','font-size':11,'font-weight':700,fill:'#22303c'},String(r.hadir)+'/'+String(r.peserta));
+    const dl=r.tanggal?new Date(r.tanggal+'T00:00:00'):null;
+    const lab=dl&&!isNaN(dl)?dl.toLocaleDateString('id-ID',{day:'numeric',month:'short'}):'Keg. '+(i+1);
+    mk('text',{x:cx,y:base+16,'text-anchor':'middle','font-size':10.5,fill:'#43586a'},lab);
+  });
+  const C=2*Math.PI*34;
+  const hadirLen=totalPeserta?totalHadir/totalPeserta*C:0;
+  const donut=document.createElementNS(NS,'svg');
+  donut.setAttribute('viewBox','0 0 100 100');
+  donut.setAttribute('class','home-donut-svg');
+  donut.setAttribute('role','img');
+  donut.setAttribute('aria-label','Donat kehadiran: '+totalHadir+' dari '+totalPeserta+' peserta hadir');
+  const dk=(tag,attrs,text)=>{const n=document.createElementNS(NS,tag);for(const k in attrs)n.setAttribute(k,attrs[k]);if(text!=null)n.textContent=text;donut.append(n);return n};
+  dk('circle',{cx:50,cy:50,r:34,fill:'none',stroke:'#b9b3d9','stroke-width':15});
+  if(totalHadir>0)dk('circle',{cx:50,cy:50,r:34,fill:'none',stroke:'#2a8f7d','stroke-width':15,'stroke-dasharray':hadirLen+' '+C,transform:'rotate(-90 50 50)','stroke-linecap':'butt'});
+  dk('text',{x:50,y:48,'text-anchor':'middle','font-size':17,'font-weight':700,fill:'#22303c'},pct+'%');
+  dk('text',{x:50,y:63,'text-anchor':'middle','font-size':9.5,fill:'#43586a'},'hadir');
+  const barsWrap=h('div',{class:'home-chart-bars'},svg,
+    h('div',{class:'home-chart-legend'},
+      h('span',{},h('i',{class:'home-chart-sw',style:'background:#57a891'}),'Hadir (batang berwarna)'),
+      h('span',{},h('i',{class:'home-chart-sw',style:'background:#c9d8e2'}),'Peserta (batang latar)')));
+  const donutWrap=h('div',{class:'home-chart-donut'},donut,
+    h('div',{class:'home-chart-legend home-chart-legend-col'},
+      h('span',{},h('i',{class:'home-chart-sw',style:'background:#2a8f7d'}),'Hadir · '+totalHadir),
+      h('span',{},h('i',{class:'home-chart-sw',style:'background:#b9b3d9'}),'Belum hadir · '+belum),
+      h('span',{},'Total peserta · '+totalPeserta)));
+  return h('section',{class:'home-chart'},
+    h('div',{class:'home-section-heading'},h('h2',{},'Kehadiran kegiatan')),
+    h('div',{class:'home-chart-grid'},barsWrap,donutWrap),
+    h('ul',{class:'home-chart-list'},...rows.map(r=>h('li',{},h('span',{},r.judul),h('b',{},r.hadir+'/'+r.peserta+' hadir')))));
+}
 function vDash(){
-  const c=(glyph,t,d,n,v)=>h('button',{class:'card',onclick:()=>go(v)},
+  const c=(glyph,t,n,v)=>h('button',{class:'card',onclick:()=>go(v)},
     h('span',{class:'e',style:'position:relative'},icon(glyph,23),v==='pesan'&&h('span',{class:'icon-badge','data-message-badge':'true',style:S.unreadMessages>0?'':'display:none'},String(S.unreadMessages))),
-    h('span',{style:'flex:1'},h('b',{},t),h('small',{},d),h('br'),h('b',{style:'font-size:15px'},n)),'›');
+    h('span',{style:'flex:1'},h('b',{},t),h('b',{style:'font-size:15px'},n)),'›');
   return [h('h1',{},'Selamat datang'+(S.name?', '+S.name.split(' ')[0]:'')+'!'),
     h('p',{class:'sub'},new Date().toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'})),
     h('div',{class:'card',style:'display:block'},h('small',{class:'warn'},'User ID'),h('br'),h('b',{},S.email||S.uid||'-')),
     h('div',{class:'stats'},...[['Anggota',S.members.length],['Kegiatan',S.events.length],['Wilayah',Object.keys(wilayah()).length]].map(x=>h('div',{},h('small',{},x[0]),h('b',{},String(x[1]))))),
-    c('users','Daftar Anggota','Kelola data anggota komunitas',S.members.length+' anggota','members'),
-    c('calendar','Kegiatan','Agenda, peserta, dan absensi anggota',S.events.length+' kegiatan','kegiatan'),
-    c('brush','Jadwal Piket','Jadwal kebersihan komunitas',S.cleaningDuties.length+' jadwal','piket'),
-    c('messages','Forum','Diskusi & komentar anggota',S.topics.length+' topik','forum'),
-    c('inbox','Pesan Masuk','Pesan dan balasan admin',S.admin?((S.tanya?.length||0)+' pesan'):'Pesan saya','pesan'),
-    c('map','Peta & Wilayah','Sebaran anggota di Jepang',Object.keys(wilayah()).length+' wilayah','peta'),
-    h('button',{class:'card',onclick:async()=>{await S.supabase.auth.signOut()}},h('span',{class:'e'},icon('logout',22)),h('span',{style:'flex:1'},h('b',{},'Keluar'),h('small',{},'Akhiri sesi akun')),'›')];
+    c('users','Daftar Anggota',S.members.length+' anggota','members'),
+    c('calendar','Kegiatan',S.events.length+' kegiatan','kegiatan'),
+    c('brush','Jadwal Piket',S.cleaningDuties.length+' jadwal','piket'),
+    c('messages','Forum',S.topics.length+' topik','forum'),
+    c('inbox','Pesan Masuk',S.admin?((S.tanya?.length||0)+' pesan'):'Pesan saya','pesan'),
+    c('map','Peta & Wilayah',Object.keys(wilayah()).length+' wilayah','peta'),
+    h('button',{class:'card',onclick:()=>signOut()},h('span',{class:'e'},icon('logout',22)),h('span',{style:'flex:1'},h('b',{},'Keluar')),'›')];
 }

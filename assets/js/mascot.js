@@ -14,14 +14,12 @@ function askForm(){
   const askPlus=h('button',{class:'composer-plus',type:'button',title:'Lampiran',onclick:()=>askMenu.classList.toggle('open')},'+');
   const m=h('div',{id:'qm'},h('div',{class:'card',style:'display:block;max-width:420px'},
     h('b',{},icon('messages',18),h('span',{},'Tanya Admin')),
-    h('p',{class:'warn',style:'margin:4px 0 2px'},'Sampaikan pertanyaan Anda. Admin akan membalasnya.'),
     h('label',{class:'lb'},'Nama lengkap *',nama),
     h('label',{class:'lb'},'Pertanyaan *',ta),
     askMenu,askPlus,picker.label,
     h('div',{class:'row',style:'justify-content:flex-start;margin-top:8px'},
       h('button',{class:'btn',onclick:async()=>{
         if(!nama.value.trim()||(!ta.value.trim()&&!picker.files.length)){alert('Nama dan pertanyaan atau lampiran wajib diisi');return}
-        if(!S.supabase){alert('Supabase belum tersedia');return}
         try{
           const namaValue=nama.value.trim();
           const attachments=await uploadMessageFiles(picker.files);
@@ -31,7 +29,7 @@ function askForm(){
           alert('Pertanyaan terkirim dan sudah masuk ke Pesan Masuk.');
         }catch(e){
           console.error(e);
-          alert('Gagal mengirim: '+(e.message||'periksa koneksi Supabase'));
+          alert('Gagal mengirim: '+(e.message||'periksa koneksi'));
         }
       }},'Kirim pertanyaan'),
       h('button',{class:'btn s',onclick:()=>m.remove()},'Batal'))));

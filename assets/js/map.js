@@ -10,7 +10,13 @@ async function loadMapSettings(){
   S.pengaturan=data?[{id:'peta',mid:data.map_mid}]:[];
 }
 async function loadPendingUsers(){
-  if(!S.supabase||!S.mainAdmin){S.pendingUsers=[];return}
+  if(!S.supabase){
+    if(!S.mainAdmin){S.pendingUsers=[];return}
+    S.pendingUsers=localUsers().filter(user=>user.approval_status==='pending')
+      .map(user=>({id:user.id,name:user.name,email:user.email,created_at:user.created_at,approval_status:user.approval_status}));
+    return;
+  }
+  if(!S.mainAdmin){S.pendingUsers=[];return}
   const {data,error}=await S.supabase.from('profiles').select('id,name,email,created_at,approval_status').eq('approval_status','pending').order('created_at',{ascending:true});
   if(error){console.error(error);S.pendingUsers=[];return}
   S.pendingUsers=data||[];
@@ -54,7 +60,16 @@ function mapEmbed(){
 }
 function vPeta(){return [mapEmbed()]}
 async function setApproval(id,status){
-  if(!S.supabase||!S.mainAdmin)return;
+  if(!S.mainAdmin)return;
+  if(!S.supabase){
+    const users=localUsers(),user=users.find(item=>item.id===id);
+    if(!user){alert('Pendaftar tidak ditemukan.');return}
+    user.approval_status=status;
+    user.approved_at=status==='approved'?new Date().toISOString():null;
+    try{saveLocalUsers(users)}catch(e){alert('Gagal memperbarui persetujuan: '+e.message);return}
+    await loadPendingUsers();render();
+    return;
+  }
   const {error}=await S.supabase.from('profiles').update({
     approval_status:status,
     approved_at:status==='approved'?new Date().toISOString():null
@@ -67,7 +82,7 @@ function vApprovals(){
   const rows=S.pendingUsers.map(user=>h('div',{class:'card approval-row'},
     h('div',{style:'flex:1;min-width:0'},h('b',{},user.name||'Nama belum diisi'),h('small',{},user.email||'-'),h('small',{},new Date(user.created_at).toLocaleString('id-ID'))),
     h('div',{class:'fl'},h('button',{class:'btn',onclick:()=>setApproval(user.id,'approved')},'Setujui'),h('button',{class:'btn s',onclick:()=>setApproval(user.id,'rejected')},'Tolak'))));
-  return [h('h1',{},'Persetujuan Akun'),h('p',{class:'sub'},'Pendaftar baru menunggu persetujuan admin.'),...(rows.length?rows:[h('p',{class:'warn'},'Tidak ada pendaftar yang menunggu persetujuan.')])];
+  return [h('h1',{},'Persetujuan Akun'),...(rows.length?rows:[h('p',{class:'warn'},'Tidak ada pendaftar yang menunggu persetujuan.')])];
 }
 function vPetaSettings(){
   const mid=mapMid(),det=h('input',{type:'checkbox'}),inp=h('textarea',{rows:4,placeholder:'Tempel kode embed (iframe) dari Google My Maps'});

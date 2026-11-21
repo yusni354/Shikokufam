@@ -1,6 +1,8 @@
 /* Foto dan dokumen anggota (bucket privat member-files) */
 function isPrivateMemberMedia(path){return typeof path==='string'&&path.startsWith('members/')}
 function memberMediaAttributes(path,attribute){
+  /* Media mode lokal tertanam sebagai data URL dan bisa langsung ditampilkan */
+  if(typeof path==='string'&&path.startsWith('data:'))return {[attribute]:path};
   if(S.supabase&&isPrivateMemberMedia(path)){
     const cached=S.memberMediaUrls.get(path);
     return {'data-member-media':path,...(cached&&cached.expiresAt>Date.now()+30000?{[attribute]:cached.url}:{})};
@@ -32,6 +34,22 @@ function hydrateMemberMedia(){
       render();
     }).finally(()=>S.memberMediaPending.delete(path));
   });
+}
+/* Baca berkas sebagai data URL (dipakai mode lokal untuk foto, dokumen, dan lampiran) */
+function readFileAsDataUrl(file){return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result||''));reader.onerror=()=>reject(reader.error||new Error('File tidak dapat dibaca'));reader.readAsDataURL(file)})}
+async function readLocalImageDataUrl(file){
+  if(!file.type||!file.type.startsWith('image/'))return readFileAsDataUrl(file);
+  try{
+    const bitmap=await createImageBitmap(file);
+    const scale=Math.min(1,1024/Math.max(bitmap.width,bitmap.height));
+    if(scale>=1&&file.size<700000){if(bitmap.close)bitmap.close();return readFileAsDataUrl(file)}
+    const canvas=document.createElement('canvas');
+    canvas.width=Math.max(1,Math.round(bitmap.width*scale));
+    canvas.height=Math.max(1,Math.round(bitmap.height*scale));
+    canvas.getContext('2d').drawImage(bitmap,0,0,canvas.width,canvas.height);
+    if(bitmap.close)bitmap.close();
+    return canvas.toDataURL('image/jpeg',0.82);
+  }catch(e){return readFileAsDataUrl(file)}
 }
 async function uploadPrivateMemberMedia(file){
   if(!S.supabase||!S.uid)throw new Error('Login Supabase diperlukan untuk mengunggah media anggota.');

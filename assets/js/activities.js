@@ -82,7 +82,6 @@ function activityCard(event){
     h('div',{class:'activity-counts'},h('b',{},participants.length+' peserta'),h('b',{},attendees.size+' hadir')),
     legacyCount>0&&h('p',{class:'warn'},legacyCount+' catatan absensi lama belum terhubung dengan data anggota.'),
     h('h3',{},'Absensi per wilayah'),
-    h('p',{class:'activity-help'},'Peserta dikelompokkan sesuai wilayah pada profil anggota.'),
     h('div',{class:'activity-region-list'},...regionSections)
   ];
   if(S.admin){
@@ -167,7 +166,6 @@ function activityCard(event){
     };
     content.push(
       h('h3',{},'Pemindaian QR'),
-      h('p',{class:'activity-help'},'QR berisi ID anggota. Pemindaian akan mencatat kehadiran dan menempatkan anggota di wilayah profilnya.'),
       h('div',{class:'activity-scanner-row'},barcodeInput,h('button',{class:'btn s',onclick:submitBarcode},'Catat hadir')),
       h('div',{class:'activity-scanner-row'},scanButton),
       scannerVideo,status
@@ -197,7 +195,6 @@ function vKegiatan(){
     }},'Buat kegiatan'));
   return [
     h('h1',{},'Kegiatan'),
-    h('p',{class:'sub'},'Rencanakan kegiatan, daftarkan anggota, dan catat kehadiran.'),
     guard(),
     createForm,
     events.length?h('div',{class:'activity-list'},...events.map(activityCard)):h('p',{class:'warn'},'Belum ada kegiatan.')

@@ -1,3 +1,41 @@
+/* Akun lokal: dipakai pada mode tanpa Supabase, tersimpan di perangkat ini.
+   Alur sama seperti Supabase: daftar -> menunggu persetujuan -> disetujui admin utama.
+   Akun pertama yang mendaftar menjadi admin utama (pengganti langkah SQL manual di README). */
+const LOCAL_USERS_KEY='shikoku-family:users';
+const LOCAL_SESSION_KEY='shikoku-family:session';
+function localUsers(){try{return JSON.parse(localStorage.getItem(LOCAL_USERS_KEY)||'[]')}catch(e){return[]}}
+function saveLocalUsers(users){try{localStorage.setItem(LOCAL_USERS_KEY,JSON.stringify(users))}catch(e){throw new Error('Penyimpanan lokal tidak tersedia')}}
+function localPasswordHash(password,salt){let hash=5381;const text=String(salt)+':'+String(password);for(let i=0;i<text.length;i++)hash=((hash<<5)+hash+text.charCodeAt(i))>>>0;return 'h'+hash.toString(36)}
+function applyLocalUser(user){
+  S.uid=user.id;S.email=user.email||'';S.name=user.name||user.email||'';
+  S.admin=user.role==='admin';S.mainAdmin=S.admin&&user.is_main_admin===true;
+  S.approvalStatus=user.approval_status||'pending';S.authLoading=false;
+}
+/* Mode lokal paksa: dipilih dari halaman masuk agar pengguna bisa masuk dan
+   melihat isi aplikasi di perangkat ini tanpa bergantung pada akun Supabase. */
+const FORCE_LOCAL_KEY='shikoku-family:force-local';
+function localModeForced(){try{return localStorage.getItem(FORCE_LOCAL_KEY)==='1'}catch(e){return false}}
+function enterLocalMode(){try{localStorage.setItem(FORCE_LOCAL_KEY,'1')}catch(e){}location.reload()}
+function exitLocalMode(){try{localStorage.removeItem(FORCE_LOCAL_KEY)}catch(e){}location.reload()}
+function restoreLocalSession(){
+  try{
+    const id=localStorage.getItem(LOCAL_SESSION_KEY);
+    if(!id)return false;
+    const user=localUsers().find(item=>item.id===id);
+    if(!user)return false;
+    applyLocalUser(user);
+    return true;
+  }catch(e){return false}
+}
+/* Keluar akun: bekerja untuk sesi Supabase maupun sesi lokal */
+async function signOut(){
+  if(S.supabase){await S.supabase.auth.signOut();return}
+  try{localStorage.removeItem(LOCAL_SESSION_KEY)}catch(e){}
+  S.uid=null;S.email='';S.name='';S.admin=false;S.mainAdmin=false;S.approvalStatus='approved';
+  S.tanya=[];S.replies=[];S.messageSignature='';S.unreadMessages=0;S.openConversation=null;S.pendingUsers=[];
+  S.view='landing';S.adminMenuOpen=false;document.body.classList.remove('open');
+  render();
+}
 /* Formulir masuk / daftar / lupa password */
 function accountForm(){
   const email=h('input',{type:'email',placeholder:'Email',autocomplete:'email'});
@@ -11,6 +49,12 @@ function accountForm(){
   const forgot=h('button',{class:'btn s',onclick:async()=>{
     const emailValue=email.value.trim();
     if(!emailValue){notice.textContent='Masukkan email terlebih dahulu untuk menerima tautan reset password.';email.focus();return}
+    if(!S.supabase){
+      const known=localUsers().some(user=>(user.email||'').toLowerCase()===emailValue.toLowerCase());
+      notice.className='warn '+(known?'auth-success':'auth-error');
+      notice.textContent=known?'Mode lokal tidak mengirim email. Bila lupa password, minta admin utama membantu menggantinya dari perangkat ini.':'Email tidak terdaftar di perangkat ini.';
+      return;
+    }
     forgot.disabled=true;notice.textContent='Mengirim tautan reset password...';
     const {error}=await S.supabase.auth.resetPasswordForEmail(emailValue);
     forgot.disabled=false;
@@ -29,13 +73,100 @@ function accountForm(){
     loginTab.className=signup?'auth-tab':'auth-tab on';signupTab.className=signup?'auth-tab on':'auth-tab';
   };
   nameLabel.style.display='none';
-  return h('div',{class:'card auth-card'},title,h('p',{class:'sub'},'Masuk untuk bergabung atau daftar akun baru sebagai anggota komunitas.'),h('div',{class:'auth-tabs'},loginTab,signupTab),nameLabel,h('label',{class:'lb'},'Email',email),h('label',{class:'lb'},'Password',password),forgotWrap,notice,h('button',{class:'btn',onclick:async()=>{
+  /* Masuk dengan Google (Supabase Auth OAuth); alur persetujuan akun tidak berubah */
+  const google=h('button',{class:'btn s auth-alt',style:'width:100%;margin-top:10px',onclick:async()=>{
+    if(!S.supabase){
+      notice.className='warn auth-error';
+      notice.textContent=localModeForced()
+        ?'Anda sedang memakai mode lokal. Untuk masuk dengan Google, kembali ke mode online (Supabase) terlebih dahulu.'
+        :'Masuk dengan Google memerlukan koneksi Supabase. Periksa koneksi internet Anda, lalu muat ulang aplikasi.';
+      return;
+    }
+    notice.className='warn';
+    notice.textContent='Mengalihkan ke halaman masuk Google...';
+    try{
+      const {error}=await S.supabase.auth.signInWithOAuth({provider:'google',options:{redirectTo:window.location.origin+window.location.pathname}});
+      if(error){
+        notice.className='warn auth-error';
+        notice.textContent='Gagal masuk dengan Google: '+error.message;
+      }
+    }catch(e){
+      notice.className='warn auth-error';
+      notice.textContent='Gagal masuk dengan Google: '+(e.message||'periksa koneksi');
+    }
+  }},'Masuk dengan Google');
+  /* Panel pilihan mode lokal: hanya tampil saat mode online (Supabase
+     tersedia dan mode lokal belum aktif) sebagai tawaran masuk mode lokal.
+     Bila mode lokal aktif, tidak ada blok status yang ditampilkan. */
+  const modeSwitch=(!localModeForced()&&S.supabase)
+      ?h('div',{class:'local-mode-box'},
+          h('b',{},'MODE LOKAL — LIHAT ISI APLIKASI'),
+          h('p',{},'Tidak punya akun Supabase? Tekan tombol di bawah untuk beralih ke mode lokal di perangkat ini. Setelah itu daftar akun baru lewat formulir di atas: akun pertama langsung menjadi admin utama dan langsung masuk, jadi seluruh isi aplikasi bisa langsung dilihat.'),
+          h('button',{class:'btn local-mode-btn',style:'width:100%',onclick:()=>enterLocalMode()},'Gunakan Mode Lokal di Perangkat Ini'))
+      :null;
+  return h('div',{class:'card auth-card'},title,h('div',{class:'auth-tabs'},loginTab,signupTab),nameLabel,h('label',{class:'lb'},'Email',email),h('label',{class:'lb'},'Password',password),forgotWrap,notice,h('button',{class:'btn',onclick:async()=>{
     const emailValue=email.value.trim();
     notice.className='warn';
     notice.textContent='Memproses...';
     if(!emailValue||!password.value){notice.textContent='Email dan password wajib diisi.';return}
     if(signup&&(!name.value.trim()||password.value.length<6)){
       notice.textContent=!name.value.trim()?'Nama lengkap wajib diisi.':'Password minimal 6 karakter.';
+      return;
+    }
+    if(!S.supabase){
+      /* Mode lokal: akun disimpan di perangkat ini dengan alur persetujuan yang sama */
+      const users=localUsers(),emailKey=emailValue.toLowerCase();
+      if(signup){
+        if(users.some(user=>(user.email||'').toLowerCase()===emailKey)){
+          notice.className='warn auth-error';
+          notice.textContent='Email sudah terdaftar. Silakan masuk.';
+          return;
+        }
+        const first=users.length===0;
+        const salt='u'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+        const newUser={id:'local-user-'+salt,name:name.value.trim(),email:emailValue,password_hash:localPasswordHash(password.value,salt),salt,role:first?'admin':'member',is_main_admin:first,approval_status:first?'approved':'pending',created_at:new Date().toISOString()};
+        users.push(newUser);
+        try{saveLocalUsers(users)}catch(e){notice.className='warn auth-error';notice.textContent=e.message;return}
+        if(first){
+          /* Akun pertama langsung disetujui sebagai admin utama: langsung masuk
+             supaya pemilik perangkat bisa langsung melihat isi aplikasi. */
+          try{localStorage.setItem(LOCAL_SESSION_KEY,newUser.id)}catch(e){}
+          applyLocalUser(newUser);
+          notice.className='warn auth-success';
+          notice.textContent='Akun admin utama berhasil dibuat. Login berhasil.';
+          await loadPendingUsers();
+          render();
+          await loadMessages();
+          return;
+        }
+        notice.className='warn auth-success';
+        notice.textContent='Akun berhasil dibuat dan menunggu persetujuan admin.';
+        setMode(false);
+        return;
+      }
+      const user=users.find(item=>(item.email||'').toLowerCase()===emailKey);
+      if(!user||user.password_hash!==localPasswordHash(password.value,user.salt)){
+        notice.className='warn auth-error';
+        notice.textContent='Email atau password salah. Silakan coba lagi.';
+        return;
+      }
+      if(user.approval_status==='pending'||user.approval_status==null){
+        notice.className='warn auth-error';
+        notice.textContent='Akun Anda masih menunggu persetujuan admin.';
+        return;
+      }
+      if(user.approval_status==='rejected'){
+        notice.className='warn auth-error';
+        notice.textContent='Pendaftaran akun Anda ditolak oleh admin.';
+        return;
+      }
+      try{localStorage.setItem(LOCAL_SESSION_KEY,user.id)}catch(e){}
+      applyLocalUser(user);
+      notice.className='warn auth-success';
+      notice.textContent='Akun Anda telah disetujui. Login berhasil.';
+      await loadPendingUsers();
+      render();
+      await loadMessages();
       return;
     }
     let result,approvedProfile=null;
@@ -89,5 +220,67 @@ function accountForm(){
       await loadMessages();
       if(!S.messageChannel)await subscribeToMessages();
     }
-  }},submitLabel));
+  }},submitLabel),google,modeSwitch);
 }
+/* Jalan pintas pemilik: ketuk tulisan SHIKOKU FAMILY di header 3 kali cepat.
+   Hanya masuk ke MODE LOKAL di perangkat ini (data lokal saja) — tidak pernah
+   membuat sesi Supabase dan tidak membuka data Supabase. Tanpa petunjuk di layar. */
+let brandTapCount=0,brandLastTapAt=0;
+function ensureLocalAdminUser(){
+  const users=localUsers();
+  let admin=users.find(u=>u.is_main_admin===true&&u.approval_status==='approved')
+    ||users.find(u=>u.role==='admin'&&u.approval_status==='approved');
+  if(admin){
+    if(admin.is_main_admin!==true&&!users.some(u=>u.is_main_admin===true)){
+      const idx=users.findIndex(u=>u.id===admin.id);
+      if(idx>=0){users[idx]={...users[idx],is_main_admin:true};admin=users[idx];try{saveLocalUsers(users)}catch(e){}}
+    }
+    return admin;
+  }
+  const salt='q'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+  admin={id:'local-user-'+salt,name:'Putro',email:'putro@shikoku.local',password_hash:localPasswordHash('lokal-'+salt,salt),salt,role:'admin',is_main_admin:true,approval_status:'approved',created_at:new Date().toISOString()};
+  users.push(admin);
+  try{saveLocalUsers(users)}catch(e){}
+  return admin;
+}
+async function quickLocalLogin(){
+  try{
+    const wasForced=localModeForced();
+    try{localStorage.setItem(FORCE_LOCAL_KEY,'1')}catch(e){}
+    const admin=ensureLocalAdminUser();
+    try{localStorage.setItem(LOCAL_SESSION_KEY,admin.id)}catch(e){}
+    /* Bila sesi saat ini masih mode online (Supabase), muat ulang supaya
+       aplikasi beralih penuh ke basis data lokal sebelum masuk. */
+    if(S.supabase||!S.db||S.authLoading){
+      location.reload();
+      return;
+    }
+    /* Sudah di mode lokal: langsung masuk tanpa formulir, tampilkan Home. */
+    applyLocalUser(admin);
+    S.view='landing';S.adminMenuOpen=false;document.body.classList.remove('open');
+    if(typeof startDataSubscriptions==='function'){try{startDataSubscriptions()}catch(e){}}
+    if(typeof loadPendingUsers==='function'){try{await loadPendingUsers()}catch(e){}}
+    if(typeof render==='function')render();
+    if(typeof loadMessages==='function'){try{await loadMessages()}catch(e){}}
+    /* wasForced dipakai hanya untuk keputusan di atas; bila tadinya belum
+       paksa-lokal dan tidak ada Supabase, sesi lokal di atas sudah cukup. */
+    void wasForced;
+  }catch(e){
+    try{location.reload()}catch(_){}
+  }
+}
+function handleBrandTap(){
+  const now=Date.now();
+  if(now-brandLastTapAt>1000)brandTapCount=0;
+  brandLastTapAt=now;
+  brandTapCount+=1;
+  if(brandTapCount<3)return;
+  brandTapCount=0;brandLastTapAt=0;
+  quickLocalLogin();
+}
+(function initBrandShortcut(){
+  const el=document.getElementById('brand-title')||document.querySelector('header b');
+  if(!el||el.dataset.brandShortcut==='1')return;
+  el.dataset.brandShortcut='1';
+  el.addEventListener('click',handleBrandTap);
+})();

@@ -6,7 +6,7 @@ function createLocalDb(){
   const write=(name,rows)=>{try{localStorage.setItem(key(name),JSON.stringify(rows))}catch(e){throw new Error('Penyimpanan lokal tidak tersedia')}};
   const notify=name=>(listeners[name]||[]).forEach(fn=>fn({docs:read(name).map(data=>({id:data.id,data:()=>({...data})}))}));
   const collection=name=>({
-    onSnapshot(fn){(listeners[name]||(listeners[name]=[])).push(fn);notify(name)},
+    onSnapshot(fn){(listeners[name]||(listeners[name]=[])).push(fn);notify(name);return ()=>{const list=listeners[name]||[],index=list.indexOf(fn);if(index>=0)list.splice(index,1)}},
     add:async data=>{const rows=read(name),id='local-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,7);rows.push({id,...data});write(name,rows);notify(name);return {id}},
     doc:id=>({
       set:async data=>{const rows=read(name),i=rows.findIndex(x=>x.id===id),next={id,...data};if(i<0)rows.push(next);else rows[i]=next;write(name,rows);notify(name)},
@@ -16,7 +16,7 @@ function createLocalDb(){
   });
   return {collection};
 }
-const APP_DATA_COLLECTIONS=new Set(['members','events','topics','cleaning_duties','pin']);
+const APP_DATA_COLLECTIONS=new Set(['members','events','topics','cleaning_duties','pin','musyawarah','pengaturan']);
 function createSupabaseDb(client){
   const collection=name=>{
     if(!APP_DATA_COLLECTIONS.has(name))throw new Error('Koleksi aplikasi tidak dikenal: '+name);

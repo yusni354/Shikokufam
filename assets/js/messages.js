@@ -1,6 +1,12 @@
 /* Pesan ke admin: muat, kirim, balas, lampiran, tampilan percakapan */
 function messageFromRow(row){return {id:row.id,nama:row.name,teks:row.message,attachments:row.attachments||[],at:new Date(row.created_at).getTime(),status:row.status,sender_id:row.sender_id}}
 function replyFromRow(row){return {id:row.id,message_id:row.message_id,by:row.sender_id,teks:row.message,attachments:row.attachments||[],at:new Date(row.created_at).getTime()}}
+/* Penyimpanan pesan mode lokal (tanpa Supabase): baris berbentuk sama seperti tabel Supabase */
+const LOCAL_MESSAGES_KEY='shikoku-family:messages';
+const LOCAL_REPLIES_KEY='shikoku-family:message-replies';
+function localMessageRows(key){try{return JSON.parse(localStorage.getItem(key)||'[]')}catch(e){return[]}}
+function saveLocalMessageRows(key,rows){try{localStorage.setItem(key,JSON.stringify(rows))}catch(e){throw new Error('Penyimpanan lokal tidak tersedia')}}
+function newLocalRowId(prefix){return prefix+'-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8)}
 function updateMessageBadges(){
   const value=String(S.unreadMessages||0);
   document.querySelectorAll('[data-message-badge]').forEach(badge=>{
@@ -53,6 +59,12 @@ function markMessagesRead(group){
     if(group)query=query.in('id',group.messages.map(message=>message.id));
     query
       .then(({error})=>{if(error)console.error('Status pesan admin tidak dapat diperbarui:',error)});
+  }else if(S.admin&&!S.supabase){
+    const rows=localMessageRows(LOCAL_MESSAGES_KEY);let changed=false;
+    rows.forEach(row=>{
+      if(row.status==='unread'&&(!group||group.messages.some(message=>message.id===row.id))){row.status='read';row.read_at=new Date().toISOString();changed=true}
+    });
+    if(changed)saveLocalMessageRows(LOCAL_MESSAGES_KEY,rows);
   }
   const seenNow=userMessageSeen();
   S.unreadMessages=incomingMessageItems().filter(item=>!seenNow[item.id]).length;
@@ -69,7 +81,27 @@ async function subscribeToMessages(){
   });
 }
 async function loadMessages(){
-  if(!S.supabase||!S.uid)return;
+  if(!S.uid)return;
+  if(!S.supabase){
+    let rows=localMessageRows(LOCAL_MESSAGES_KEY);
+    if(!S.admin)rows=rows.filter(row=>row.sender_id===S.uid);
+    const nextMessages=rows.map(messageFromRow).sort((a,b)=>a.at-b.at);
+    const ids=new Set(nextMessages.map(item=>item.id));
+    const nextReplies=localMessageRows(LOCAL_REPLIES_KEY).filter(row=>ids.has(row.message_id)).map(replyFromRow).sort((a,b)=>a.at-b.at);
+    const signature=JSON.stringify({
+      messages:nextMessages.map(item=>[item.id,item.status,item.at,item.attachments]),
+      replies:nextReplies.map(item=>[item.id,item.message_id,item.at,item.attachments])
+    });
+    const changed=signature!==S.messageSignature;
+    S.messageSignature=signature;
+    S.tanya=nextMessages;
+    S.replies=nextReplies;
+    const seen=userMessageSeen();
+    S.unreadMessages=incomingMessageItems().filter(item=>!seen[item.id]).length;
+    updateMessageBadges();
+    if(changed&&S.view==='pesan')render();
+    return;
+  }
   let query=S.supabase.from('messages').select('*').order('created_at',{ascending:true});
   if(!S.admin)query=query.eq('sender_id',S.uid);
   const {data,error}=await query;
@@ -95,8 +127,13 @@ async function loadMessages(){
   if(changed&&S.view==='pesan')render();
 }
 async function submitMessage(data){
-  if(!S.supabase)throw new Error('Supabase belum tersedia');
   if(!S.uid)throw new Error('Silakan login terlebih dahulu');
+  if(!S.supabase){
+    const rows=localMessageRows(LOCAL_MESSAGES_KEY);
+    rows.push({id:newLocalRowId('msg'),name:data.nama,message:data.teks,sender_id:S.uid,status:'unread',attachments:data.attachments||[],created_at:new Date().toISOString()});
+    saveLocalMessageRows(LOCAL_MESSAGES_KEY,rows);
+    return;
+  }
   const {error}=await S.supabase.from('messages').insert({
     name:data.nama,
     message:data.teks,
@@ -106,7 +143,17 @@ async function submitMessage(data){
   if(error)throw error;
 }
 async function submitReply(messageId,text,attachments=[]){
-  if(!S.supabase||!S.uid)throw new Error('Silakan login terlebih dahulu');
+  if(!S.uid)throw new Error('Silakan login terlebih dahulu');
+  if(!S.supabase){
+    const replies=localMessageRows(LOCAL_REPLIES_KEY);
+    replies.push({id:newLocalRowId('rpl'),message_id:messageId,sender_id:S.uid,message:text,attachments,created_at:new Date().toISOString()});
+    saveLocalMessageRows(LOCAL_REPLIES_KEY,replies);
+    if(S.admin){
+      const rows=localMessageRows(LOCAL_MESSAGES_KEY),row=rows.find(item=>item.id===messageId);
+      if(row){row.status='replied';row.replied_at=new Date().toISOString();saveLocalMessageRows(LOCAL_MESSAGES_KEY,rows)}
+    }
+    return;
+  }
   const {error}=await S.supabase.from('message_replies').insert({message_id:messageId,sender_id:S.uid,message:text,attachments});
   if(error)throw error;
   if(S.admin){
@@ -120,7 +167,15 @@ async function submitReply(messageId,text,attachments=[]){
 
 async function uploadMessageFiles(files){
   if(!files.length)return [];
-  if(!S.supabase)throw new Error('Supabase belum tersedia');
+  if(!S.supabase){
+    /* Mode lokal: lampiran disimpan sebagai data di perangkat ini */
+    const uploaded=[];
+    for(const file of files){
+      const url=file.type&&file.type.startsWith('image/')?await readLocalImageDataUrl(file):await readFileAsDataUrl(file);
+      uploaded.push({url,name:file.name,type:file.type||'application/octet-stream'});
+    }
+    return uploaded;
+  }
   const uploaded=[];
   for(const file of files){
     const safeName=file.name.replace(/[^a-zA-Z0-9._-]/g,'-');
@@ -134,8 +189,11 @@ async function uploadMessageFiles(files){
 }
 // Hanya izinkan tautan https dari server Supabase milik aplikasi (cegah tautan berbahaya seperti javascript:)
 function safeAttachmentUrl(value){
+  const raw=String(value||'');
+  /* Mode lokal: lampiran berupa data tertanam dari perangkat ini sendiri */
+  if(!S.supabase&&/^data:(image\/|audio\/|video\/|application\/pdf)/.test(raw))return raw;
   try{
-    const url=new URL(String(value||''));
+    const url=new URL(raw);
     const allowedHost=window.SUPABASE_CONFIG?.url?new URL(window.SUPABASE_CONFIG.url).hostname:'';
     return url.protocol==='https:'&&allowedHost&&url.hostname===allowedHost?url.href:'';
   }catch(error){return ''}

@@ -7,12 +7,21 @@ render();
     if (!S.uid) { S.uid = 'u' + Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem('uid', S.uid); }
   } catch (e) { S.uid = 'u' + Math.random().toString(36).slice(2); }
 
-  const hasSupabase = window.supabase && window.SUPABASE_CONFIG?.url && window.SUPABASE_CONFIG?.anonKey;
+  // Mode lokal dapat dipilih dari halaman masuk (tombol "Mode lokal di perangkat ini")
+  // agar isi aplikasi tetap bisa dibuka di perangkat ini tanpa akun Supabase.
+  let forceLocal = false;
+  try { forceLocal = localStorage.getItem('shikoku-family:force-local') === '1'; } catch (e) {}
+  const hasSupabase = !forceLocal && window.supabase && window.SUPABASE_CONFIG?.url && window.SUPABASE_CONFIG?.anonKey;
   if (!hasSupabase) {
-    // Tanpa Supabase: pakai penyimpanan lokal di perangkat (mode uji coba)
+    // Tanpa Supabase: pakai penyimpanan lokal di perangkat (mode uji coba),
+    // dengan sesi akun lokal agar alur masuk/persetujuan tetap berjalan penuh
     S.db = createLocalDb();
+    S.uid = null;
+    restoreLocalSession();
     S.authLoading = false;
     startDataSubscriptions();
+    await loadPendingUsers();
+    if (S.uid) await loadMessages();
     render();
     return;
   }
@@ -73,8 +82,12 @@ render();
     console.error('Supabase gagal diinisialisasi, memakai penyimpanan lokal:', error);
     S.supabase = null;
     S.db = createLocalDb();
+    S.uid = null;
+    restoreLocalSession();
     S.authLoading = false;
     startDataSubscriptions();
+    await loadPendingUsers();
+    if (S.uid) await loadMessages();
     render();
   }
 })();

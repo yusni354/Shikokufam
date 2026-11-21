@@ -41,7 +41,7 @@ function vPiket(){
     drawAssignments();
     editor=box(h('b',{},edit?'Edit jadwal piket':'Tambah jadwal piket'),
       h('label',{class:'lb'},'Tanggal *',date),
-      h('div',{class:'duty-form-heading'},h('b',{},'Nama dan tugas'),h('small',{},'Tambahkan satu baris untuk setiap orang yang bertugas.')),
+      h('div',{class:'duty-form-heading'},h('b',{},'Nama dan tugas')),
       rows,
       h('button',{class:'btn s duty-add-person',onclick:()=>{form.assignments.push({nama:'',tugas:''});drawAssignments()}},'+ Tambah nama dan tugas'),
       h('div',{class:'fl'},
@@ -57,7 +57,7 @@ function vPiket(){
         }},edit?'Simpan perubahan':'Tambah jadwal'),
         h('button',{class:'btn s',onclick:()=>{S.dutyForm=null;render()}},'Batal')));
   }
-  return [h('div',{class:'duty-heading'},h('div',{},h('h1',{},'Jadwal Piket'),h('p',{class:'sub'},'Bersama menjaga kebersihan tempat kita berkumpul.')),h('span',{class:'duty-count'},S.cleaningDuties.length+' jadwal')),
+  return [h('div',{class:'duty-heading'},h('div',{},h('h1',{},'Jadwal Piket')),h('span',{class:'duty-count'},S.cleaningDuties.length+' jadwal')),
     S.admin&&!form&&h('button',{class:'btn duty-add',onclick:()=>{const today=new Date();S.dutyForm={tanggal:[today.getFullYear(),String(today.getMonth()+1).padStart(2,'0'),String(today.getDate()).padStart(2,'0')].join('-'),assignments:[{nama:'',tugas:''}]};render()}},'+ Tambah jadwal'),
     editor,
     cards.length?h('div',{class:'duty-list'},...cards):h('div',{class:'duty-empty'},icon('brush',24),h('b',{},'Belum ada jadwal piket'),h('p',{},S.admin?'Tambahkan jadwal pertama untuk mulai mengatur tugas kebersihan.':'Jadwal piket yang akan datang akan tampil di sini.'))];
@@ -69,11 +69,11 @@ function vForum(){
       if(!confirm('Hapus topik ini?'))return;
       try{await S.db.collection('topics').doc(x.id).delete()}catch(error){console.error(error);alert('Gagal menghapus topik: '+(error.message||'periksa koneksi'))}
     }},'Hapus')));
-  return [h('h1',{},'Forum'),h('p',{class:'sub'},'Diskusi anggota'),guard(),
+  return [h('h1',{},'Forum'),guard(),
     h('div',{class:'card',style:'display:block'},t,b,h('button',{class:'btn',onclick:async()=>{
       if(!t.value.trim()||!S.db){alert('Isi judul topik terlebih dahulu.');return}
       try{await S.db.collection('topics').add({judul:t.value.trim(),isi:b.value.trim(),by:S.uid,at:Date.now()});t.value='';b.value=''}
       catch(error){console.error(error);alert('Gagal mengirim topik: '+(error.message||'periksa koneksi'))}
     }},'Kirim')),
-    list.length?list:h('p',{class:'warn'},'Belum ada topik.')];
+    ...(list.length?list:[h('p',{class:'warn'},'Belum ada topik.')])];
 }
