@@ -1277,3 +1277,48 @@ body.auth-locked .landing{padding-top:0}
 .member-profile-page .member-id-banner span{color:#ffffff}
 .member-profile-page .member-id-banner .member-region-tag{background:#ffffff;color:var(--region-color,#718096)}
 .member-profile-page .member-id-info>small{color:var(--region-color,#718096)}
+
+/* ===== Halaman Kegiatan: pemilih Tahun & Bulan daftar kartu, judul
+   bulan terpilih, dan warna aksen per nama kegiatan =====
+   Pemilih memakai ulang gaya .ringkasan-filters dari Ringkasan &
+   Laporan supaya tampilannya sama persis. */
+.kegiatan-filters{margin-top:2px}
+.kegiatan-bulan-judul{margin:0 2px 10px;font-size:15px;font-weight:700;color:var(--ink)}
+/* Warna aksen kartu kegiatan: --activity-color diisi activityCard()
+   dari warnaKegiatan(nama) — pita tepi atas kartu + nuansa judul.
+   Warna pil & grafik status (Hadir/Izin/Cuti/Alpha) tidak berubah. */
+.activity-card{border-top:5px solid var(--activity-color,#dbe7ee)}
+.activity-card .activity-heading h2{color:var(--activity-color,#10222e)}
+/* Dropdown terkelola di formulir Buat Kegiatan: select memenuhi kolom
+   formulir seperti field lain; panel tambah/hapus tampil di bawahnya
+   di dalam kolom yang sama. */
+.activity-field .managed-select select{display:block;width:100%}
+.activity-create .managed-panel{background:var(--card)}
+
+/* ===== Aturan umum: teks TIDAK BOLEH keluar dari kartu =====
+   Semua tulisan di dalam komponen kartu membungkus (wrap) ke baris
+   bawah bila kepanjangan — termasuk mematahkan kata yang sangat
+   panjang — alih-alih meluber keluar tepi kartu atau terpotong.
+   Anak flex/grid yang memuat teks boleh menyusut (min-width:0) supaya
+   pembungkusan benar-benar terjadi. Tabel rekap Ringkasan & tabel
+   laporan TIDAK diubah: keduanya memang punya wadah gulir mendatar
+   sendiri, jadi aturan nowrap-nya ditegaskan kembali di bawah. */
+.card *,.member-card *,.duty-card *,.home-region-card *,.home-event *,.home-duty *,.conversation-row *,.peta-detail *{min-width:0}
+.card img,.card video,.card canvas{max-width:100%}
+.card :is(h1,h2,h3,h4,h5,p,li,label,td,th),.member-card :is(h1,h2,h3,h4,p,li,label),.duty-card :is(h1,h2,h3,h4,p,li,label),.home-region-card :is(h1,h2,h3,h4,p),.home-event :is(b,small,p),.home-duty :is(b,span,p),.peta-detail :is(h1,h2,h3,h4,p){white-space:normal;overflow-wrap:anywhere;word-break:break-word}
+.card :is(b,strong,small,span,a,em),.member-card :is(b,strong,small,span,a),.duty-card :is(b,strong,small,span,a),.home-region-card :is(b,span),.peta-detail :is(b,strong,small,span){overflow-wrap:anywhere;word-break:break-word;max-width:100%}
+/* Kartu kegiatan khususnya: judul, baris meta tanggal/waktu/lokasi,
+   pil total, legenda grafik, dan keterangan semuanya membungkus di
+   dalam kartu; baris meta boleh turun baris (flex-wrap). */
+.activity-heading,.activity-heading>div{min-width:0}
+.activity-card h2,.activity-card h3{white-space:normal;overflow-wrap:anywhere;word-break:break-word}
+.activity-meta{flex-wrap:wrap;white-space:normal;overflow-wrap:anywhere;word-break:break-word}
+.activity-meta>span{flex:1 1 auto;min-width:0;white-space:normal;overflow-wrap:anywhere;word-break:break-word}
+.activity-counts b,.activity-chart-legend span,.activity-total-note,.activity-description,.activity-help,.activity-feedback{white-space:normal;overflow-wrap:anywhere;word-break:break-word}
+.activity-region-pick-main,.activity-region-pick-main b,.activity-region-pick-main small{min-width:0;white-space:normal;overflow-wrap:anywhere;word-break:break-word}
+/* Pengecualian: tabel rekap & tabel laporan tetap seperti semula
+   (kolom status satu huruf, wadah gulir mendatar miliknya sendiri). */
+.card .rekap-table th,.card .rekap-table td{white-space:nowrap;overflow-wrap:normal;word-break:normal}
+.card .rekap-table .rekap-name,.card .rekap-table .rekap-name b{white-space:normal;overflow-wrap:anywhere;word-break:break-word}
+.card .rekap-divider-label{white-space:nowrap;overflow-wrap:normal;word-break:normal}
+.card .laporan-table th{white-space:nowrap;overflow-wrap:normal;word-break:normal}

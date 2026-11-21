@@ -140,6 +140,45 @@ function activityTotalsView(totals,totalAnggota){
   ):null;
   return {pills,chart,legend};
 }
+/* ===== Warna aksen per NAMA kegiatan =====
+   Tiap nama kegiatan yang berbeda mendapat warna aksennya sendiri dari
+   palet lembut aplikasi (selaras warna wilayah/kelompok). Warna
+   ditentukan TETAP dari nama kegiatan (hash nama → indeks palet), jadi
+   nama yang sama selalu berwarna sama — rangkaian pengulangan satu
+   nama satu warna — konsisten antar bulan dan antar muat ulang. Warna
+   hanya aksen kartu (pita atas + nuansa judul); warna status
+   Hadir/Izin/Cuti/Alpha pada pil & grafik tidak berubah. */
+const PALET_WARNA_KEGIATAN=['#3985c6','#24947e','#e28b36','#8e68b5','#d95763','#d45e9f','#6f9e3b','#2b7a8c','#b5651d','#6073c4','#c04b7a','#4f772d'];
+function warnaKegiatan(nama){
+  const s=String(nama||'').trim().toLowerCase();
+  let hash=5381;
+  for(let i=0;i<s.length;i++)hash=((hash<<5)+hash+s.charCodeAt(i))>>>0;
+  return PALET_WARNA_KEGIATAN[hash%PALET_WARNA_KEGIATAN.length];
+}
+/* ===== Daftar bawaan dropdown terkelola Nama Kegiatan & Lokasi =====
+   Pilihan bawaan berasal dari nama/lokasi yang sudah pernah dipakai
+   pada kegiatan tersimpan; pilihan tambahan tersimpan lewat sistem
+   pilihan terkelola (dokumen pilihan_nama_kegiatan /
+   pilihan_lokasi_kegiatan di koleksi pengaturan). */
+function daftarUnikKegiatan(field){
+  const seen=new Map();
+  (S.events||[]).forEach(ev=>{
+    const v=String(ev[field]||'').trim();
+    if(!v)return;
+    const k=v.toLowerCase();
+    if(!seen.has(k))seen.set(k,v);
+  });
+  return [...seen.values()].sort((a,b)=>a.localeCompare(b,'id'));
+}
+const hitungPemakaianKegiatan=field=>value=>(S.events||[]).filter(ev=>String(ev[field]||'').trim().toLowerCase()===String(value||'').trim().toLowerCase()).length;
+/* Kosongkan dropdown terkelola sesudah kegiatan berhasil dibuat:
+   nilai internalnya hanya berubah lewat handler onchange select-nya. */
+function resetManagedSelect(wrap){
+  try{
+    const sel=wrap&&wrap.querySelector?wrap.querySelector('select'):null;
+    if(sel){sel.value='';if(typeof sel.onchange==='function')sel.onchange()}
+  }catch(e){/* abaikan: formulir akan digambar ulang oleh data baru */}
+}
 function activityCard(event){
   const attendees=new Set(activityMemberIds(event,'hadir_anggota'));
   const registeredMembers=S.members.filter(member=>String(member.status||'aktif').toLowerCase()!=='nonaktif');
@@ -155,6 +194,7 @@ function activityCard(event){
      muncul sesudah badan kartu diklik; membuka satu kartu menutup
      kartu lain (S.activityExpanded hanya memuat satu id). */
   const expanded=String(S.activityExpanded)===String(event.id);
+  const warnaAksen=warnaKegiatan(event.judul||'Kegiatan komunitas');
   const totals=activityTotals(event);
   /* Pil total hanya menampilkan JUMLAH tiap status (tanpa teks
      persen). Proporsi tiap status terhadap TOTAL KESELURUHAN ANGGOTA
@@ -290,7 +330,7 @@ function activityCard(event){
         scannerVideo,status)
     );
   }
-  const card=h('article',{class:'card activity-card'+(expanded?' open':''),'aria-expanded':expanded?'true':'false',title:expanded?'Ketuk untuk menutup':'Ketuk untuk melihat wilayah'},...content);
+  const card=h('article',{class:'card activity-card'+(expanded?' open':''),style:'--activity-color:'+warnaAksen,'aria-expanded':expanded?'true':'false',title:expanded?'Ketuk untuk menutup':'Ketuk untuk melihat wilayah'},...content);
   /* Klik pada badan kartu membuka/menutup daftar wilayah; klik pada
      tombol/field di dalam kartu (pemilih wilayah, pemindai)
      tidak ikut membuka/menutup. */
@@ -1034,10 +1074,15 @@ function vKegiatan(){
     if(focused)return [h('h1',{},'Absensi Kegiatan'),guard(),vAbsensiFokus(focused,S.absensiRegion)];
     S.absensiEvent=null;S.absensiRegion=null;S.absensiDraft=null;
   }
-  const title=h('input',{placeholder:'Nama kegiatan',maxlength:'150'});
+  /* Nama kegiatan & Lokasi: dropdown TERKELOLA (sistem pilihan.js) —
+     pilihan bawaan dari nama/lokasi yang pernah dipakai kegiatan
+     tersimpan, dengan '＋ Tambah pilihan baru…' dan '－ Hapus pilihan…'
+     di bawah daftar; pilihan yang sedang dipakai data tidak bisa
+     dihapus (tampil jumlah pemakainya). */
+  const title=managedSelect({key:'nama_kegiatan',bawaan:daftarUnikKegiatan('judul'),value:'',placeholder:'Pilih nama kegiatan',countUsage:hitungPemakaianKegiatan('judul')});
   const date=h('input',{type:'date'});
   const time=h('input',{type:'time'});
-  const location=h('input',{placeholder:'Lokasi kegiatan',maxlength:'180'});
+  const location=managedSelect({key:'lokasi_kegiatan',bawaan:daftarUnikKegiatan('lokasi'),value:'',placeholder:'Pilih lokasi kegiatan',countUsage:hitungPemakaianKegiatan('lokasi')});
   /* Pengulangan: pilihan utama di kolom KETIGA baris ke-2 grid formulir;
      sub-pemilihnya tampil tepat DI BAWAH field Pengulangan di kolom yang
      sama, tersusun rapat ke bawah ('Sekali saja' / 'Setiap minggu' =
@@ -1079,7 +1124,44 @@ function vKegiatan(){
     }
     repeatFeedback.textContent='';
   };
-  const events=[...S.events].sort((a,b)=>(b.tanggal||'').localeCompare(a.tanggal||'')||(b.at||0)-(a.at||0));
+  const semuaEvents=[...S.events].sort((a,b)=>(b.tanggal||'').localeCompare(a.tanggal||'')||(b.at||0)-(a.at||0));
+  /* ===== Struktur Tahun & Bulan untuk daftar kartu: kartu yang tampil
+     hanya kegiatan SATU BULAN terpilih. Tahun terpilih = pilihan
+     pengguna (diingat di S selama aplikasi dibuka, pola yang sama
+     seperti Ringkasan); bawaan tahun kegiatan paling baru. Bulan hanya
+     ditawarkan yang memiliki kegiatan pada tahun terpilih; bawaan
+     bulan paling baru yang memiliki kegiatan. ===== */
+  const tahunBerjalan=new Date().getFullYear();
+  const tahunTersedia=[...new Set([tahunBerjalan,...semuaEvents.map(activityYear)].filter(y=>y!=null))].sort((a,b)=>b-a);
+  const tahunTerpilih=tahunTersedia.includes(S.kegiatanTahun)?S.kegiatanTahun:(semuaEvents.length?activityYear(semuaEvents[0]):tahunBerjalan);
+  if(semuaEvents.length)S.kegiatanTahun=tahunTerpilih;
+  const eventsTahun=semuaEvents.filter(ev=>activityYear(ev)===tahunTerpilih);
+  const bulanTersedia=[...new Set(eventsTahun.map(activityMonth).filter(m=>m!=null))].sort((a,b)=>a-b);
+  const bulanTerpilih=bulanTersedia.includes(S.kegiatanBulan)?S.kegiatanBulan:(bulanTersedia.length?bulanTersedia[bulanTersedia.length-1]:null);
+  if(bulanTerpilih!=null)S.kegiatanBulan=bulanTerpilih;
+  const events=bulanTerpilih!=null?eventsTahun.filter(ev=>activityMonth(ev)===bulanTerpilih):[];
+  let kegiatanFilters=null;
+  if(semuaEvents.length){
+    const yearSelect=h('select',{'aria-label':'Pilih tahun kegiatan',onchange:e=>{S.kegiatanTahun=Number(e.target.value);S.kegiatanBulan=null;render()}},
+      ...tahunTersedia.map(y=>h('option',{value:String(y)},String(y))));
+    yearSelect.value=String(tahunTerpilih);
+    let monthSelect=null;
+    if(bulanTersedia.length){
+      monthSelect=h('select',{'aria-label':'Pilih bulan kegiatan',onchange:e=>{S.kegiatanBulan=Number(e.target.value);render()}},
+        ...bulanTersedia.map(m=>h('option',{value:String(m)},NAMA_BULAN[m-1])));
+      monthSelect.value=String(bulanTerpilih);
+    }
+    kegiatanFilters=h('div',{class:'ringkasan-filters kegiatan-filters'},
+      h('label',{class:'activity-field ringkasan-year'},'Tahun',yearSelect),
+      monthSelect&&h('label',{class:'activity-field ringkasan-month'},'Bulan',monthSelect));
+  }
+  let kegiatanDaftar;
+  if(!semuaEvents.length)kegiatanDaftar=h('p',{class:'warn'},'Belum ada kegiatan.');
+  else if(!eventsTahun.length)kegiatanDaftar=h('p',{class:'warn'},'Belum ada kegiatan pada tahun '+tahunTerpilih+'. Pilih tahun lain yang memiliki kegiatan.');
+  else if(!events.length)kegiatanDaftar=h('p',{class:'warn'},'Belum ada kegiatan pada bulan ini.');
+  else kegiatanDaftar=h('div',{class:'kegiatan-bulan-blok'},
+    h('p',{class:'kegiatan-bulan-judul'},'Kegiatan '+NAMA_BULAN[bulanTerpilih-1]+' '+tahunTerpilih+' · '+events.length+' kegiatan'),
+    h('div',{class:'activity-list'},...events.map(activityCard)));
   /* Formulir TEPAT 2 baris: baris 1 dua kolom Nama | Lokasi, baris 2
      TIGA kolom Tanggal | Waktu | Pengulangan. Pemilih tambahan
      pengulangan tinggal di dalam kolom ketiga, tepat di bawah field
@@ -1090,15 +1172,15 @@ function vKegiatan(){
   const createForm=S.admin&&h('section',{class:'card activity-create'},h('h2',{},'Buat kegiatan'),
     h('div',{class:'activity-create-grid'},
       h('label',{class:'activity-field'},'Nama kegiatan *',title),
-      h('label',{class:'activity-field'},'Lokasi',location)),
+      h('label',{class:'activity-field'},'Lokasi *',location)),
     h('div',{class:'activity-create-grid3'},
       h('label',{class:'activity-field'},'Tanggal *',date),
       h('label',{class:'activity-field'},'Waktu',time),
       repeatCell),
     h('button',{class:'btn',onclick:async()=>{
-      const judul=title.value.trim();
-      if(!judul||!date.value){alert('Isi nama dan tanggal kegiatan.');return}
-      const lokasi=location.value.trim();
+      const judul=title.getValue().trim();
+      const lokasi=location.getValue().trim();
+      if(!judul||!lokasi||!date.value){alert('Isi nama kegiatan, lokasi, dan tanggal kegiatan.');return}
       try{
         if(repeat.value==='sekali'){
           await S.db.collection('events').add({judul,tanggal:date.value,waktu:time.value,lokasi,peserta_anggota:[],hadir_anggota:[],at:Date.now()});
@@ -1128,7 +1210,7 @@ function vKegiatan(){
           repeatFeedback.textContent=pesan;
           alert(pesan);
         }
-        title.value='';date.value='';time.value='';location.value='';
+        resetManagedSelect(title);resetManagedSelect(location);date.value='';time.value='';
         repeat.value='sekali';
         repeatDateWrap.style.display='none';
         repeatWeekWrap.style.display='none';
@@ -1139,6 +1221,7 @@ function vKegiatan(){
     h('h1',{},'Kegiatan'),
     guard(),
     createForm,
-    events.length?h('div',{class:'activity-list'},...events.map(activityCard)):h('p',{class:'warn'},'Belum ada kegiatan.')
+    kegiatanFilters,
+    kegiatanDaftar
   ];
 }
