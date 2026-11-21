@@ -782,23 +782,66 @@ function vRingkasan(){
     h('th',{title:'Total Cuti sepanjang tahun'},'Cuti'),
     h('th',{title:'Total Alpha sepanjang tahun'},'Alpha'),
     h('th',{title:'Persen kehadiran sepanjang tahun'},'% Hadir')));
-  const rekapBody=h('tbody',{},...rekapMembers.map(member=>{
-    const totals={hadir:0,izin:0,cuti:0,alpha:0};
-    const cells=rekapEvents.map(event=>{
-      const st=activityStatusOf(event,member.id);
-      if(st&&totals[st]!=null){totals[st]++;return h('td',{class:'rekap-st st-'+st},REKAP_HURUF[st])}
-      return h('td',{class:'rekap-none'},'–');
+  /* Kelompok per wilayah: anggota sudah terurut wilayah lalu nama,
+     jadi tiap kelompok didahului SATU baris pembatas selebar penuh
+     tabel (nama wilayah + jumlah anggota + chevron) yang bisa diklik
+     untuk melipat/membuka baris-baris anggotanya; keadaan lipat
+     diingat di S.rekapLipatan selama aplikasi dibuka (bawaan: semua
+     kelompok terbuka). Sel nama tidak lagi memuat label wilayah —
+     latarnya memakai turunan pastel sangat muda dari warna wilayah
+     (regionColor yang sama dengan pin peta & kepala kelompok), teks
+     tetap hitam; pembatas memakai turunan yang sedikit lebih tegas,
+     tetap lembut. */
+  if(!(S.rekapLipatan instanceof Set))S.rekapLipatan=new Set();
+  const rekapTotalKolom=1+rekapEvents.length+5;
+  const warnaLembut=(hex,f)=>{
+    const m=/^#?([0-9a-f]{6})$/i.exec(String(hex||''));
+    if(!m)return '#eef3f6';
+    const n=parseInt(m[1],16),campur=v=>Math.round(v+(255-v)*f);
+    return 'rgb('+campur((n>>16)&255)+','+campur((n>>8)&255)+','+campur(n&255)+')';
+  };
+  const kelompokRekap=[];
+  rekapMembers.forEach(member=>{
+    const wilayah=memberRegion(member);
+    const grup=kelompokRekap[kelompokRekap.length-1];
+    if(grup&&grup.wilayah===wilayah)grup.anggota.push(member);
+    else kelompokRekap.push({wilayah,anggota:[member]});
+  });
+  const barisRekap=[];
+  kelompokRekap.forEach(grup=>{
+    const warna=regionColor(grup.wilayah);
+    const terlipat=S.rekapLipatan.has(grup.wilayah);
+    const barisAnggota=grup.anggota.map(member=>{
+      const totals={hadir:0,izin:0,cuti:0,alpha:0};
+      const cells=rekapEvents.map(event=>{
+        const st=activityStatusOf(event,member.id);
+        if(st&&totals[st]!=null){totals[st]++;return h('td',{class:'rekap-st st-'+st},REKAP_HURUF[st])}
+        return h('td',{class:'rekap-none'},'–');
+      });
+      const pct=rekapEvents.length?Math.round(totals.hadir/rekapEvents.length*100):0;
+      return h('tr',{class:terlipat?'rekap-tersembunyi':''},
+        h('td',{class:'rekap-name',style:'background:'+warnaLembut(warna,.85)},h('b',{},member.nama||'Tanpa nama')),
+        ...cells,
+        h('td',{class:'rekap-num rekap-sum-start'},String(totals.hadir)),
+        h('td',{class:'rekap-num'},String(totals.izin)),
+        h('td',{class:'rekap-num'},String(totals.cuti)),
+        h('td',{class:'rekap-num'},String(totals.alpha)),
+        h('td',{class:'rekap-num'},pct+'%'));
     });
-    const pct=rekapEvents.length?Math.round(totals.hadir/rekapEvents.length*100):0;
-    return h('tr',{},
-      h('td',{class:'rekap-name'},h('b',{},member.nama||'Tanpa nama'),h('small',{},memberRegion(member))),
-      ...cells,
-      h('td',{class:'rekap-num rekap-sum-start'},String(totals.hadir)),
-      h('td',{class:'rekap-num'},String(totals.izin)),
-      h('td',{class:'rekap-num'},String(totals.cuti)),
-      h('td',{class:'rekap-num'},String(totals.alpha)),
-      h('td',{class:'rekap-num'},pct+'%'));
-  }));
+    const pembatas=h('tr',{class:'rekap-divider'+(terlipat?' tertutup':''),'aria-expanded':terlipat?'false':'true',title:(terlipat?'Tampilkan':'Sembunyikan')+' anggota '+grup.wilayah},
+      h('td',{class:'rekap-divider-cell',colspan:String(rekapTotalKolom),style:'background:'+warnaLembut(warna,.62)},
+        h('span',{class:'rekap-divider-label'},icon('chevD',14),h('b',{},grup.wilayah),h('span',{class:'rekap-divider-count'},'· '+grup.anggota.length+' anggota'))));
+    pembatas.addEventListener('click',()=>{
+      const tutup=!S.rekapLipatan.has(grup.wilayah);
+      if(tutup)S.rekapLipatan.add(grup.wilayah);else S.rekapLipatan.delete(grup.wilayah);
+      pembatas.classList.toggle('tertutup',tutup);
+      pembatas.setAttribute('aria-expanded',tutup?'false':'true');
+      pembatas.title=(tutup?'Tampilkan':'Sembunyikan')+' anggota '+grup.wilayah;
+      barisAnggota.forEach(b=>b.classList.toggle('rekap-tersembunyi',tutup));
+    });
+    barisRekap.push(pembatas,...barisAnggota);
+  });
+  const rekapBody=h('tbody',{},...barisRekap);
   const rekapCard=h('section',{class:'card ringkasan-rekap'},
     rekapMembers.length
       ?h('div',{class:'rekap-wrap'},h('table',{class:'rekap-table'},rekapHead,rekapBody))

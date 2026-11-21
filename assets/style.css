@@ -429,7 +429,14 @@ body.admin-dark .card .e{background:#293946;color:var(--acc)}
 .rekap-table tbody tr:last-child td{border-bottom:0}
 .rekap-name{min-width:138px;max-width:200px;white-space:normal!important}
 .rekap-name b{display:block;font-size:12.5px;overflow-wrap:anywhere}
-.rekap-name small{display:block;margin-top:1px;color:var(--mut);font-size:10.5px}
+.rekap-divider{cursor:pointer}
+.rekap-table td.rekap-divider-cell{position:static;text-align:left;padding:0;border-bottom:1px solid var(--line)}
+.rekap-divider:hover td.rekap-divider-cell{filter:brightness(.97)}
+.rekap-divider-label{position:sticky;left:12px;display:inline-flex;align-items:center;gap:6px;padding:7px 10px;font-size:12px;color:#17222b;white-space:nowrap}
+.rekap-divider-label svg{flex:none;transition:transform .15s ease}
+.rekap-divider.tertutup .rekap-divider-label svg{transform:rotate(-90deg)}
+.rekap-divider-count{color:var(--mut);font-weight:500}
+.rekap-tersembunyi{display:none}
 .rekap-st{font-weight:700;font-size:13px}
 .rekap-st.st-hadir{color:#2e9e63}
 .rekap-st.st-izin{color:#a8740a}
