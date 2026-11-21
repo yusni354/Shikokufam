@@ -57,9 +57,17 @@ function renderDrawer(){
 /* Gerbang awal: kerangka (header, drawer, navigasi bawah, maskot) hanya
    tampil untuk pengguna yang sudah masuk dan disetujui. Selama terkunci,
    body ber-class auth-locked dan CSS menyembunyikan semua kerangka —
-   yang terlihat hanya halaman login / menunggu persetujuan di #app. */
+   yang terlihat hanya halaman login / menunggu persetujuan di #app.
+   Kelas bottom-nav-hidden ikut dikelola di sini: CSS menguncinya dengan
+   display:none!important pada #tb dan TIDAK ada kode lain yang pernah
+   melepasnya, jadi bila tidak dilepas saat kunci dibuka, navigasi bawah
+   tidak akan pernah muncul walau render() sudah memasang display:flex.
+   Selama terkunci kelas itu terpasang (gerbang tetap polos); sesudah
+   masuk & disetujui kelas itu dilepas bersama auth-locked, sehingga
+   header dan semua tombol navigasi tampil lagi. */
 function setAuthLocked(locked){
   document.body.classList.toggle('auth-locked',!!locked);
+  document.body.classList.toggle('bottom-nav-hidden',!!locked);
   if(locked){
     document.body.classList.remove('open');
     const pm=document.querySelector('#pm');if(pm)pm.remove();

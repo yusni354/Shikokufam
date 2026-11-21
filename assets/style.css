@@ -345,13 +345,14 @@ body.open #dr{transform:none}body.open #ov{display:block}
 .chat-file{display:block;color:var(--acc);margin-top:6px;font-weight:600;overflow-wrap:anywhere}
 .chat-bubble audio{display:block;max-width:220px;margin-top:6px}
 #tb{position:fixed;left:12px;right:12px;bottom:calc(10px + env(safe-area-inset-bottom,0px));background:var(--card);border-radius:24px;box-shadow:0 8px 30px rgba(47,134,184,.28);display:flex;justify-content:space-around;padding:8px;z-index:6}
-#tb a{position:relative;flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;font-size:11px;color:var(--mut);padding:6px 0;border-radius:16px;cursor:pointer}
+#tb a{position:relative;flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;font-size:11px;color:var(--mut);padding:6px 0;border-radius:16px;cursor:pointer}
+#tb a span{max-width:100%;line-height:1.15;overflow-wrap:anywhere}
 #tb a>.app-icon{color:var(--mut)}
 #tb a.on{color:var(--acc);background:var(--line);font-weight:700}
 #tb a.on>.app-icon{color:var(--acc)}
 body.admin-dark .home-shortcut-icon{background:#293946}
 body.admin-dark .card .e{background:#293946;color:var(--acc)}
-@media (max-width:390px){#tb{left:6px;right:6px;padding:6px 3px}#tb a{font-size:10px}}
+@media (max-width:390px){#tb{left:6px;right:6px;padding:6px 3px}#tb a{font-size:9.5px;gap:3px;padding:5px 0}}
 @media (max-width:560px){.duty-card{align-items:flex-start;flex-wrap:wrap}.duty-info{padding-top:2px}.duty-actions{width:100%;padding-left:72px;justify-content:flex-start}.duty-heading{align-items:flex-start}.duty-count{margin-top:14px}}
 #pet{position:fixed;right:12px;bottom:calc(92px + env(safe-area-inset-bottom,0px));z-index:7;cursor:grab;touch-action:none;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
 #pet img{display:block;height:96px;pointer-events:none;-webkit-user-drag:none}
