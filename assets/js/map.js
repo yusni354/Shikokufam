@@ -50,8 +50,11 @@ async function setApproval(id,status){
 /* Hapus akun dari data aplikasi (khusus admin utama): catatan akun
    dihapus dari daftar pengguna lokal / tabel profiles Supabase, sehingga
    akun hilang dari daftar persetujuan dan tidak bisa masuk lagi (alur
-   masuk selalu memeriksa catatan profil). Akun sendiri tidak bisa
-   dihapus. */
+   masuk selalu memeriksa catatan profil). Bila penghapusan keras dari
+   tabel profiles terblokir kebijakan database, fungsi ini beralih ke
+   penghapusan lewat UPDATE (status 'rejected' + data dikosongkan) —
+   hasil akhirnya sama: akun hilang dari daftar dan tidak bisa masuk.
+   Akun sendiri tidak bisa dihapus. */
 async function hapusAkun(id){
   if(!S.mainAdmin)return;
   if(id===S.uid){alert('Akun Anda sendiri tidak dapat dihapus.');return}
@@ -65,13 +68,49 @@ async function hapusAkun(id){
   /* .select('id') wajib ada: tanpa itu PostgREST melaporkan sukses walau
      RLS memblokir penghapusan dan 0 baris terhapus — akun tampak tidak
      bisa dihapus tanpa pesan apa pun. Baris yang benar-benar terhapus
-     kini diperiksa, dan kegagalan ditampilkan dengan jelas. */
+     kini diperiksa. */
   const {data,error}=await S.supabase.from('profiles').delete().eq('id',id).select('id');
-  if(error){alert('Gagal menghapus akun: '+error.message);return}
-  if(!data||!data.length){
-    alert('Akun tidak terhapus: penghapusan terblokir oleh database. Jalankan ulang berkas supabase/schema.sql terbaru di Supabase SQL Editor (kebijakan hapus akun untuk admin utama ada di sana), lalu coba lagi.');
+  if(!error&&data&&data.length){
+    await loadPendingUsers();render();
     return;
   }
+  /* Penghapusan keras terblokir (kebijakan DELETE untuk admin utama
+     belum aktif di database produksi) atau gagal: JANGAN berhenti di
+     pesan kesalahan seperti sebelumnya — akun harus benar-benar hilang
+     dari daftar. Beralih ke jalur UPDATE, izin yang sama dengan yang
+     dipakai Setujui/Tolak dan sudah terbukti bekerja di database:
+     status diubah menjadi 'rejected' (nilai sah menurut batas kolom
+     approval_status), peran diturunkan, dan nama/email/foto dikosongkan.
+     Hasilnya sama bagi aplikasi: akun hilang dari tab Menunggu maupun
+     Sudah Disetujui, dan alur masuk menolak status 'rejected', jadi
+     akun itu tidak bisa masuk lagi. Bila nanti kebijakan DELETE di
+     schema.sql terbaru dijalankan, penghapusan keras di atas yang
+     lebih dulu bekerja. */
+  const kosong={approval_status:'rejected',role:'member',is_main_admin:false,approved_at:null,approved_by:null,name:null,email:null,avatar_url:null};
+  let gagal=await S.supabase.from('profiles').update(kosong).eq('id',id);
+  if(gagal.error&&/approved_by/.test(gagal.error.message||'')){
+    /* Database lama belum punya kolom approved_by: ulangi tanpa kolom itu */
+    const tanpaBy={...kosong};delete tanpaBy.approved_by;
+    gagal=await S.supabase.from('profiles').update(tanpaBy).eq('id',id);
+  }
+  if(gagal.error){
+    alert('Gagal menghapus akun: '+(error?error.message:gagal.error.message));
+    return;
+  }
+  /* Periksa hasil sebenarnya: baca ulang barisnya. Akun dianggap
+     terhapus hanya bila barisnya sudah tidak ada, atau statusnya sudah
+     'rejected' dan datanya sudah dikosongkan. */
+  const cek=await S.supabase.from('profiles').select('id,approval_status,email').eq('id',id).maybeSingle();
+  const hilang=!cek.data||(cek.data.approval_status==='rejected'&&!cek.data.email);
+  if(!hilang){
+    alert('Akun belum terhapus dari database. Periksa koneksi, lalu coba lagi.');
+    return;
+  }
+  /* Keluarkan dari daftar di ingatan lebih dulu supaya akun langsung
+     hilang dari layar, baru muat ulang daftar dari database. */
+  S.pendingUsers=S.pendingUsers.filter(user=>user.id!==id);
+  S.approvedUsers=S.approvedUsers.filter(user=>user.id!==id);
+  if(typeof updateApprovalBadges==='function')updateApprovalBadges();
   await loadPendingUsers();render();
 }
 /* Jadikan akun terpilih sebagai admin utama (khusus admin utama yang

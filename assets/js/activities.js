@@ -144,7 +144,6 @@ function activityCard(event){
     event.lokasi&&h('p',{class:'activity-meta'},icon('pin',15),h('span',{},event.lokasi)),
     legacyCount>0&&h('p',{class:'warn'},legacyCount+' catatan absensi lama belum terhubung dengan data anggota.'),
     h('h3',{},'Absensi per wilayah'),
-    h('p',{class:'activity-help'},'Pilih wilayah yang akan dikerjakan pengabsenannya:'),
     h('div',{class:'activity-region-pick-grid'},...regionPicks)
   );
   if(S.admin){

@@ -11,9 +11,18 @@ const LOCAL_SESSION_KEY='shikoku-family:session';
    di peramban biasa localStorage tetap dipakai seperti sebelumnya. */
 let memoryLocalUsers=null;
 function localUsers(){
+  /* Cermin ingatan didahulukan: ia selalu berisi salinan TERBARU hasil
+     saveLocalUsers() pada sesi ini. Membaca localStorage lebih dulu
+     berbahaya bila penulisan ke penyimpanan perangkat gagal diam-diam
+     (webview/penyimpanan penuh): salinan lama di sana akan dibaca lagi,
+     sehingga akun yang baru dihapus/diubah muncul kembali apa adanya —
+     penghapusan tampak tidak pernah terjadi. localStorage hanya dibaca
+     sekali, saat cermin masih kosong (awal sesi), lalu hasilnya menjadi
+     cermin untuk sisa sesi. */
+  if(memoryLocalUsers)return memoryLocalUsers;
   try{
     const raw=localStorage.getItem(LOCAL_USERS_KEY);
-    if(raw!==null)return JSON.parse(raw)||[];
+    if(raw!==null){memoryLocalUsers=JSON.parse(raw)||[];return memoryLocalUsers}
   }catch(e){}
   return memoryLocalUsers||[];
 }
