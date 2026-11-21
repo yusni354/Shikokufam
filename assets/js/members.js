@@ -88,7 +88,7 @@ function detailCard(){
     ['Identitas & Keanggotaan',[['Nama lengkap',member.nama],['Nomor HP / WhatsApp',member.wa],['Nomor anggota',code],['Jenis kelamin',member.kelamin],['Tanggal lahir',member.lahir],['Umur',memberAge(member)===null?'-':memberAge(member)+' tahun'],['Peran',member.peran||'Anggota'],['Pernikahan',member.nikah],['MT',member.mt],['Email',member.email],['Instagram',member.instagram],['Facebook',member.facebook]]],
     ['Kontak & Keluarga',[['Nama pengurus daerah',member.pengurus],['Nomor HP pengurus daerah',member.hp_pengurus],['Nama orang tua',member.ortu],['Nomor HP orang tua',member.hp_ortu]]],
     ['Alamat Indonesia',[['Kelompok',member.kelompok],['Desa',member.desa],['Daerah',member.daerah],['Alamat Indonesia',member.alamat_id]]],
-    ['Alamat & Pekerjaan di Jepang',[['Kode pos',member.kodepos],['Alamat',member.alamat_jp],['Stasiun',member.stasiun],['Status visa',member.tinggal],['Bidang pekerjaan',member.bidang],['Perusahaan',member.perusahaan]]],
+    ['Alamat & Pekerjaan di Jepang',[['Kode pos',member.kodepos],['Alamat',member.alamat_jp],['Stasiun',member.stasiun],['Status visa',member.tinggal],['Bidang pekerjaan',member.bidang],['Perusahaan',member.perusahaan],['Posisi pin di peta',(typeof pinManualCoords==='function'&&pinManualCoords(member))?('Posisi manual ('+pinManualCoords(member)[0].toFixed(5)+', '+pinManualCoords(member)[1].toFixed(5)+')'):'Otomatis dari alamat']]],
     ['Catatan',[['Catatan',member.catatan]]]
   ];
   const qrValue=memberQrValue(member);
@@ -348,8 +348,15 @@ async function saveForm(){
     return;
   }
   f.pref=allowedPref;
+  /* Pin manual: hanya koordinat valid yang disimpan; selain itu bidang
+     dibuang supaya anggota kembali ke penempatan otomatis. */
+  if(f.pinManual){
+    const lat=Number(f.pinManual.lat),lng=Number(f.pinManual.lng);
+    if(isFinite(lat)&&isFinite(lng)&&lat>=20&&lat<=50&&lng>=120&&lng<=155)f.pinManual={lat:Number(lat.toFixed(6)),lng:Number(lng.toFixed(6))};
+    else delete f.pinManual;
+  }
   const d={...f};delete d.id;Object.keys(d).forEach(key=>{if(typeof d[key]!=='string')return;const v=cleanMemberValue(d[key]);d[key]=key==='email'?v.toLowerCase():KEEP_CASE.includes(key)?v:v.toUpperCase()});d.peran=d.peran||'ANGGOTA';
-  try{if(f.id)await S.db.collection('members').doc(f.id).set(d);else await S.db.collection('members').add({...d,at:Date.now()});S.form=null;S.memberUploadState=null;render()}catch(e){console.error(e);alert('Tidak bisa menyimpan: '+(e.message||'periksa koneksi dan izin database'))}}
+  try{if(f.id)await S.db.collection('members').doc(f.id).set(d);else await S.db.collection('members').add({...d,at:Date.now()});S.form=null;S.memberUploadState=null;S.formPinOpen=false;S.formPinTemp=null;render()}catch(e){console.error(e);alert('Tidak bisa menyimpan: '+(e.message||'periksa koneksi dan izin database'))}}
 function memberFormCard(){
   const f=S.form;
   if(!f.id&&!f.kode){
@@ -372,12 +379,46 @@ function memberFormCard(){
     S.memberUploadState?.form===f&&h('p',{class:'warn '+(S.memberUploadState.status==='error'?'storage-warning':'')},S.memberUploadState.message),
     h('div',{class:'fl'},pick('Ambil foto','image/jpeg,image/png,image/webp',1,file=>up(file,'foto')),pick('Pilih foto','image/jpeg,image/png,image/webp',0,file=>up(file,'foto'))),
     dropZone('Ganti foto setengah badan','image/jpeg,image/png,image/webp','foto',0))
+  const pinBox=()=>{
+    const manual=(typeof pinManualCoords==='function')?pinManualCoords(f):null;
+    const anak=[
+      h('div',{class:'form-pin-head'},h('b',{},'Posisi Pin di Peta'),h('span',{class:'form-pin-sumber'},manual?'Posisi manual':'Otomatis dari alamat'))
+    ];
+    anak.push(h('p',{class:'sub form-pin-note'},manual
+      ?'Pin manual tersimpan: '+manual[0].toFixed(6)+', '+manual[1].toFixed(6)+'. Posisi ini dipakai di Peta & Wilayah dan tidak digeser oleh geocoding otomatis.'
+      :'Belum ada pin manual. Posisi pin ditentukan otomatis dari alamat & kode pos. Letakkan pin sendiri bila posisi otomatis kurang tepat.'));
+    const tombol=[
+      h('button',{type:'button',class:'btn s',onclick:()=>{
+        if(!S.admin){alert('Hanya admin yang dapat meletakkan pin.');return}
+        S.formPinTemp=manual?[manual[0],manual[1]]:null;
+        S.formPinOpen=true;render();
+        setTimeout(()=>{const el=document.getElementById('form-pin-map');if(el)el.scrollIntoView({behavior:'smooth',block:'center'})},80);
+      }},manual?'Ubah Posisi Pin':'Letakkan Pin di Peta')
+    ];
+    if(manual)tombol.push(h('button',{type:'button',class:'btn s',onclick:()=>{delete f.pinManual;S.formPinTemp=null;S.formPinOpen=false;render()}},'Hapus Pin Manual'));
+    anak.push(h('div',{class:'fl form-pin-actions'},...tombol));
+    if(S.formPinOpen){
+      anak.push(h('div',{class:'form-pin-panel'},
+        h('p',{class:'sub',style:'margin:0 0 8px'},'Ketuk peta untuk meletakkan pin, atau geser penanda ke posisi yang tepat.'),
+        h('div',{id:'form-pin-map',role:'application','aria-label':'Peta untuk meletakkan pin anggota'}),
+        h('p',{class:'form-pin-coords',id:'form-pin-coords'},manual?('Koordinat terpilih: '+manual[0].toFixed(6)+', '+manual[1].toFixed(6)):'Belum ada titik dipilih — ketuk peta untuk meletakkan pin.'),
+        h('div',{class:'fl'},
+          h('button',{type:'button',class:'btn s',onclick:()=>{
+            const t=S.formPinTemp;
+            if(!t||t.length!==2){alert('Ketuk peta dulu untuk memilih titik pin.');return}
+            f.pinManual={lat:Number(Number(t[0]).toFixed(6)),lng:Number(Number(t[1]).toFixed(6))};
+            S.formPinOpen=false;S.formPinTemp=null;render();
+          }},'Pakai Posisi Ini'),
+          h('button',{type:'button',class:'btn s',onclick:()=>{S.formPinOpen=false;S.formPinTemp=null;render()}},'Batal'))));
+    }
+    return h('div',{class:'form-pin-box'},...anak);
+  };
   const documentBox=()=>box(h('b',{},'Foto Surat Sambung'),
     ...(f.surat||[]).map((id,index)=>h('div',{class:'member-file-row'},h('a',{...memberMediaAttributes(id,'href'),target:'_blank'},icon('attachment',16),h('span',{},'Lampiran '+(index+1))),h('button',{class:'btn s btn-eh',onclick:()=>{f.surat=f.surat.filter(value=>value!==id);render()}},'Hapus'))),
     h('div',{class:'fl'},pick('Ambil / foto dokumen','image/*,application/pdf',1,file=>up(file,'surat',1)),pick('Pilih dokumen','image/*,application/pdf',0,file=>up(file,'surat',1))),
     dropZone('Tambah foto atau PDF surat sambung','image/*,application/pdf','surat',1));
   return h('div',{class:'member-editor'},
-    h('div',{class:'member-editor-heading'},h('button',{class:'btn s',onclick:()=>{S.form=null;render()}},'← Kembali'),
+    h('div',{class:'member-editor-heading'},h('button',{class:'btn s',onclick:()=>{S.form=null;S.formPinOpen=false;S.formPinTemp=null;render()}},'← Kembali'),
       h('div',{},h('p',{class:'member-eyebrow'},'DATA KOMUNITAS'),h('h1',{},f.id?'Edit data anggota':'Anggota baru'))),
     topCard(),
     box(h('div',{class:'member-section-heading'},h('b',{},'Profil anggota')),
@@ -387,10 +428,11 @@ function memberFormCard(){
     box(h('div',{class:'member-section-heading'},h('b',{},'Asal di Indonesia')),
       fieldGrid(fld('Kelompok','kelompok',{opts:[],ph:'Pilih kelompok',managed:{key:'kelompok',countUsage:hitungPemakaianAnggota('kelompok')}}),fld('Desa','desa'),fld('Daerah','daerah'),fld('Alamat Indonesia','alamat_id',{area:1}))),
     box(h('div',{class:'member-section-heading'},h('b',{},'Alamat & pekerjaan di Jepang')),
-      fieldGrid(fld('Kode pos','kodepos',{inputmode:'numeric'}),fld('Alamat di Jepang','alamat_jp',{area:1}),fld('Stasiun terdekat','stasiun'),fld('Status visa','tinggal',{opts:TGL,ph:'Pilih status visa',managed:{key:'tinggal',countUsage:hitungPemakaianAnggota('tinggal')}}),fld('Bidang pekerjaan','bidang',{opts:BIDANG_PEKERJAAN_AWAL,ph:'Pilih bidang pekerjaan',managed:{key:'bidang',countUsage:hitungPemakaianAnggota('bidang')}}),fld('Nama perusahaan','perusahaan'))),
+      fieldGrid(fld('Kode pos','kodepos',{inputmode:'numeric'}),fld('Alamat di Jepang','alamat_jp',{area:1}),fld('Stasiun terdekat','stasiun'),fld('Status visa','tinggal',{opts:TGL,ph:'Pilih status visa',managed:{key:'tinggal',countUsage:hitungPemakaianAnggota('tinggal')}}),fld('Bidang pekerjaan','bidang',{opts:BIDANG_PEKERJAAN_AWAL,ph:'Pilih bidang pekerjaan',managed:{key:'bidang',countUsage:hitungPemakaianAnggota('bidang')}}),fld('Nama perusahaan','perusahaan')),
+      S.admin?pinBox():null),
     photoBox(),documentBox(),
     box(h('div',{class:'member-section-heading'},h('b',{},'Catatan tambahan')),fld('Catatan','catatan',{area:1})),
-    h('div',{class:'member-editor-actions'},h('button',{class:'btn s',onclick:()=>{S.form=null;render()}},'Batal'),h('button',{class:'btn',onclick:saveForm},f.id?'Simpan perubahan':'Simpan anggota'))
+    h('div',{class:'member-editor-actions'},h('button',{class:'btn s',onclick:()=>{S.form=null;S.formPinOpen=false;S.formPinTemp=null;render()}},'Batal'),h('button',{class:'btn',onclick:saveForm},f.id?'Simpan perubahan':'Simpan anggota'))
   );
 }
 
@@ -405,8 +447,11 @@ function memberFormCard(){
    Format lama {pemegang:{kunci:uidAnggota}} dimigrasikan otomatis saat
    dibaca: jabatan bawaan menjadi simpul awal dan semua pemegang yang
    sudah ditetapkan dipertahankan pada jabatan yang sama.
-   Hanya admin yang bisa mengubah struktur (mode 'Atur Struktur');
-   anggota biasa hanya melihat tabel susunan kepengurusan. ===== */
+   Hanya admin yang bisa mengubah struktur, dan pengaturannya tampil
+   LANGSUNG di tabel (tidak ada mode khusus); anggota biasa hanya
+   melihat tabel susunan kepengurusan yang bersih. Dokumen yang sama
+   juga menyimpan 'labelKelompokPuncak': tulisan kepala kelompok
+   teratas pada tabel (bawaan 'Pengurus Inti'), yang bisa diubah admin. ===== */
 function susunanBawaan(pemegangSumber){
   const ambil=id=>(pemegangSumber&&pemegangSumber[id])||'';
   const nodes=[
@@ -479,12 +524,22 @@ function susunanKedalaman(nodes,node){
 function pemegangJabatan(node){
   return node&&node.pemegang?S.members.find(member=>member.id===node.pemegang)||null:null;
 }
+/* Tulisan kepala kelompok teratas pada tabel. Tersimpan tersendiri di
+   dokumen susunan sebagai 'labelKelompokPuncak'; kosong = bawaan. */
+function labelKelompokPuncak(){
+  const label=String(S.susunanLabelPuncak||'').trim();
+  return label||'Pengurus Inti';
+}
+async function simpanLabelKelompokPuncak(label){
+  S.susunanLabelPuncak=String(label||'').trim();
+  await simpanSusunan(susunanSimpul());
+}
 async function simpanSusunan(nodes){
   const bersih=susunanBersih(nodes)||[];
   S.susunanSimpul=bersih;
   const map={};bersih.forEach(n=>{if(n.pemegang)map[n.id]=n.pemegang});
   S.susunanPemegang=map;
-  if(S.db)await S.db.collection('pengaturan').doc('susunan_pengurus').set({versi:2,simpul:bersih,at:Date.now()});
+  if(S.db)await S.db.collection('pengaturan').doc('susunan_pengurus').set({versi:2,simpul:bersih,labelKelompokPuncak:String(S.susunanLabelPuncak||'').trim(),at:Date.now()});
 }
 function subscribeSusunan(){
   if(!S.db)return ()=>{};
@@ -492,6 +547,7 @@ function subscribeSusunan(){
     return S.db.collection('pengaturan').onSnapshot(snap=>{
       const doc=(snap.docs||[]).find(d=>d.id==='susunan_pengurus');
       const data=doc&&typeof doc.data==='function'?doc.data():null;
+      const labelBaru=data&&typeof data.labelKelompokPuncak==='string'?data.labelKelompokPuncak:'';
       let next=(data&&Array.isArray(data.simpul))?susunanBersih(data.simpul):null;
       if(!next){
         /* Migrasi format lama {pemegang:{...}}: jabatan bawaan menjadi
@@ -505,7 +561,8 @@ function subscribeSusunan(){
         });
         next=susunanBersih(next);
       }
-      if(JSON.stringify(next)!==JSON.stringify(S.susunanSimpul||null)){
+      if(JSON.stringify(next)!==JSON.stringify(S.susunanSimpul||null)||labelBaru!==String(S.susunanLabelPuncak||'')){
+        S.susunanLabelPuncak=labelBaru;
         S.susunanSimpul=next;
         const map={};(next||[]).forEach(n=>{if(n.pemegang)map[n.id]=n.pemegang});
         S.susunanPemegang=map;
@@ -749,22 +806,22 @@ function susunanPilihLetak(){
 function susunanPanelAtur(nodes,node){
   const isRoot=node.induk===null;
   const current=pemegangJabatan(node);
-  const parts=[h('b',{},'Pengaturan Jabatan — '+node.nama)];
+  const parts=[h('b',{},'Pengaturan Dapukan — '+node.nama)];
   /* — Nama jabatan — */
-  const inputNama=h('input',{type:'text',value:node.nama,maxlength:'60',placeholder:'Nama jabatan'});
+  const inputNama=h('input',{type:'text',value:node.nama,maxlength:'60',placeholder:'Nama dapukan'});
   parts.push(h('div',{class:'org-set-blok'},
-    h('b',{class:'org-set-judul'},'Nama Jabatan'),
+    h('b',{class:'org-set-judul'},'Nama Dapukan'),
     inputNama,
     h('div',{class:'fl'},h('button',{class:'btn s',onclick:async()=>{
       const nama=inputNama.value.trim();
-      if(!nama){alert('Nama jabatan tidak boleh kosong.');return}
+      if(!nama){alert('Nama dapukan tidak boleh kosong.');return}
       try{await gantiNamaJabatan(node.id,nama);render()}
-      catch(error){console.error(error);alert('Gagal mengganti nama jabatan: '+(error.message||'periksa koneksi'))}
+      catch(error){console.error(error);alert('Gagal mengganti nama dapukan: '+(error.message||'periksa koneksi'))}
     }},'Simpan Nama'))));
   /* — Pemegang jabatan — */
   const selPemegang=susunanPilihAnggota(current?current.id:'');
   parts.push(h('div',{class:'org-set-blok'},
-    h('b',{class:'org-set-judul'},'Pemegang Jabatan'),
+    h('b',{class:'org-set-judul'},'Pemegang Dapukan'),
     selPemegang,
     h('div',{class:'fl'},h('button',{class:'btn s',onclick:async()=>{
       try{await tetapkanPengurus(node.id,selPemegang.value||'');render()}
@@ -774,7 +831,7 @@ function susunanPanelAtur(nodes,node){
   if(isRoot){
     parts.push(h('div',{class:'org-set-blok'},
       h('b',{class:'org-set-judul'},'Geser Posisi'),
-      h('p',{class:'sub',style:'margin:0'},'Jabatan puncak: posisinya tetap di paling atas dan tidak dapat dipindah atau dihapus.')));
+      h('p',{class:'sub',style:'margin:0'},'Dapukan puncak: posisinya tetap di paling atas dan tidak dapat dipindah atau dihapus.')));
   }else{
     const sib=susunanAnak(nodes,node.induk);
     const idx=sib.findIndex(n=>n.id===node.id);
@@ -791,17 +848,17 @@ function susunanPanelAtur(nodes,node){
     const selInduk=susunanPilihInduk(nodes,node.induk,susunanKeturunan(nodes,node.id));
     parts.push(h('div',{class:'org-set-blok'},
       h('b',{class:'org-set-judul'},'Geser Posisi'),
-      h('p',{class:'sub',style:'margin:0 0 8px'},'Urutan di antara jabatan setingkat di bawah "'+(susunanCari(nodes,node.induk)||{}).nama+'": posisi '+(idx+1)+' dari '+sib.length+'.'),
+      h('p',{class:'sub',style:'margin:0 0 8px'},'Urutan di antara dapukan setingkat di bawah "'+(susunanCari(nodes,node.induk)||{}).nama+'": posisi '+(idx+1)+' dari '+sib.length+'.'),
       h('div',{class:'fl',style:'margin:0 0 12px'},naik,turun),
-      h('p',{class:'sub',style:'margin:0 0 8px'},'Pindahkan ke bawah jabatan lain:'),
+      h('p',{class:'sub',style:'margin:0 0 8px'},'Pindahkan ke bawah dapukan lain:'),
       selInduk,
       h('div',{class:'fl'},h('button',{class:'btn s',onclick:async()=>{
-        if(selInduk.value===node.induk){alert('Jabatan ini sudah berada di bawah jabatan tersebut.');return}
+        if(selInduk.value===node.induk){alert('Dapukan ini sudah berada di bawah dapukan tersebut.');return}
         try{
           const ok=await pindahIndukJabatan(node.id,selInduk.value);
-          if(!ok){alert('Jabatan tidak dapat dipindah ke bawah dirinya sendiri atau keturunannya.');return}
+          if(!ok){alert('Dapukan tidak dapat dipindah ke bawah dirinya sendiri atau keturunannya.');return}
           render();
-        }catch(error){console.error(error);alert('Gagal memindah jabatan: '+(error.message||'periksa koneksi'))}
+        }catch(error){console.error(error);alert('Gagal memindah dapukan: '+(error.message||'periksa koneksi'))}
       }},'Pindahkan'))));
   }
   /* — Tambah dapukan terhadap jabatan ini — */
@@ -823,14 +880,14 @@ function susunanPanelAtur(nodes,node){
   /* — Hapus jabatan — */
   if(!isRoot){
     parts.push(h('div',{class:'org-set-blok'},
-      h('b',{class:'org-set-judul'},'Hapus Jabatan'),
+      h('b',{class:'org-set-judul'},'Hapus Dapukan'),
       h('div',{class:'fl',style:'margin:0'},orgTombolHapus(nodes,node))));
   }
   parts.push(h('div',{class:'fl',style:'margin-top:16px'},
     h('button',{class:'btn',onclick:tutupPanelSusunan},'Tutup')));
   return box(...parts);
 }
-/* Panel Tambah Dapukan (dari tombol besar '+ Tambah Jabatan Baru'):
+/* Panel Tambah Dapukan (dari tombol besar '+ Tambah Dapukan Baru'):
    pilih jabatan ACUAN, lalu cara letaknya — 'Sejajar dengan acuan'
    (saudara acuan, disisipkan tepat sesudahnya) atau 'Di bawah acuan'
    (anak acuan) — plus nama dan pemegang lewat combobox anggota.
@@ -850,69 +907,84 @@ function susunanPanelTambah(nodes,acuanAwal){
   const selPemegang=susunanPilihAnggota('');
   return box(h('b',{},'Tambah dapukan baru'),
     h('p',{class:'sub',style:'margin:10px 0 8px'},'Nama dapukan:'),input,
-    h('p',{class:'sub',style:'margin:10px 0 8px'},'Jabatan acuan:'),selAcuan,
+    h('p',{class:'sub',style:'margin:10px 0 8px'},'Dapukan acuan:'),selAcuan,
     h('p',{class:'sub',style:'margin:10px 0 8px'},'Letak dapukan baru:'),letak,
     h('p',{class:'sub',style:'margin:10px 0 8px'},'Pemegang dapukan (boleh dikosongkan dulu):'),selPemegang,
     h('div',{class:'fl'},
       h('button',{class:'btn',onclick:async()=>{
         const nama=input.value.trim();
         if(!nama){alert('Isi nama dapukan baru terlebih dahulu.');return}
-        if(!selAcuan.value){alert('Pilih jabatan acuan terlebih dahulu.');return}
+        if(!selAcuan.value){alert('Pilih dapukan acuan terlebih dahulu.');return}
         try{await tambahJabatanLetak(nama,selAcuan.value,letak.value,selPemegang.value||'');tutupPanelSusunan()}
         catch(error){console.error(error);alert('Gagal menambah dapukan: '+(error.message||'periksa koneksi'))}
       }},'Simpan'),
       h('button',{class:'btn s',onclick:tutupPanelSusunan},'Batal')));
 }
-/* ===== Alat mode atur pada kartu/baris jabatan ===== */
+/* ===== Tombol hapus dapukan (dipakai di dalam kartu pengaturan) ===== */
 function orgTombolHapus(nodes,node){
   return h('button',{class:'btn s btn-eh',onclick:async()=>{
     const anak=susunanAnak(nodes,node.id);
-    const pesan='Hapus jabatan "'+node.nama+'"?'+(anak.length?' '+anak.length+' jabatan di bawahnya akan naik ke jabatan di atasnya ("'+(susunanCari(nodes,node.induk)||{}).nama+'").':'')+' Pemegangnya menjadi tidak menjabat.';
+    const pesan='Hapus dapukan "'+node.nama+'"?'+(anak.length?' '+anak.length+' dapukan di bawahnya akan naik ke dapukan di atasnya ("'+(susunanCari(nodes,node.induk)||{}).nama+'").':'')+' Pemegangnya menjadi tidak menjabat.';
     if(!confirm(pesan))return;
     try{
       await hapusJabatan(node.id);
       if(S.susunanPanel&&S.susunanPanel.id===node.id)S.susunanPanel=null;
       render();
-    }catch(error){console.error(error);alert('Gagal menghapus jabatan: '+(error.message||'periksa koneksi'))}
+    }catch(error){console.error(error);alert('Gagal menghapus dapukan: '+(error.message||'periksa koneksi'))}
   }},'Hapus');
-}
-/* Alat mode atur pada kartu/baris jabatan: SATU tombol 'Atur' yang
-   membuka kartu pengaturan jabatan (nama, pemegang, geser, tambah,
-   hapus semua di dalam kartu itu). */
-function orgAlat(nodes,node){
-  return h('div',{class:'org-tools'},
-    h('button',{class:'btn s',onclick:()=>bukaPanelSusunan('atur',node.id)},'Atur'));
 }
 /* ===== SUSUNAN KEPENGURUSAN BERBASIS TABEL =====
    Tampilan hierarki (Bagan) sudah dihapus: halaman Kepengurusan kini
-   langsung menampilkan tabel. Data pohon jabatan tetap dipakai di
-   belakang layar untuk pengelompokan, urutan, dan mode Atur Struktur.
-   Tabel dikelompokkan per cabang: kelompok pertama 'Pengurus Inti'
-   berisi jabatan puncak beserta anak-anak langsungnya; sesudah itu
-   satu kelompok per jabatan yang mempunyai bawahan, dengan nama
-   jabatan itu sebagai kepala kelompok. Di dalam kelompok, kedudukan
-   bawahan ditunjukkan indentasi bertingkat + garis pemandu vertikal
-   di sisi kiri baris, sehingga siapa berada di bawah siapa tetap
-   terbaca sekilas tanpa bagan. */
+   langsung menampilkan tabel. Data pohon dapukan tetap dipakai di
+   belakang layar untuk pengelompokan dan urutan tampil.
+   Tabel dikelompokkan per cabang: kelompok pertama berlabel tersimpan
+   (bawaan 'Pengurus Inti') berisi dapukan puncak beserta anak-anak
+   langsungnya; sesudah itu satu kelompok per dapukan yang mempunyai
+   bawahan, dengan nama dapukan itu sebagai kepala kelompok. Semua
+   baris RATA SEJAJAR (tanpa indentasi dan tanpa garis pemandu) dan
+   diberi nomor urut berjalan 1, 2, 3, … yang berlanjut di seluruh
+   tabel mengikuti urutan struktur. */
+/* Kepala kelompok: pemisah ringan antar kelompok pada tabel. Bagi admin
+   tulisannya bisa disunting langsung lewat ikon pensil di sampingnya:
+   kepala kelompok puncak menyunting label tersimpan 'labelKelompokPuncak',
+   sedangkan kepala kelompok cabang menyunting nama dapukan induknya
+   (jalur ganti nama yang sama, supaya baris dan data tetap seirama). */
 function orgKepalaKelompok(grup){
   const terisi=grup.items.filter(n=>!!pemegangJabatan(n)).length;
   const kosong=grup.items.length-terisi;
-  const subParts=[];
-  if(grup.indukNama)subParts.push('Di bawah '+grup.indukNama);
-  subParts.push(grup.items.length+' jabatan');
+  const subParts=[grup.items.length+' dapukan'];
   if(kosong)subParts.push(kosong+' belum terisi');
   else subParts.push('semua terisi');
+  if(S.admin&&S.susunanLabelEdit&&S.susunanLabelEdit===grup.kunciEdit){
+    const input=h('input',{type:'text',class:'org-group-edit-input',value:grup.nama,maxlength:'60','aria-label':'Tulisan kepala kelompok'});
+    const simpan=async()=>{
+      const teks=input.value.trim();
+      if(!teks){alert('Tulisan kepala kelompok tidak boleh kosong.');return}
+      try{
+        if(grup.nodeId)await gantiNamaJabatan(grup.nodeId,teks);
+        else await simpanLabelKelompokPuncak(teks);
+        S.susunanLabelEdit=null;render();
+      }catch(error){console.error(error);alert('Gagal menyimpan tulisan kepala kelompok: '+(error.message||'periksa koneksi'))}
+    };
+    input.addEventListener('keydown',ev=>{if(ev.key==='Enter'){ev.preventDefault();simpan()}else if(ev.key==='Escape'){S.susunanLabelEdit=null;render()}});
+    setTimeout(()=>{if(input.isConnected){input.focus();input.select()}},0);
+    return h('div',{class:'org-group-head'},
+      h('span',{class:'org-group-ic','aria-hidden':'true'},icon('team',20)),
+      h('div',{class:'org-group-edit'},input,
+        h('button',{class:'btn s',onclick:simpan},'Simpan'),
+        h('button',{class:'btn s',onclick:()=>{S.susunanLabelEdit=null;render()}},'Batal')));
+  }
   return h('div',{class:'org-group-head'},
     h('span',{class:'org-group-ic','aria-hidden':'true'},icon('team',20)),
     h('div',{class:'org-group-head-main'},
       h('h2',{class:'org-group-heading'},grup.nama),
       h('p',{class:'org-group-sub'},subParts.join(' • '))),
+    S.admin?h('button',{class:'org-group-edit-btn',title:'Ubah tulisan kepala kelompok ini','aria-label':'Ubah tulisan kepala kelompok '+grup.nama,onclick:()=>{S.susunanLabelEdit=grup.kunciEdit;render()}},icon('edit',15)):null,
     h('span',{class:'org-group-count'},terisi+'/'+grup.items.length+' terisi'));
 }
-function orgRow(nodes,node,relDepth,urut){
+function orgRow(nodes,node,urut){
   const member=pemegangJabatan(node);
   const depth=susunanKedalaman(nodes,node);
-  const induk=node.induk?susunanCari(nodes,node.induk):null;
   const wilayahTampil=member?memberRegion(member):(node.wilayah||'');
   const waUrl=member&&member.wa?whatsappUrl(member.wa):'';
   /* Sel utama: foto + jabatan (tegas) + nama pemegang di bawahnya */
@@ -925,15 +997,13 @@ function orgRow(nodes,node,relDepth,urut){
       avatar,
       h('span',{class:'org-person-text'},
         h('b',{class:'org-jabatan'},node.nama),
-        h('span',{class:'org-holder'},member.nama||'Nama belum diisi'),
-        induk&&relDepth>0?h('small',{class:'org-under'},'Di bawah '+induk.nama):null));
+        h('span',{class:'org-holder'},member.nama||'Nama belum diisi')));
   }else{
     personEl=h('div',{class:'org-person org-person-empty'},
       h('span',{class:'org-photo org-avatar-ph org-photo-empty'},icon('team',20)),
       h('span',{class:'org-person-text'},
         h('b',{class:'org-jabatan'},node.nama),
-        h('span',{class:'org-vacant'},'Belum ditetapkan'),
-        induk&&relDepth>0?h('small',{class:'org-under'},'Di bawah '+induk.nama):null));
+        h('span',{class:'org-vacant'},'Belum ditetapkan')));
   }
   /* Sel kontak: tombol WhatsApp bila nomor ada, selain itu email/teks */
   let kontakEl;
@@ -946,10 +1016,9 @@ function orgRow(nodes,node,relDepth,urut){
     kontakEl=h('span',{class:'org-kontak-none'},'—');
   }
   const rowClass='org-row org-row-v2'
-    +(relDepth>0?' org-row-child':'')
     +(depth===0?' org-row-root':'')
     +(member?'':' org-row-vacant-row');
-  return h('div',{class:rowClass,style:'--org-indent:'+(relDepth*26)+'px','data-depth':String(depth)},
+  return h('div',{class:rowClass,'data-depth':String(depth)},
     h('span',{class:'org-num','aria-hidden':'true'},String(urut)),
     h('div',{class:'org-c-main'},personEl),
     h('div',{class:'org-c-wilayah'},
@@ -962,14 +1031,13 @@ function orgRow(nodes,node,relDepth,urut){
 function orgTabel(nodes){
   const root=susunanAkar(nodes);
   if(!root)return h('p',{class:'warn'},'Susunan kepengurusan belum tersedia.');
-  /* Kelompok pertama: Pengurus Inti (puncak + anak langsungnya) */
-  const groups=[{nama:'Pengurus Inti',indukNama:null,items:[root,...susunanAnak(nodes,root.id)],baseDepth:0}];
+  /* Kelompok pertama: label kelompok puncak (puncak + anak langsungnya) */
+  const groups=[{nama:labelKelompokPuncak(),kunciEdit:'puncak',nodeId:null,items:[root,...susunanAnak(nodes,root.id)]}];
   const walk=node=>{
     susunanAnak(nodes,node.id).forEach(k=>{
       const kids=susunanAnak(nodes,k.id);
       if(kids.length){
-        const parent=k.induk?susunanCari(nodes,k.induk):null;
-        groups.push({nama:k.nama,indukNama:parent?parent.nama:null,items:kids,baseDepth:susunanKedalaman(nodes,k)});
+        groups.push({nama:k.nama,kunciEdit:'cabang:'+k.id,nodeId:k.id,items:kids});
       }
       walk(k);
     });
@@ -979,24 +1047,23 @@ function orgTabel(nodes){
   const total=nodes.length;
   const terisi=nodes.filter(n=>!!pemegangJabatan(n)).length;
   const summary=h('div',{class:'org-summary'},
-    h('div',{class:'org-summary-item'},h('b',{},String(total)),h('span',{},'Total jabatan')),
+    h('div',{class:'org-summary-item'},h('b',{},String(total)),h('span',{},'Total dapukan')),
     h('div',{class:'org-summary-item'},h('b',{},String(terisi)),h('span',{},'Sudah terisi')),
     h('div',{class:'org-summary-item'},h('b',{},String(total-terisi)),h('span',{},'Belum ditetapkan')),
     h('div',{class:'org-summary-item'},h('b',{},String(groups.length)),h('span',{},'Kelompok')));
-  const hint=h('p',{class:'org-hint'},'Baris yang menjorok ke dalam dengan garis di sisi kirinya adalah bawahan dari jabatan di atasnya. Ketuk nama pengurus untuk melihat kartu ID-nya.');
+  const hint=h('p',{class:'org-hint'},'Daftar disusun mengikuti urutan kepengurusan dari nomor 1 dan seterusnya. Ketuk nama pengurus untuk melihat kartu ID-nya.');
   let urutGlobal=0;
   const groupEls=groups.map(grup=>{
     const rows=grup.items.map(item=>{
       urutGlobal+=1;
-      const relDepth=Math.max(0,susunanKedalaman(nodes,item)-grup.baseDepth);
-      return orgRow(nodes,item,relDepth,urutGlobal);
+      return orgRow(nodes,item,urutGlobal);
     });
     return h('section',{class:'org-table-group'},
       orgKepalaKelompok(grup),
       h('div',{class:'org-table'+(S.admin?' org-table-admin':'')},
         h('div',{class:'org-row org-row-head org-row-head-v2'},
           h('span',{},'No'),
-          h('span',{},'Jabatan & Pengurus'),
+          h('span',{},'Dapukan & Pengurus'),
           h('span',{},'Wilayah'),
           h('span',{},'Kontak'),
           S.admin?h('span',{},''):null),
@@ -1005,23 +1072,25 @@ function orgTabel(nodes){
   return h('div',{class:'org-table-wrap'},summary,hint,...groupEls);
 }
 /* Halaman Kepengurusan: langsung menampilkan susunan berbasis tabel
-   (tanpa pemilih Bagan/Tabel dan tanpa tampilan hierarki). Admin
-   mendapat tombol 'Atur Struktur' untuk membuka mode atur: satu kartu
-   'Pengaturan Jabatan' per jabatan dari tombol Atur pada barisnya. */
+   (tanpa pemilih Bagan/Tabel dan tanpa tampilan hierarki). Tidak ada
+   mode khusus untuk mengatur: bagi ADMIN semua alat pengaturan tampil
+   langsung dan selalu di tabel — tombol '+ Tambah Dapukan Baru' dan
+   'Kembalikan Susunan Awal' di atas tabel, tombol Atur pada tiap baris
+   (membuka satu kartu 'Pengaturan Dapukan'), dan ikon pensil pada tiap
+   kepala kelompok untuk mengubah tulisannya. Anggota biasa hanya
+   melihat tabel yang bersih. */
 function vSusunan(){
   const nodes=susunanSimpul();
-  const atur=!!(S.admin&&S.susunanAtur);
   const out=[h('h1',{},'Kepengurusan'),guard()];
   if(S.admin){
     out.push(h('div',{class:'org-atur-bar'},
-      h('button',{class:'btn s',onclick:()=>{S.susunanAtur=!S.susunanAtur;if(!S.susunanAtur)S.susunanPanel=null;render()}},atur?'Selesai Mengatur':'Atur Struktur'),
-      atur&&h('button',{class:'btn',onclick:()=>bukaPanelSusunan('tambah',null)},'+ Tambah Jabatan Baru'),
-      atur&&h('button',{class:'btn s',onclick:async()=>{
-        if(!confirm('Kembalikan susunan ke jabatan bawaan? Jabatan tambahan akan hilang dan susunan kembali seperti semula; pemegang jabatan bawaan dipertahankan sebisa mungkin.'))return;
+      h('button',{class:'btn',onclick:()=>bukaPanelSusunan('tambah',null)},'+ Tambah Dapukan Baru'),
+      h('button',{class:'btn s',onclick:async()=>{
+        if(!confirm('Kembalikan susunan ke dapukan bawaan? Dapukan tambahan akan hilang dan susunan kembali seperti semula; pemegang dapukan bawaan dipertahankan sebisa mungkin.'))return;
         try{await kembalikanSusunanAwal();S.susunanPanel=null;render()}
         catch(error){console.error(error);alert('Gagal mengembalikan susunan awal: '+(error.message||'periksa koneksi'))}
       }},'Kembalikan Susunan Awal'),
-      atur&&h('p',{class:'sub org-atur-note'},'Mode atur aktif: ketuk tombol Atur pada baris sebuah jabatan untuk membuka satu kartu pengaturannya — ganti nama, tetapkan pemegang, geser posisi (Naik/Turun dan pindah induk), tambah dapukan (sejajar atau di bawah jabatan itu), dan hapus jabatan semuanya di kartu tersebut. Tombol + Tambah Jabatan Baru di atas menambah dapukan terhadap jabatan acuan yang dipilih.')
+      h('p',{class:'sub org-atur-note'},'Pengaturan ada langsung di tabel ini: ketuk tombol Atur pada baris sebuah dapukan untuk membuka satu kartu pengaturannya — ganti nama, tetapkan pemegang, geser posisi (Naik/Turun dan pindah induk), tambah dapukan (sejajar atau di bawah dapukan itu), dan hapus dapukan semuanya di kartu tersebut. Tulisan kepala kelompok (mis. "'+labelKelompokPuncak()+'") bisa diubah lewat ikon pensil di sampingnya.')
     ));
   }
   if(S.admin&&S.susunanPanel){

@@ -122,6 +122,9 @@ function render(){
   /* Halaman Peta: bangun peta Leaflet sesudah DOM terpasang (dijaga di
      dalam initPetaMap sendiri supaya kegagalan peta tidak merusak render) */
   if(typeof initPetaMap==='function')initPetaMap();
+  /* Panel 'Letakkan Pin di Peta' di formulir anggota: bangun petanya
+     sesudah DOM formulir terpasang, bersihkan bila panel ditutup. */
+  if(typeof initFormPinMap==='function')initFormPinMap();
   $('#pet').style.display=S.form?'none':'block';
 }
 function sub(name,key){

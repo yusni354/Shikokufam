@@ -124,23 +124,61 @@ function vApprovals(){
    peta dasar cadangan lokal (assets/japan-basemap.svg). Seluruh modul
    dijaga: bila Leaflet gagal dimuat, halaman tetap tampil. */
 function petaNormKey(v){return String(v||'').toLowerCase().replace(/[^a-z0-9]/g,'')}
+/* ===== Pin manual (pinManual {lat,lng} pada data anggota) =====
+   ATURAN DIDAHULUKAN: pin manual SELALU menang atas hasil geocoding
+   v3. Anggota ber-pin manual tidak dicari koordinatnya lagi oleh mesin
+   geocoding. Menghapus pin manual mengembalikan anggota ke penempatan
+   otomatis dari alamat + kode pos. Hanya admin yang menetapkan pin
+   manual (formulir anggota & mode Perbaiki Posisi Pin di halaman peta). */
+function pinManualCoords(m){
+  const p=m&&m.pinManual;
+  if(!p||typeof p!=='object')return null;
+  const lat=Number(p.lat),lng=Number(p.lng);
+  if(!isFinite(lat)||!isFinite(lng))return null;
+  if(lat<20||lat>50||lng<120||lng>155)return null;
+  return [lat,lng];
+}
+function pinManualObj(coords){return {lat:Number(Number(coords[0]).toFixed(6)),lng:Number(Number(coords[1]).toFixed(6))}}
+/* Simpan / hapus pin manual lewat jalur data anggota yang sudah ada
+   (Supabase app_data & lokal memakai doc.set yang sama seperti simpan
+   profil). pin=null berarti hapus pin manual (kembali otomatis). */
+async function simpanPinManualAnggota(member,pin){
+  if(!S.admin)throw new Error('Hanya admin yang dapat mengubah posisi pin.');
+  if(!member||!member.id||!S.db)throw new Error('Data anggota tidak ditemukan.');
+  const idx=(S.members||[]).findIndex(x=>x.id===member.id);
+  const sumber=idx>=0?S.members[idx]:member;
+  const salin={...sumber};delete salin.id;
+  if(pin)salin.pinManual=pinManualObj([pin.lat!=null?pin.lat:pin[0],pin.lng!=null?pin.lng:pin[1]]);
+  else delete salin.pinManual;
+  /* Perbarui ingatan lebih dulu supaya peta langsung memakai posisi baru
+     walau langganan data tiba sesudahnya. */
+  if(idx>=0){if(pin)S.members[idx].pinManual=salin.pinManual;else delete S.members[idx].pinManual}
+  await S.db.collection('members').doc(member.id).set(salin);
+  return salin.pinManual||null;
+}
 /* Bagi anggota menjadi yang terpetakan dan yang belum. Di v3, pin
    HANYA berasal dari hasil geocoding alamat/kode pos yang tersimpan di
    cache v3 — tidak ada koordinat perkiraan kota/wilayah. Anggota tanpa
    hasil geocode (belum dicoba / gagal) masuk daftar 'belum' dan tidak
-   diberi pin sampai geocoding latar berhasil menempatkannya. */
-function petaBuatEntry(m,i,coords,lvl){
-  return {m,region:memberRegion(m),coords:[coords[0],coords[1]],lvl:lvl||'Kode pos',key:String(m.id||('idx'+i))};
+   diberi pin sampai geocoding latar berhasil menempatkannya.
+   Pengecualian satu-satunya: pin manual admin (lihat di atas). */
+function petaBuatEntry(m,i,coords,lvl,manual){
+  return {m,region:memberRegion(m),coords:[coords[0],coords[1]],lvl:manual?'Posisi manual':(lvl||'Kode pos'),manual:!!manual,key:String(m.id||('idx'+i))};
 }
 function petaEntries(){
   const entries=[],belum=[];
   const cache=petaGeoCacheLoad();
   (S.members||[]).forEach((m,i)=>{
+    const manual=pinManualCoords(m);
+    if(manual){entries.push(petaBuatEntry(m,i,manual,'Posisi manual',true));return}
     const tersimpan=cache[petaGeoKey(m)];
     if(tersimpan&&tersimpan.c)entries.push(petaBuatEntry(m,i,tersimpan.c,tersimpan.l));
     else belum.push(m);
   });
   return {entries,belum};
+}
+function petaSumberLabel(en){
+  return en&&en.manual?'Posisi manual':'Otomatis dari alamat';
 }
 /* ===== Mesin geocoding alamat Jepang v3 — acuan ALAMAT + KODE POS =====
    Perubahan besar dari v2: posisi TIDAK lagi mengacu wilayah/kota.
@@ -381,6 +419,7 @@ async function petaGeocodeEntries(gen){
   const cache=petaGeoCacheLoad();
   const todo=[];
   (S.members||[]).forEach((m,i)=>{
+    if(pinManualCoords(m))return; /* pin manual didahulukan: tidak dicari lagi */
     if(!(m.alamat_jp||m.kodepos))return;
     const gkey=petaGeoKey(m);
     if(gkey in cache)return;
@@ -399,11 +438,11 @@ async function petaGeocodeEntries(gen){
       else{
         gagalJaringan=0;
         cache[item.gkey]=hasil||{c:null};petaGeoCacheSave();
-        if(hasil&&gen===PM.gen){
+        if(hasil&&gen===PM.gen&&!pinManualCoords(item.m)){
           const idkey=String(item.m.id||('idx'+item.i));
           const ada=PM.entries.find(en=>en.key===idkey);
-          if(ada){ada.coords=[hasil.c[0],hasil.c[1]];ada.lvl=hasil.l;const mk=PM.markers[idkey];if(mk)mk.setLatLng(ada.coords)}
-          else PM.entries.push(petaBuatEntry(item.m,item.i,hasil.c,hasil.l));
+          if(ada&&!ada.manual){ada.coords=[hasil.c[0],hasil.c[1]];ada.lvl=hasil.l;const mk=PM.markers[idkey];if(mk)mk.setLatLng(ada.coords)}
+          else if(!ada)PM.entries.push(petaBuatEntry(item.m,item.i,hasil.c,hasil.l));
           petaRefresh();
           const en2=PM.entries.find(en=>en.key===idkey);
           if(en2&&String(S.petaSelected)===idkey)petaShowDetail(en2);
@@ -503,7 +542,58 @@ function petaFiltered(){
 }
 function petaIcon(en,selected){
   const c=regionColor(en.region);
-  return L.divIcon({className:'peta-pin-wrap'+(selected?' peta-pin-selected':''),html:'<div class="peta-pin"><div class="peta-pin-body" style="background:'+c+'"></div></div>',iconSize:[30,38],iconAnchor:[15,36],popupAnchor:[0,-34]});
+  return L.divIcon({className:'peta-pin-wrap'+(selected?' peta-pin-selected':'')+(en&&en.manual?' peta-pin-manual':''),html:'<div class="peta-pin"><div class="peta-pin-body" style="background:'+c+'"></div></div>',iconSize:[30,38],iconAnchor:[15,36],popupAnchor:[0,-34]});
+}
+/* Isi popup pin sebagai elemen DOM (bukan teks HTML) supaya tombol
+   admin di dalamnya — Perbaiki Posisi & Kembalikan Otomatis — bisa
+   diberi penangan ketuk langsung. Popup menampilkan keterangan sumber
+   posisi: 'Posisi manual' atau 'Otomatis dari alamat'. */
+function petaPopupContent(en){
+  const m=en.m;
+  const anak=[
+    h('div',{class:'peta-pop-name'},m.nama||'Tanpa nama'),
+    h('span',{class:'peta-pop-badge',style:'background:'+regionColor(en.region)},en.region),
+    h('div',{class:'peta-pop-addr'},
+      [m.kota,m.pref].filter(Boolean).join(', '),
+      h('br'),alamatJp(m,false),
+      m.stasiun?h('span',{},h('br'),'Stasiun terdekat: '+m.stasiun):null,
+      h('br'),'Sumber posisi: ',h('b',{},petaSumberLabel(en)),
+      en.manual?h('span',{},h('br'),'Koordinat: '+en.coords[0].toFixed(5)+', '+en.coords[1].toFixed(5)):h('span',{},h('br'),'Ketepatan pin: '+(en.lvl||'Kode pos')))
+  ];
+  if(S.admin){
+    const tombol=[
+      h('button',{type:'button',class:'btn s',onclick:ev=>{ev.stopPropagation();petaMulaiPerbaiki(en)}},S.petaFixMode?'Geser pin ini di peta':'Perbaiki Posisi')
+    ];
+    if(en.manual)tombol.push(h('button',{type:'button',class:'btn s',onclick:ev=>{ev.stopPropagation();petaKembalikanOtomatis(en)}},'Kembalikan Otomatis'));
+    anak.push(h('div',{class:'peta-pop-actions'},...tombol));
+  }
+  return h('div',{class:'peta-pop'},...anak);
+}
+/* Aktifkan mode Perbaiki Posisi Pin dan arahkan ke pin anggota ini. */
+function petaMulaiPerbaiki(en){
+  if(!S.admin)return;
+  S.petaFixMode=true;S.petaFixNotice='';
+  S.petaSelected=en.key;
+  render();
+  setTimeout(()=>{
+    const target=PM.entries.find(x=>x.key===en.key);
+    if(target&&PM.map){PM.map.flyTo(target.coords,Math.max(PM.map.getZoom(),13),{duration:.6})}
+    petaSetFixNotice('Mode Perbaiki aktif — geser pin '+(en.m.nama||'anggota')+' ke posisi yang benar, lalu lepaskan. Posisi baru langsung tersimpan.');
+  },80);
+}
+/* Hapus pin manual anggota: pin kembali ke hasil geocoding otomatis. */
+async function petaKembalikanOtomatis(en){
+  if(!S.admin)return;
+  try{
+    await simpanPinManualAnggota(en.m,null);
+    S.petaFixNotice='Pin '+(en.m.nama||'anggota')+' dikembalikan ke posisi otomatis dari alamat.';
+    render();
+  }catch(error){console.error(error);alert('Gagal mengembalikan pin ke otomatis: '+(error.message||'periksa koneksi'))}
+}
+function petaSetFixNotice(txt){
+  S.petaFixNotice=txt||'';
+  const el=document.getElementById('peta-fix-notice');
+  if(el){el.textContent=S.petaFixNotice;el.style.display=S.petaFixNotice?'block':'none'}
 }
 function petaRenderChips(){
   const el=document.getElementById('peta-chips');if(!el)return;
@@ -529,39 +619,66 @@ function petaRenderChips(){
 function petaRenderMarkers(){
   const list=petaFiltered();
   const cnt=document.getElementById('peta-count');if(cnt)cnt.textContent=list.length+' pin tampil';
-  const hint=document.getElementById('peta-hint');if(hint)hint.textContent=S.petaFilter?('Menyaring: '+S.petaFilter):'Menampilkan semua wilayah';
+  const hint=document.getElementById('peta-hint');if(hint)hint.textContent=S.petaFixMode?'Mode Perbaiki Posisi Pin aktif — geser pin untuk memindahkannya':(S.petaFilter?('Menyaring: '+S.petaFilter):'Menampilkan semua wilayah');
   if(!PM.map||!PM.layer||typeof L==='undefined')return;
   petaSpiderCollapse();
   PM.layer.clearLayers();PM.markers={};
+  const bisaGeser=!!(S.admin&&S.petaFixMode);
   list.forEach(en=>{
-    const mk=L.marker(en.coords,{icon:petaIcon(en,String(S.petaSelected)===en.key)});
+    const mk=L.marker(en.coords,{icon:petaIcon(en,String(S.petaSelected)===en.key),draggable:bisaGeser});
     const m=en.m;
-    const popup='<div class="peta-pop"><div class="peta-pop-name">'+petaEsc(m.nama||'Tanpa nama')+'</div>'
-      +'<div class="peta-pop-badge" style="background:'+regionColor(en.region)+'">'+petaEsc(en.region)+'</div>'
-      +'<div class="peta-pop-addr">'+petaEsc([m.kota,m.pref].filter(Boolean).join(', '))+'<br>'+petaEsc(alamatJp(m,false))+(m.stasiun?'<br>Stasiun terdekat: '+petaEsc(m.stasiun):'')+'<br>Ketepatan pin: '+petaEsc(en.lvl||'Kode pos')+'</div></div>';
-    mk.bindPopup(popup,{closeButton:false,maxWidth:280,className:'peta-popup'});
+    mk.bindPopup(petaPopupContent(en),{closeButton:false,maxWidth:280,className:'peta-popup'});
     /* Tooltip hover: nama anggota melayang di atas pin saat kursor diarahkan.
        interactive:false + sticky:false → murni label, hilang saat kursor
        menjauh dan tidak menangkap ketukan di layar sentuh. */
     const tip='<div class="pin-tip-name">'+petaEsc(m.nama||'Tanpa nama')+'</div>'
-      +'<div class="pin-tip-sub"><i style="background:'+regionColor(en.region)+'"></i>'+petaEsc(en.region)+(m.kota?' • '+petaEsc(m.kota):'')+'</div>';
+      +'<div class="pin-tip-sub"><i style="background:'+regionColor(en.region)+'"></i>'+petaEsc(en.region)+(m.kota?' • '+petaEsc(m.kota):'')+(en.manual?' • Posisi manual':'')+'</div>';
     mk.bindTooltip(tip,{direction:'top',offset:[0,-34],className:'pin-tip',sticky:false,interactive:false,opacity:1});
-    /* Hover di atas pin yang bertumpuk: tumpukan MEKAR (spiderfy).
-       Ketuk pada tumpukan (layar sentuh) juga memekarkannya dulu —
-       pin aslinya dipilih sesudah pin mekarnya diketuk. */
-    mk.on('mouseover',()=>petaSpiderHover(en.key));
-    mk.on('mouseout',()=>petaSpiderSchedule());
+    if(bisaGeser){
+      /* Mode Perbaiki: spiderfy MATI, pin langsung bisa digeser. Sesudah
+         digeser & dilepas, koordinat baru langsung tersimpan ke data
+         anggota sebagai pin manual. */
+      mk.on('dragstart',()=>{if(mk.closeTooltip)mk.closeTooltip();if(mk.closePopup)mk.closePopup()});
+      mk.on('dragend',async()=>{
+        const ll=mk.getLatLng();
+        const baru=[ll.lat,ll.lng];
+        try{
+          await simpanPinManualAnggota(m,{lat:baru[0],lng:baru[1]});
+          en.coords=baru;en.manual=true;en.lvl='Posisi manual';
+          if(m&&typeof m==='object')m.pinManual=pinManualObj(baru);
+          mk.setIcon(petaIcon(en,String(S.petaSelected)===en.key));
+          mk.setPopupContent(petaPopupContent(en));
+          petaSetFixNotice('Posisi pin '+(m.nama||'anggota')+' disimpan');
+          if(String(S.petaSelected)===en.key)petaShowDetail(en);
+          petaRenderList();
+        }catch(error){
+          console.error(error);
+          mk.setLatLng(en.coords);
+          petaSetFixNotice('');
+          alert('Gagal menyimpan posisi pin: '+(error.message||'periksa koneksi'));
+        }
+      });
+    }else{
+      /* Hover di atas pin yang bertumpuk: tumpukan MEKAR (spiderfy).
+         Ketuk pada tumpukan (layar sentuh) juga memekarkannya dulu —
+         pin aslinya dipilih sesudah pin mekarnya diketuk. */
+      mk.on('mouseover',()=>petaSpiderHover(en.key));
+      mk.on('mouseout',()=>petaSpiderSchedule());
+    }
     mk.on('click',()=>{
+      if(bisaGeser){S.petaSelected=en.key;petaShowDetail(en);petaRenderList();return}
       const cl=PM.clusterOf[en.key];
       if(cl&&!PM.spider){if(mk.closeTooltip)mk.closeTooltip();petaSpiderExpand(cl);return}
       if(mk.closeTooltip)mk.closeTooltip();petaSelect(en,{popup:true});
     });
     mk.addTo(PM.layer);PM.markers[en.key]=mk;
   });
-  /* Pin TIDAK disebar/digeser secara permanen: posisinya persis di
-     koordinat alamatnya pada semua zoom, walau pin lain berimpit.
-     Yang mekar saat hover hanyalah salinan visual sementara. */
-  petaComputeClusters();
+  /* Pin TIDAK disebar/digeser secara permanen oleh sistem: posisinya
+     persis di koordinatnya pada semua zoom, walau pin lain berimpit.
+     Yang mekar saat hover hanyalah salinan visual sementara — dan
+     mekar itu dimatikan selama mode Perbaiki Posisi Pin aktif. */
+  if(bisaGeser){PM.clusters=[];PM.clusterOf={}}
+  else petaComputeClusters();
 }
 /* ===== Spiderfy: tumpukan pin mekar sementara saat hover/ketuk =====
    Pin yang berimpit (jarak ≤42px di layar pada zoom saat itu) dihitung
@@ -574,6 +691,7 @@ function petaRenderMarkers(){
    dan pin kembali bertumpuk. Zoom/geser peta juga melipat mekar. */
 function petaComputeClusters(){
   PM.clusters=[];PM.clusterOf={};
+  if(S.petaFixMode)return; /* spiderfy nonaktif selama mode Perbaiki */
   if(!PM.map||typeof L==='undefined')return;
   const pts=petaFiltered().map(en=>({en,pt:PM.map.latLngToContainerPoint(en.coords)}));
   const used=new Set();
@@ -605,6 +723,7 @@ function petaSpiderSchedule(){
   PM.spiderTimer=setTimeout(()=>petaSpiderCollapse(),280);
 }
 function petaSpiderHover(key){
+  if(S.petaFixMode)return;
   const cl=PM.clusterOf[key];
   if(!cl)return;
   if(PM.spider&&PM.spider.cluster===cl){petaSpiderKeep();return}
@@ -641,7 +760,7 @@ function petaRenderList(){
     const m=en.m,c=regionColor(en.region);
     return h('li',{},h('button',{type:'button',class:'peta-member-item'+(String(S.petaSelected)===en.key?' on':''),onclick:()=>petaSelect(en,{fly:true,popup:true})},
       h('span',{class:'peta-avatar',style:'background:'+c},petaInisial(m.nama)),
-      h('span',{class:'peta-member-main'},h('strong',{},m.nama||'Tanpa nama'),h('span',{},[m.kota,m.pref].filter(Boolean).join(', ')||'—',m.alamat_jp?' • '+m.alamat_jp:'')),
+      h('span',{class:'peta-member-main'},h('strong',{},m.nama||'Tanpa nama'),h('span',{},[m.kota,m.pref].filter(Boolean).join(', ')||'—',m.alamat_jp?' • '+m.alamat_jp:'',en.manual?' • Posisi manual':'')),
       h('span',{class:'peta-mini-badge',style:'background:'+c},en.region)));
   }));
 }
@@ -661,7 +780,10 @@ function petaShowDetail(en){
   const card=document.getElementById('peta-detail');if(!card)return;
   const m=en.m,c=regionColor(en.region);
   const boxInfo=(label,value)=>h('div',{class:'peta-detail-box'},h('label',{},label),h('p',{},value||'—'));
-  card.replaceChildren(
+  const sumber=en.manual
+    ?'Posisi manual — ditetapkan admin pada '+en.coords[0].toFixed(5)+', '+en.coords[1].toFixed(5)+'. Pin ini tidak digeser geocoding otomatis.'
+    :('Otomatis dari alamat — ketepatan '+(en.lvl||'Kode pos')+(en.lvl==='Alamat'?' (titik hasil geocoding alamat lengkap, dekat titik kode pos alamat ini)':' (titik kawasan kode pos alamat ini)'));
+  const anak=[
     h('div',{class:'peta-detail-top'},
       h('div',{style:'flex:1;min-width:0'},
         h('div',{class:'peta-detail-label'},'Anggota terpilih'),
@@ -673,8 +795,15 @@ function petaShowDetail(en){
     h('div',{class:'peta-detail-grid'},
       boxInfo('Alamat di Jepang',alamatJp(m,false)),
       boxInfo('Stasiun terdekat • Kode pos',[m.stasiun,m.kodepos?('〒'+m.kodepos):''].filter(Boolean).join('  •  ')),
-      boxInfo('Ketepatan posisi pin',(en.lvl||'Kode pos')+(en.lvl==='Alamat'?' — titik hasil geocoding alamat lengkap, dekat titik kode pos alamat ini':' — titik kawasan kode pos alamat ini'))),
-    h('p',{class:'peta-detail-note'},'Ketuk area peta di luar pin untuk menutup detail ini.'));
+      boxInfo('Sumber posisi pin',sumber))
+  ];
+  if(S.admin){
+    const tombol=[h('button',{type:'button',class:'btn s',onclick:()=>petaMulaiPerbaiki(en)},S.petaFixMode?'Geser pin ini di peta':'Perbaiki Posisi')];
+    if(en.manual)tombol.push(h('button',{type:'button',class:'btn s',onclick:()=>petaKembalikanOtomatis(en)},'Kembalikan Otomatis'));
+    anak.push(h('div',{class:'fl',style:'margin-top:12px'},...tombol));
+  }
+  anak.push(h('p',{class:'peta-detail-note'},'Ketuk area peta di luar pin untuk menutup detail ini.'));
+  card.replaceChildren(...anak);
   card.style.display='block';
 }
 function petaHideDetail(){const card=document.getElementById('peta-detail');if(card){card.style.display='none';card.replaceChildren()}}
@@ -689,16 +818,19 @@ function vPeta(){
   const {entries,belum}=petaEntries();
   const stat=(id,val,label)=>h('div',{class:'peta-stat'},h('b',{id},String(val)),h('span',{},label));
   const styleBtn=(key,label)=>h('button',{type:'button',class:'peta-style-btn'+(PM.style===key?' on':''),'data-style':key,'aria-label':'Tampilan peta '+label},label);
+  const fixAktif=!!(S.admin&&S.petaFixMode);
   const mapCard=h('section',{class:'peta-map-card'},
     h('div',{class:'peta-map-head'},
-      h('div',{},h('h2',{},'Peta Jepang — Shikoku & sekitarnya'),h('p',{},'Ketuk pin untuk melihat nama anggota • Geser & zoom bebas')),
+      h('div',{},h('h2',{},'Peta Jepang — Shikoku & sekitarnya'),h('p',{},fixAktif?'Mode Perbaiki Posisi Pin aktif — geser pin ke posisi yang benar':'Ketuk pin untuk melihat nama anggota • Geser & zoom bebas')),
       h('div',{class:'peta-map-head-side'},
         h('div',{class:'peta-style-switch',role:'group','aria-label':'Pilihan tampilan peta'},styleBtn('jalan','Jalan'),styleBtn('satelit','Satelit'),styleBtn('terang','Terang')),
         h('span',{class:'peta-count-badge',id:'peta-count'},entries.length+' pin tampil'))),
+    fixAktif?h('div',{class:'peta-fix-banner'},h('b',{},'Perbaiki Posisi Pin'),h('span',{},'Geser pin anggota ke posisi yang benar lalu lepaskan — posisi baru langsung tersimpan sebagai pin manual. Ketuk "Selesai Memperbaiki" bila sudah.')):null,
+    h('div',{id:'peta-fix-notice',class:'peta-fix-notice',style:S.petaFixNotice?'display:block':'display:none'},S.petaFixNotice||''),
     h('div',{id:'peta-map',role:'application','aria-label':'Peta anggota Shikoku Family'}),
     h('div',{id:'peta-geo-status',class:'peta-geo-status',style:'display:none'}),
     h('div',{id:'peta-notice',class:'peta-notice',style:'display:none'},'Server peta luar sedang tidak terjangkau, jadi yang tampil adalah ',h('b',{},'peta dasar cadangan lokal'),'. Pencarian, saringan wilayah, dan detail anggota tetap bekerja.'),
-    h('div',{class:'peta-map-foot'},h('span',{id:'peta-attrib'},'Memuat peta dasar… • Leaflet'),h('span',{id:'peta-hint'},'Menampilkan semua wilayah')));
+    h('div',{class:'peta-map-foot'},h('span',{id:'peta-attrib'},'Memuat peta dasar… • Leaflet'),h('span',{id:'peta-hint'},fixAktif?'Mode Perbaiki Posisi Pin aktif — geser pin untuk memindahkannya':'Menampilkan semua wilayah')));
   const stats=h('div',{class:'peta-stats'},
     stat('peta-stat-total',(S.members||[]).length,'Total anggota'),
     stat('peta-stat-pin',entries.length,'Terpetakan di peta'),
@@ -708,7 +840,8 @@ function vPeta(){
     h('div',{class:'peta-controls-row'},
       h('label',{class:'peta-search'},icon('search',17),h('input',{id:'peta-search',type:'search',placeholder:'Cari nama anggota…',autocomplete:'off'})),
       h('button',{type:'button',class:'btn s',id:'peta-reset'},'Semua wilayah'),
-      h('button',{type:'button',class:'btn s',id:'peta-shikoku'},'Ke Shikoku')),
+      h('button',{type:'button',class:'btn s',id:'peta-shikoku'},'Ke Shikoku'),
+      S.admin?h('button',{type:'button',class:'btn s'+(fixAktif?' peta-fix-on':''),id:'peta-fix-toggle'},fixAktif?'Selesai Memperbaiki':'Perbaiki Posisi Pin'):null),
     h('div',{class:'peta-legend-head'},h('h3',{},'Legenda warna wilayah'),h('span',{},'Angka = jumlah anggota terpetakan • Ketuk chip untuk menyaring, ketuk lagi untuk membatalkan')),
     h('div',{class:'peta-chips',id:'peta-chips'}));
   const listCard=box(
@@ -740,6 +873,14 @@ function initPetaMap(){
     if(reset)reset.onclick=()=>{S.petaFilter=null;S.petaSearch='';S.petaSelected=null;const s=document.getElementById('peta-search');if(s)s.value='';petaHideDetail();petaRefresh()};
     const ke=document.getElementById('peta-shikoku');
     if(ke)ke.onclick=()=>{if(PM.map)PM.map.flyTo([33.9,133.7],window.innerWidth<640?7:8,{duration:.7})};
+    const fixBtn=document.getElementById('peta-fix-toggle');
+    if(fixBtn)fixBtn.onclick=()=>{
+      if(!S.admin)return;
+      S.petaFixMode=!S.petaFixMode;
+      if(!S.petaFixMode)S.petaFixNotice='';
+      render();
+    };
+    if(S.petaFixMode&&!S.admin)S.petaFixMode=false;
     if(typeof L==='undefined'){
       el.replaceChildren(h('div',{class:'peta-nomap'},h('b',{},'Peta sedang tidak tampil'),h('span',{},'Daftar anggota, legenda, dan saringan wilayah di bawah tetap bisa dipakai.')));
       petaRefresh();
@@ -755,13 +896,103 @@ function initPetaMap(){
     PM.chain=petaChain();
     petaTryBasemap(0);
     petaRefresh();
-    /* Penempatan pin presisi dari alamat lengkap berjalan di latar */
-    petaGeocodeEntries(PM.gen);
+    /* Penempatan pin presisi dari alamat lengkap berjalan di latar —
+       dijeda selama mode Perbaiki Posisi Pin aktif supaya pin yang
+       sedang digeser tidak berpindah sendiri. */
+    if(!S.petaFixMode)petaGeocodeEntries(PM.gen);
     if(S.petaSelected){const en=PM.entries.find(x=>x.key===String(S.petaSelected));if(en)petaShowDetail(en)}
   }catch(e){
     console.error('Peta anggota gagal dimulai (halaman lain tidak terpengaruh):',e);
     PM.map=null;
     try{petaRefresh()}catch(e2){console.error(e2)}
+  }
+}
+
+/* ===== Panel 'Letakkan Pin di Peta' pada formulir anggota =====
+   Peta kecil Leaflet di dalam formulir (bagian alamat di Jepang).
+   Rantai peta dasar sama seperti halaman peta: Esri Jalan → OSM →
+   cadangan lokal SVG. Admin mengetuk peta atau menggeser penanda;
+   titik terpilih disimpan sementara di FP.temp / S.formPinTemp dan
+   baru masuk ke data formulir lewat tombol 'Pakai Posisi Ini' di
+   formulir (tersimpan ke data anggota saat formulir disimpan). */
+const FP={map:null,marker:null,temp:null,tileLayer:null,tileOk:0,tileErr:0,tileTimer:null,idx:0,fallbackLayer:null};
+function formPinCleanup(){
+  if(FP.tileTimer){clearTimeout(FP.tileTimer);FP.tileTimer=null}
+  if(FP.map){try{FP.map.remove()}catch(e){}FP.map=null;FP.marker=null;FP.tileLayer=null;FP.fallbackLayer=null;FP.temp=null}
+}
+function formPinSetCoordsText(){
+  const el=document.getElementById('form-pin-coords');if(!el)return;
+  if(FP.temp)el.textContent='Koordinat terpilih: '+FP.temp[0].toFixed(6)+', '+FP.temp[1].toFixed(6);
+  else el.textContent='Belum ada titik dipilih — ketuk peta untuk meletakkan pin.';
+}
+function formPinSetMarker(coords){
+  if(!FP.map||typeof L==='undefined')return;
+  FP.temp=[coords[0],coords[1]];
+  S.formPinTemp=FP.temp;
+  const icon=L.divIcon({className:'peta-pin-wrap peta-pin-manual',html:'<div class="peta-pin"><div class="peta-pin-body" style="background:#2b7a8c"></div></div>',iconSize:[30,38],iconAnchor:[15,36]});
+  if(FP.marker){FP.marker.setLatLng(FP.temp);FP.marker.setIcon(icon)}
+  else{
+    FP.marker=L.marker(FP.temp,{icon,draggable:true}).addTo(FP.map);
+    FP.marker.on('dragend',()=>{const ll=FP.marker.getLatLng();FP.temp=[ll.lat,ll.lng];S.formPinTemp=FP.temp;formPinSetCoordsText()});
+  }
+  formPinSetCoordsText();
+}
+function formPinTryBasemap(idx){
+  if(!FP.map||typeof L==='undefined')return;
+  FP.idx=idx;FP.tileOk=0;FP.tileErr=0;
+  if(FP.tileTimer){clearTimeout(FP.tileTimer);FP.tileTimer=null}
+  if(FP.tileLayer){try{FP.map.removeLayer(FP.tileLayer)}catch(e){}FP.tileLayer=null}
+  const urutan=[PETA_STYLES.jalan,PETA_STYLES.terang];
+  if(idx>=urutan.length){
+    if(!FP.fallbackLayer)FP.fallbackLayer=L.imageOverlay('assets/japan-basemap.svg',[[31,129],[45.5,145.5]],{opacity:1,interactive:false}).addTo(FP.map);
+    if(FP.marker)FP.marker.bringToFront();
+    return;
+  }
+  const bp=urutan[idx];
+  FP.tileLayer=L.tileLayer(bp.url,bp.opts);
+  FP.tileLayer.on('tileload',()=>{FP.tileOk++;if(FP.tileTimer){clearTimeout(FP.tileTimer);FP.tileTimer=null}});
+  FP.tileLayer.on('tileerror',()=>{FP.tileErr++;const total=FP.tileOk+FP.tileErr;if((FP.tileOk===0&&FP.tileErr>=5)||(total>=8&&FP.tileOk===0))formPinTryBasemap(idx+1)});
+  FP.tileLayer.addTo(FP.map);
+  FP.tileTimer=setTimeout(()=>{if(FP.tileOk===0)formPinTryBasemap(idx+1)},6000);
+}
+/* Posisi awal panel formulir: pin manual yang sudah ada → hasil
+   geocoding alamat saat ini / kawasan kode pos (cache v3) → Shikoku. */
+function formPinTitikAwal(f){
+  const manual=pinManualCoords(f);
+  if(manual)return {coords:manual,zoom:16};
+  try{
+    const cache=petaGeoCacheLoad();
+    const tersimpan=cache[petaGeoKey(f)];
+    if(tersimpan&&tersimpan.c)return {coords:tersimpan.c,zoom:tersimpan.l==='Alamat'?16:13};
+  }catch(e){}
+  return {coords:[33.9,133.7],zoom:8};
+}
+function initFormPinMap(){
+  const el=document.getElementById('form-pin-map');
+  if(!el||!S.form||!S.formPinOpen){
+    if(!el)formPinCleanup();
+    return;
+  }
+  try{
+    formPinCleanup();
+    if(typeof L==='undefined'){
+      el.replaceChildren(h('div',{class:'peta-nomap'},h('b',{},'Peta sedang tidak tampil'),h('span',{},'Periksa koneksi lalu coba lagi. Posisi pin otomatis dari alamat tetap bekerja.')));
+      return;
+    }
+    const f=S.form;
+    const awal=formPinTitikAwal(f);
+    /* Titik mulai panel: pilihan sementara sesi ini (bila panel dibuka
+       lagi tanpa menyimpan) didahulukan, lalu titik awal terbaik. */
+    const mulai=(Array.isArray(S.formPinTemp)&&S.formPinTemp.length===2)?S.formPinTemp:(pinManualCoords(f)||awal.coords);
+    FP.map=L.map(el,{scrollWheelZoom:true}).setView(awal.coords,awal.zoom);
+    formPinTryBasemap(0);
+    FP.map.on('click',ev=>{formPinSetMarker([ev.latlng.lat,ev.latlng.lng])});
+    const punyaTitik=!!(pinManualCoords(f)||(Array.isArray(S.formPinTemp)&&S.formPinTemp.length===2)||formPinTitikAwal(f).zoom>8);
+    if(punyaTitik){formPinSetMarker(mulai);FP.map.setView(mulai,Math.max(awal.zoom,13))}
+    else formPinSetCoordsText();
+    setTimeout(()=>{if(FP.map)FP.map.invalidateSize()},60);
+  }catch(e){
+    console.error('Panel letakkan pin gagal dimulai:',e);
   }
 }
 
