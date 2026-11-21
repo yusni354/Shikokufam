@@ -400,8 +400,9 @@ body.admin-dark .card .e{background:#293946;color:var(--acc)}
 .ringkasan-item{cursor:pointer}
 .ringkasan-item h2{font-size:17px;margin:0}
 .activity-total-note{margin:5px 0 0;font-size:11px;color:var(--mut)}
-.ringkasan-rekap h2{margin:0 0 4px}
-.rekap-wrap{overflow-x:auto;margin-top:10px;border:1px solid var(--line);border-radius:12px}
+.ringkasan-summary,.ringkasan-item,.ringkasan-rekap{display:block;width:100%}
+.ringkasan-rekap{padding:12px}
+.rekap-wrap{overflow-x:auto;overflow-y:hidden;max-width:100%;margin-top:0;border:1px solid var(--line);border-radius:12px;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}
 .rekap-table{border-collapse:separate;border-spacing:0;width:100%;min-width:560px;font-size:12px;background:var(--card)}
 .rekap-table th,.rekap-table td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:center;white-space:nowrap;vertical-align:middle}
 .rekap-table thead th{background:#2c4a5e;color:#fff;font-size:11px;font-weight:700}
@@ -409,7 +410,8 @@ body.admin-dark .card .e{background:#293946;color:var(--acc)}
 .rekap-table thead th.rekap-ev small{display:block;font-size:10px;font-weight:400;opacity:.85}
 .rekap-table thead th.rekap-ev span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .rekap-table th:first-child,.rekap-table td:first-child{position:sticky;left:0;text-align:left}
-.rekap-table thead th:first-child{z-index:2;background:#2c4a5e}
+.rekap-table thead th:first-child{z-index:3;background:#2c4a5e}
+.rekap-table tbody td:first-child{z-index:1;box-shadow:2px 0 0 var(--line)}
 .rekap-table tbody td{background:var(--card)}
 .rekap-table tbody tr:nth-child(even) td{background:#f2f6f3}
 .rekap-table tbody tr:last-child td{border-bottom:0}

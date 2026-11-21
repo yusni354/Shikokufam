@@ -475,8 +475,6 @@ function vRingkasan(){
       h('td',{class:'rekap-num'},pct+'%'));
   }));
   const rekapCard=h('section',{class:'card ringkasan-rekap'},
-    h('h2',{},'Rekap absensi per anggota'),
-    h('p',{class:'activity-meta'},h('span',{},'H = Hadir · I = Izin · C = Cuti · A = Alpha · – = belum tercatat')),
     rekapMembers.length
       ?h('div',{class:'rekap-wrap'},h('table',{class:'rekap-table'},rekapHead,rekapBody))
       :h('p',{class:'warn'},'Belum ada anggota aktif.'));
