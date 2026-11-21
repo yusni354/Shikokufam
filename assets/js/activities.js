@@ -346,7 +346,7 @@ function vAbsensiFokus(event,region){
   };
   updateSummary();
   return h('section',{class:'card absensi-card'},
-    h('button',{class:'btn s absensi-back',onclick:()=>leaveAbsensi()},icon('back',16),h('span',{},'Ganti wilayah')),
+    h('button',{class:'btn s absensi-back',onclick:()=>leaveAbsensi()},icon('back',16),h('span',{},'Kembali')),
     h('p',{class:'absensi-kicker'},'Absensi kegiatan'),
     h('h2',{},event.judul||'Kegiatan komunitas'),
     h('p',{class:'activity-meta'},icon('calendar',15),h('span',{},dateLabel+(event.waktu?' · '+event.waktu:''))),
@@ -359,10 +359,14 @@ function vAbsensiFokus(event,region){
       h('button',{class:'btn',onclick:async()=>{
         try{
           await saveRegionAttendance(event.id,region,draft);
-          feedback.textContent='Absensi wilayah '+region+' tersimpan.';
+          /* Berhasil tersimpan: langsung kembali ke pilihan wilayah
+             pada kartu kegiatan yang sama (kartu tetap terbuka).
+             Bila gagal, tetap di halaman ini dan pesan kesalahan
+             tampil lewat feedback di bawah. */
+          leaveAbsensi();
         }catch(error){console.error(error);feedback.textContent='Gagal menyimpan absensi: '+(error.message||'periksa koneksi')}
       }},'Simpan absensi'),
-      h('button',{class:'btn s',onclick:()=>leaveAbsensi()},'Ganti wilayah')),
+      h('button',{class:'btn s',onclick:()=>leaveAbsensi()},'Kembali')),
     feedback
   );
 }
@@ -753,10 +757,10 @@ function vKegiatan(){
   const events=[...S.events].sort((a,b)=>(b.tanggal||'').localeCompare(a.tanggal||'')||(b.at||0)-(a.at||0));
   const createForm=S.admin&&h('section',{class:'card activity-create'},h('h2',{},'Buat kegiatan'),
     h('div',{class:'activity-create-grid'},
-      h('label',{class:'activity-field activity-field-wide'},'Nama kegiatan *',title),
+      h('label',{class:'activity-field'},'Nama kegiatan *',title),
+      h('label',{class:'activity-field'},'Lokasi',location),
       h('label',{class:'activity-field'},'Tanggal *',date),
-      h('label',{class:'activity-field'},'Waktu',time),
-      h('label',{class:'activity-field activity-field-wide'},'Lokasi',location)),
+      h('label',{class:'activity-field'},'Waktu',time)),
     h('button',{class:'btn',onclick:async()=>{
       const judul=title.value.trim();
       if(!judul||!date.value){alert('Isi nama dan tanggal kegiatan.');return}
