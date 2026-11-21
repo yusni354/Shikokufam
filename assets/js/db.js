@@ -33,11 +33,17 @@ function createSupabaseDb(client){
             callback({docs:(data||[]).map(row=>({id:row.id,data:()=>({...row.data})}))});
           }catch(error){reportError(error)}
         };
+        /* Data SELALU diambil lewat REST lebih dulu. Kanal realtime hanya
+           pemicu penyegaran tambahan: bila websocket gagal/tertutup, daftar
+           tetap terisi dari pengambilan REST ini dan berikutnya. Dulu
+           pengambilan pertama menunggu status SUBSCRIBED, jadi sekali
+           realtime gagal, seluruh data tidak pernah dimuat. */
+        void refresh();
         const channel=client.channel('app-data-'+name+'-'+Math.random().toString(36).slice(2));
         channel.on('postgres_changes',{event:'*',schema:'public',table:'app_data',filter:'collection=eq.'+name},()=>{clearTimeout(timer);timer=setTimeout(()=>{void refresh()},300)});
         channel.subscribe(status=>{
           if(status==='SUBSCRIBED')void refresh();
-          else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT')reportError(new Error('Koneksi realtime Supabase gagal ('+status+').'));
+          else if(status==='CHANNEL_ERROR'||status==='TIMED_OUT'||status==='CLOSED')console.warn('Realtime Supabase tidak tersedia untuk koleksi '+name+' ('+status+'); data tetap dimuat lewat REST.');
         });
         return ()=>{active=false;request++;clearTimeout(timer);void client.removeChannel(channel)};
       },

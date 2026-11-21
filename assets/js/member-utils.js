@@ -22,17 +22,22 @@ const regionMigrationPending=new Set();
 function migrateMemberRegions(){
   if(!S.db||!Array.isArray(S.members))return;
   S.members.forEach(member=>{
-    const target=legacyRegionTarget(member);
-    if(!target||!member.id||regionMigrationPending.has(member.id))return;
-    regionMigrationPending.add(member.id);
-    const stored=target.toUpperCase();
-    member.wilayah=stored;
-    setTimeout(()=>{
-      Promise.resolve()
-        .then(()=>S.db.collection('members').doc(member.id).update({wilayah:stored}))
-        .catch(error=>console.error('Migrasi wilayah anggota gagal:',error))
-        .finally(()=>regionMigrationPending.delete(member.id));
-    },0);
+    /* Dijaga per anggota: satu data lama yang bentuknya tidak biasa tidak
+       boleh melempar error yang menghentikan pemrosesan anggota lain
+       atau gambar ulang daftar. */
+    try{
+      const target=legacyRegionTarget(member);
+      if(!target||!member.id||regionMigrationPending.has(member.id))return;
+      regionMigrationPending.add(member.id);
+      const stored=target.toUpperCase();
+      member.wilayah=stored;
+      setTimeout(()=>{
+        Promise.resolve()
+          .then(()=>S.db.collection('members').doc(member.id).update({wilayah:stored}))
+          .catch(error=>console.error('Migrasi wilayah anggota gagal:',error))
+          .finally(()=>regionMigrationPending.delete(member.id));
+      },0);
+    }catch(error){console.error('Migrasi wilayah satu anggota dilewati:',error)}
   });
 }
 function wilayah(){const m={};S.members.forEach(x=>{const w=memberRegion(x);(m[w]=m[w]||[]).push(x)});return m}

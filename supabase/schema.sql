@@ -376,7 +376,7 @@ create policy "Message participants can send replies"
 -- Shared application data for members, events, forum topics, duties, and map pins.
 create table if not exists public.app_data (
   collection text not null
-    check (collection in ('members', 'events', 'topics', 'cleaning_duties', 'pin', 'musyawarah')),
+    check (collection in ('members', 'events', 'topics', 'cleaning_duties', 'pin', 'musyawarah', 'pengaturan')),
   id text not null,
   data jsonb not null
     check (jsonb_typeof(data) = 'object'),
@@ -388,11 +388,12 @@ create table if not exists public.app_data (
 create index if not exists app_data_collection_updated_at_idx
   on public.app_data (collection, updated_at desc);
 
--- Database lama: longgarkan batas koleksi agar catatan musyawarah ikut tersimpan.
+-- Database lama: longgarkan batas koleksi agar catatan musyawarah dan
+-- pengaturan (pesan sambutan) ikut tersimpan.
 alter table public.app_data drop constraint if exists app_data_collection_check;
 alter table public.app_data
   add constraint app_data_collection_check
-  check (collection in ('members', 'events', 'topics', 'cleaning_duties', 'pin', 'musyawarah'));
+  check (collection in ('members', 'events', 'topics', 'cleaning_duties', 'pin', 'musyawarah', 'pengaturan'));
 
 alter table public.app_data enable row level security;
 alter table public.app_data replica identity full;

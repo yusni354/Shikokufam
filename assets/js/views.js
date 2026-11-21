@@ -29,6 +29,12 @@ function renderDrawer(){
   d.replaceChildren(h('p',{class:'sub',style:'padding:0 14px'},h('b',{style:'color:var(--ink)'},'KOMUNITAS ID-JP')),
     ...ALL.filter(x=>!x[2]||(x[3]?S.mainAdmin:S.admin)).map(x=>h('a',{class:S.view===x[0]?'on':'',href:'#',onclick:navTo(x[0]),...(x[0]==='pesan'?{'data-message-nav':'true'}:{})},
       icon(x[4],19),h('span',{},x[1]),x[0]==='pesan'&&S.unreadMessages>0&&h('span',{class:'nav-badge'},String(S.unreadMessages)))),
+    /* Jalan kembali ke mode online: hanya tampil saat perangkat ini sedang
+       memakai mode lokal padahal Supabase tersedia. Tanpa ini, sekali flag
+       mode lokal terpasang tidak ada jalan keluar yang terlihat. */
+    ...((!S.supabase&&typeof localModeForced==='function'&&localModeForced()&&window.SUPABASE_CONFIG?.url&&window.SUPABASE_CONFIG?.anonKey)
+      ?[h('button',{class:'menu-logout',onclick:()=>exitLocalMode()},icon('back',17),h('span',{},'Kembali ke Mode Online'))]
+      :[]),
     h('button',{class:'menu-logout',onclick:()=>signOut()},icon('logout',17),h('span',{},'Keluar')));
 }
 function render(){
@@ -95,7 +101,9 @@ function sub(name,key){
     const next=s.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(a.at||0)-(b.at||0));
     const previous=JSON.stringify(S[key]||[]);
     S[key]=next;
-    if(key==='members'&&typeof migrateMemberRegions==='function')migrateMemberRegions();
+    /* Migrasi wilayah tidak boleh menghentikan gambar ulang: error di satu
+       anggota lama tidak boleh membuat seluruh daftar tampak kosong. */
+    if(key==='members'&&typeof migrateMemberRegions==='function'){try{migrateMemberRegions()}catch(error){console.error('Migrasi wilayah anggota gagal (diabaikan):',error)}}
     if(JSON.stringify(next)!==previous||hadError){
       /* Buku catatan Musyawarah mengelola tampilannya sendiri saat terbuka:
          data baru digabungkan tanpa menggambar ulang editor yang sedang dipakai. */
@@ -116,14 +124,21 @@ function stopDataSubscriptions(){
 function startDataSubscriptions(){
   stopDataSubscriptions();
   if(!S.db)return;
-  dataUnsubscribers=[
-    sub('members','members'),
-    sub('events','events'),
-    sub('topics','topics'),
-    sub('cleaning_duties','cleaningDuties'),
-    sub('pin','pins'),
-    sub('musyawarah','musyawarah'),
-  ];
-  if(!S.supabase)dataUnsubscribers.push(sub('pengaturan','pengaturan'));
-  dataUnsubscribers.push(subscribeSambutan());
+  /* Setiap langganan dijaga sendiri-sendiri: satu langganan yang gagal
+     (mis. koleksi baru yang belum dikenal skema lama) TIDAK boleh memutus
+     atau mencegah langganan lain, terutama 'members'. */
+  const add=subscribe=>{
+    try{
+      const unsubscribe=subscribe();
+      if(typeof unsubscribe==='function')dataUnsubscribers.push(unsubscribe);
+    }catch(error){console.error('Satu langganan data gagal dimulai (langganan lain tetap jalan):',error)}
+  };
+  add(()=>sub('members','members'));
+  add(()=>sub('events','events'));
+  add(()=>sub('topics','topics'));
+  add(()=>sub('cleaning_duties','cleaningDuties'));
+  add(()=>sub('pin','pins'));
+  add(()=>sub('musyawarah','musyawarah'));
+  if(!S.supabase)add(()=>sub('pengaturan','pengaturan'));
+  add(()=>subscribeSambutan());
 }

@@ -11,7 +11,27 @@ render();
   // agar isi aplikasi tetap bisa dibuka di perangkat ini tanpa akun Supabase.
   let forceLocal = false;
   try { forceLocal = localStorage.getItem('shikoku-family:force-local') === '1'; } catch (e) {}
-  const hasSupabase = !forceLocal && window.supabase && window.SUPABASE_CONFIG?.url && window.SUPABASE_CONFIG?.anonKey;
+  const supabaseReady = Boolean(window.supabase && window.SUPABASE_CONFIG?.url && window.SUPABASE_CONFIG?.anonKey);
+  if (forceLocal && supabaseReady) {
+    /* Sesi Supabase yang masih valid SELALU menang atas mode lokal.
+       Flag mode lokal bisa tertinggal di peramban (tombol mode lokal atau
+       jalan pintas lama); tanpa pemeriksaan ini aplikasi menampilkan data
+       lokal yang kosong padahal pengguna sebenarnya masih masuk ke
+       Supabase dan datanya utuh di sana. Bila ada sesi, flag dibersihkan
+       dan aplikasi berjalan online seperti biasa. */
+    try {
+      const probe = window.supabase.createClient(window.SUPABASE_CONFIG.url, window.SUPABASE_CONFIG.anonKey);
+      const probed = await Promise.race([
+        probe.auth.getSession(),
+        new Promise(resolve => setTimeout(() => resolve(null), 4000))
+      ]);
+      if (probed?.data?.session?.user) {
+        try { localStorage.removeItem('shikoku-family:force-local'); } catch (e) {}
+        forceLocal = false;
+      }
+    } catch (e) { /* Pemeriksaan gagal: boot ini tetap mode lokal, dicoba lagi pada muat berikutnya */ }
+  }
+  const hasSupabase = !forceLocal && supabaseReady;
   if (!hasSupabase) {
     // Tanpa Supabase: pakai penyimpanan lokal di perangkat (mode uji coba),
     // dengan sesi akun lokal agar alur masuk/persetujuan tetap berjalan penuh
