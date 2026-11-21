@@ -1148,8 +1148,8 @@ function orgRow(nodes,node,urut){
   /* Sel kontak: tombol WhatsApp bila nomor ada, selain itu email/teks */
   let kontakEl;
   if(member&&waUrl){
-    kontakEl=h('a',{class:'org-wa-btn',href:waUrl,target:'_blank',rel:'noopener noreferrer',title:'Chat WhatsApp '+(member.nama||'')},
-      icon('phone',15),h('span',{},'WhatsApp'));
+    kontakEl=h('a',{class:'org-wa-btn',href:waUrl,target:'_blank',rel:'noopener noreferrer',title:'WhatsApp','aria-label':'WhatsApp'},
+      icon('whatsapp',20));
   }else if(member&&member.email){
     kontakEl=h('span',{class:'org-kontak-text'},member.email);
   }else{
