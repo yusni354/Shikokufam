@@ -417,7 +417,14 @@ body.admin-dark .card .e{background:#293946;color:var(--acc)}
 .activity-card{cursor:pointer}
 .ringkasan-year{max-width:220px}
 .ringkasan-year select{margin:4px 0 0}
+.ringkasan-filters{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:flex-start;margin:0 0 12px}
+.ringkasan-filters .ringkasan-year,.ringkasan-filters .ringkasan-month{flex:1 1 140px;max-width:220px;margin:0}
+.ringkasan-month select{margin:4px 0 0}
 .ringkasan-summary{margin-bottom:12px}
+.ringkasan-summary-bawah{margin:12px 0 0}
+.rekap-head-info{margin:0 0 10px}
+.rekap-title{margin:0 0 3px;font-size:16px}
+.rekap-subtitle{margin:0;font-size:12px;color:var(--mut)}
 .ringkasan-summary h2{margin:0 0 4px}
 .ringkasan-item{cursor:pointer}
 .ringkasan-item h2{font-size:17px;margin:0}

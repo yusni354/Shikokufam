@@ -688,6 +688,11 @@ function activityYear(event){
   const y=parseInt(String(event.tanggal||'').slice(0,4),10);
   return Number.isNaN(y)?null:y;
 }
+function activityMonth(event){
+  const m=parseInt(String(event.tanggal||'').slice(5,7),10);
+  return Number.isNaN(m)||m<1||m>12?null:m;
+}
+const NAMA_BULAN=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
 function vRingkasan(){
   const currentYear=new Date().getFullYear();
   const ruang=ringkasanRuangAktif();
@@ -702,24 +707,48 @@ function vRingkasan(){
     ...(S.cleaningDuties||[]).map(duty=>tahunDariTanggal(duty.tanggal))
   ].filter(y=>y!=null))].sort((a,b)=>b-a);
   const selected=years.includes(S.ringkasanTahun)?S.ringkasanTahun:currentYear;
-  const yearSelect=h('select',{'aria-label':'Pilih tahun',onchange:e=>{S.ringkasanTahun=Number(e.target.value);render()}},
+  /* Kegiatan pada tahun terpilih & bulan-bulan yang memiliki kegiatan
+     di tahun itu (hanya dipakai ruangan Kegiatan untuk pemilih Bulan). */
+  const eventsTahunIni=S.events.filter(event=>activityYear(event)===selected);
+  const bulanTersedia=[...new Set(eventsTahunIni.map(activityMonth).filter(m=>m!=null))].sort((a,b)=>a-b);
+  const bulanTerpilih=bulanTersedia.includes(S.ringkasanBulan)?S.ringkasanBulan:(bulanTersedia.length?bulanTersedia[bulanTersedia.length-1]:null);
+  if(ruang==='kegiatan'&&bulanTerpilih!=null)S.ringkasanBulan=bulanTerpilih;
+  const yearSelect=h('select',{'aria-label':'Pilih tahun',onchange:e=>{S.ringkasanTahun=Number(e.target.value);S.ringkasanBulan=null;render()}},
     ...years.map(y=>h('option',{value:String(y)},String(y))));
   yearSelect.value=String(selected);
+  let monthSelect=null;
+  if(ruang==='kegiatan'&&bulanTersedia.length){
+    monthSelect=h('select',{'aria-label':'Pilih bulan',onchange:e=>{S.ringkasanBulan=Number(e.target.value);render()}},
+      ...bulanTersedia.map(m=>h('option',{value:String(m)},NAMA_BULAN[m-1])));
+    monthSelect.value=String(bulanTerpilih);
+  }
   const tabs=h('nav',{class:'ringkasan-tabs','aria-label':'Ruangan laporan'},
     ...RINGKASAN_RUANG.map(([key,label])=>h('button',{type:'button',class:'ringkasan-tab'+(ruang===key?' on':''),'aria-pressed':ruang===key?'true':'false',onclick:()=>{if(ruang!==key)setRingkasanRuang(key)}},label)));
   const head=[h('h1',{},'Ringkasan & Laporan'),guard(),tabs];
-  /* Ruangan Anggota adalah potret saat ini: pemilih tahun tidak tampil di sana. */
-  if(ruang!=='anggota')head.push(h('label',{class:'activity-field ringkasan-year'},'Tahun',yearSelect));
+  /* Ruangan Anggota adalah potret saat ini: pemilih tahun tidak tampil di sana.
+     Ruangan Kegiatan: pemilih Tahun + pemilih Bulan berdampingan dengan
+     gaya yang sama, di dalam satu baris saringan. */
+  if(ruang!=='anggota'){
+    if(monthSelect){
+      head.push(h('div',{class:'ringkasan-filters'},
+        h('label',{class:'activity-field ringkasan-year'},'Tahun',yearSelect),
+        h('label',{class:'activity-field ringkasan-month'},'Bulan',monthSelect)));
+    }else{
+      head.push(h('label',{class:'activity-field ringkasan-year'},'Tahun',yearSelect));
+    }
+  }
   if(ruang==='anggota')return [...head,...vRingkasanAnggota()];
   if(ruang==='keuangan')return [...head,...vRingkasanKeuangan(selected)];
   if(ruang==='piket')return [...head,...vRingkasanPiket(selected)];
-  /* Ruangan Kegiatan: ringkasan setahun + tabel rekap per anggota.
-     Daftar kartu per kegiatan hanya ada di halaman Kegiatan. */
-  const events=S.events.filter(event=>activityYear(event)===selected)
+  /* Ruangan Kegiatan: tabel rekap SATU BULAN terpilih di atas, lalu
+     kartu ringkasan tahunan di bagian bawah. Daftar kartu per kegiatan
+     hanya ada di halaman Kegiatan. */
+  const events=[...eventsTahunIni]
     .sort((a,b)=>(b.tanggal||'').localeCompare(a.tanggal||'')||(b.at||0)-(a.at||0));
-  if(!events.length){
+  if(!events.length||bulanTerpilih==null){
     return [...head,h('p',{class:'warn'},'Belum ada kegiatan pada tahun '+selected+'.')];
   }
+  const namaBulanTerpilih=NAMA_BULAN[bulanTerpilih-1];
   const totalAnggota=S.members.filter(member=>String(member.status||'aktif').toLowerCase()!=='nonaktif').length;
   const yearTotals={hadir:0,izin:0,cuti:0,alpha:0};
   events.forEach(event=>{const t=activityTotals(event);Object.keys(yearTotals).forEach(k=>{yearTotals[k]+=t[k]})});
@@ -728,18 +757,22 @@ function vRingkasan(){
      sisa 'Belum tercatat' berarti slot anggota×kegiatan yang belum
      tercatat statusnya. */
   const yearView=activityTotalsView(yearTotals,totalAnggota*events.length);
-  const summaryCard=h('section',{class:'card ringkasan-summary'},
+  /* Kartu ringkasan TAHUNAN: isinya tetap setahun penuh (tidak mengikuti
+     bulan terpilih) dan kini diletakkan di BAGIAN BAWAH ruangan ini,
+     sesudah tabel rekap. */
+  const summaryCard=h('section',{class:'card ringkasan-summary ringkasan-summary-bawah'},
     h('h2',{},'Ringkasan tahun '+selected),
     h('p',{class:'activity-meta'},icon('calendar',15),h('span',{},events.length+' kegiatan pada tahun ini')),
     yearView.pills,yearView.chart,yearView.legend);
-  /* ===== Laporan rekap per anggota: tabel lengkap setahun =====
+  /* ===== Laporan rekap per anggota: tabel SATU BULAN terpilih =====
      Satu baris per anggota aktif (urut wilayah mengikuti urutan resmi
-     wilayahEfektif, lalu nama), satu kolom per kegiatan tahun terpilih
-     (urut tanggal menaik seperti buku laporan), sel berisi huruf status
-     dari peta status yang sama dengan kartu kegiatan — H/I/C/A, atau
-     strip bila anggota belum tercatat pada kegiatan itu (berbeda dari
-     Alpha tersimpan). Ujung kanan: total tiap status sepanjang tahun
-     dan persen kehadiran = Hadir ÷ jumlah kegiatan tahun itu × 100. */
+     wilayahEfektif, lalu nama), satu kolom per kegiatan pada BULAN
+     terpilih saja (urut tanggal menaik seperti buku laporan), sel berisi
+     huruf status dari peta status yang sama dengan kartu kegiatan —
+     H/I/C/A, atau strip bila anggota belum tercatat pada kegiatan itu
+     (berbeda dari Alpha tersimpan). Ujung kanan: total tiap status pada
+     bulan terpilih itu saja dan persen kehadiran = Hadir ÷ jumlah
+     kegiatan bulan itu × 100. */
   const REKAP_HURUF={hadir:'H',izin:'I',cuti:'C',alpha:'A'};
   /* Singkatan nama kegiatan untuk kepala kolom: inisial huruf pertama
      tiap kata, huruf besar ('Sambung Kebaikan' → 'SK', 'Ngaji 2' →
@@ -751,7 +784,8 @@ function vRingkasan(){
     if(kata.length===1&&kata[0].length<=4)return kata[0].toUpperCase();
     return kata.map(k=>k.charAt(0).toUpperCase()).join('');
   };
-  const rekapEvents=[...events].sort((a,b)=>(a.tanggal||'').localeCompare(b.tanggal||'')||(a.at||0)-(b.at||0));
+  const rekapEvents=events.filter(event=>activityMonth(event)===bulanTerpilih)
+    .sort((a,b)=>(a.tanggal||'').localeCompare(b.tanggal||'')||(a.at||0)-(b.at||0));
   const regionOrder=new Map(wilayahEfektif().map(([name],index)=>[name,index]));
   const rekapMembers=S.members
     .filter(member=>String(member.status||'aktif').toLowerCase()!=='nonaktif')
@@ -787,11 +821,11 @@ function vRingkasan(){
       if(S.admin)props.onclick=()=>{S.rekapDialog={id:event.id,judul:namaPenuh,tanggal:event.tanggal||'',tahap:'atur'};render()};
       return h('th',props,h('small',{},shortDate(event)),label);
     }),
-    h('th',{class:'rekap-sum-start',title:'Total Hadir sepanjang tahun'},'Hadir'),
-    h('th',{title:'Total Izin sepanjang tahun'},'Izin'),
-    h('th',{title:'Total Cuti sepanjang tahun'},'Cuti'),
-    h('th',{title:'Total Alpha sepanjang tahun'},'Alpha'),
-    h('th',{title:'Persen kehadiran sepanjang tahun'},'% Hadir')));
+    h('th',{class:'rekap-sum-start',title:'Total Hadir pada bulan terpilih'},'Hadir'),
+    h('th',{title:'Total Izin pada bulan terpilih'},'Izin'),
+    h('th',{title:'Total Cuti pada bulan terpilih'},'Cuti'),
+    h('th',{title:'Total Alpha pada bulan terpilih'},'Alpha'),
+    h('th',{title:'Persen kehadiran pada bulan terpilih'},'% Hadir')));
   /* Kelompok per wilayah: anggota sudah terurut wilayah lalu nama,
      jadi tiap kelompok didahului SATU baris pembatas selebar penuh
      tabel (nama wilayah + jumlah anggota + chevron) yang bisa diklik
@@ -853,10 +887,15 @@ function vRingkasan(){
   });
   const rekapBody=h('tbody',{},...barisRekap);
   const rekapCard=h('section',{class:'card ringkasan-rekap'},
+    h('div',{class:'rekap-head-info'},
+      h('h3',{class:'rekap-title'},'Rekap '+namaBulanTerpilih+' '+selected),
+      h('p',{class:'rekap-subtitle'},rekapEvents.length+' kegiatan pada bulan ini · Total Hadir, Izin, Cuti, Alpha, dan % Hadir dihitung dari bulan ini saja')),
     rekapMembers.length
       ?h('div',{class:'rekap-wrap'},h('table',{class:'rekap-table'},rekapHead,rekapBody))
       :h('p',{class:'warn'},'Belum ada anggota aktif.'));
-  return [...head,summaryCard,rekapCard,dialogRekapKegiatan()];
+  /* Susunan akhir: saringan Tahun+Bulan → tabel rekap bulan terpilih →
+     kartu ringkasan tahunan di paling bawah. */
+  return [...head,rekapCard,summaryCard,dialogRekapKegiatan()];
 }
 /* ===== Panel pengaturan kegiatan dari kepala kolom tabel rekap =====
    Dibuka dengan mengklik kepala kolom sebuah kegiatan di tabel rekap
