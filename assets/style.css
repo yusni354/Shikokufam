@@ -365,8 +365,17 @@ body.admin-dark .card .e{background:#293946;color:var(--acc)}
 .activity-heading .btn{flex:none}
 .activity-meta,.activity-description,.activity-help{color:var(--mut);margin:4px 0}
 .activity-meta{display:flex;align-items:center;gap:6px}
-.activity-counts{display:flex;gap:8px;margin:12px 0}
-.activity-counts b{padding:7px 10px;border-radius:999px;background:var(--line);font-size:13px}
+.activity-counts{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 2px}
+.activity-counts b{display:inline-flex;align-items:center;gap:6px;padding:7px 10px;border-radius:999px;background:var(--line);font-size:13px}
+.activity-counts b::before{content:'';flex:none;width:8px;height:8px;border-radius:50%;background:#718096}
+.activity-counts b.c-hadir::before{background:#2e9e63}
+.activity-counts b.c-izin::before{background:#f2b544}
+.activity-counts b.c-cuti::before{background:#2f8fc1}
+.activity-counts b.c-alpha::before{background:#d9534f}
+.activity-card{cursor:pointer}
+.activity-heading-side{display:flex;align-items:flex-start;gap:8px;flex:none}
+.activity-chevron{flex:none;font-size:24px;line-height:1;color:var(--mut);transition:transform .18s ease;transform:rotate(90deg)}
+.activity-card.open .activity-chevron{transform:rotate(-90deg)}
 .activity-card h3{margin:16px 0 8px;font-size:16px}
 .activity-region-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .activity-region-section{min-width:0;padding:12px;border:1px solid var(--line);border-radius:16px;background:var(--card)}

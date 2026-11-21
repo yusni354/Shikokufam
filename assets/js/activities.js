@@ -103,37 +103,50 @@ function leaveAbsensi(){
 }
 
 function activityCard(event){
-  const participants=activityMemberIds(event,'peserta_anggota'),attendees=new Set(activityMemberIds(event,'hadir_anggota'));
+  const attendees=new Set(activityMemberIds(event,'hadir_anggota'));
   const registeredMembers=S.members.filter(member=>String(member.status||'aktif').toLowerCase()!=='nonaktif');
   const date=event.tanggal?new Date(event.tanggal+'T00:00:00'):null;
   const dateLabel=date&&!Number.isNaN(date.getTime())?date.toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'}):'Tanggal belum ditentukan';
   const legacyCount=Array.isArray(event.hadir_anggota)?0:(event.hadir||[]).length;
   const feedback=S.activityFeedback&&String(S.activityFeedback.eventId)===String(event.id)?S.activityFeedback.message:'';
   const status=h('p',{class:'activity-feedback','aria-live':'polite'},feedback);
+  /* Kartu ringkas (akordeon): keadaan bawaan hanya menampilkan nama,
+     keterangan, tanggal, dan TOTAL absensi gabungan semua wilayah
+     (Hadir/Izin/Cuti/Alpha dari peta status tersimpan, dengan pemetaan
+     data lama yang sama seperti di tempat lain). Pemilih wilayah baru
+     muncul sesudah badan kartu diklik; membuka satu kartu menutup
+     kartu lain (S.activityExpanded hanya memuat satu id). */
+  const expanded=String(S.activityExpanded)===String(event.id);
+  const totals={hadir:0,izin:0,cuti:0,alpha:0};
+  Object.values(activityStatusMap(event)).forEach(st=>{if(totals[st]!=null)totals[st]++});
   /* Tahap 1: pilih wilayah dulu. Daftar anggota BELUM tampil di sini;
      admin mengetuk satu wilayah untuk masuk ke halaman pengabsenannya. */
   const regionPick=(region,color)=>{
     const membersInRegion=registeredMembers.filter(member=>memberRegion(member)===region);
     const recorded=membersInRegion.filter(member=>activityStatusOf(event,member.id)).length;
     const present=membersInRegion.filter(member=>activityStatusOf(event,member.id)==='hadir').length;
-    return h('button',{class:'activity-region-pick',style:'--region-color:'+color,onclick:()=>enterAbsensi(event,region)},
+    return h('button',{class:'activity-region-pick',style:'--region-color:'+color,onclick:e=>{e.stopPropagation();enterAbsensi(event,region)}},
       h('span',{class:'activity-region-pick-main'},h('b',{},region),h('small',{},membersInRegion.length+' anggota · '+recorded+' sudah dicatat · '+present+' hadir')),
       h('span',{class:'activity-region-pick-arrow'},'›'));
   };
   const regionPicks=wilayahEfektif().map(([region,color])=>regionPick(region,color));
   if(registeredMembers.some(member=>memberRegion(member)==='Belum dipilih'))regionPicks.push(regionPick('Belum dipilih','#718096'));
   const content=[
-    h('div',{class:'activity-heading'},h('div',{},h('h2',{},event.judul||'Kegiatan komunitas'),h('p',{class:'activity-meta'},icon('calendar',15),h('span',{},dateLabel+(event.waktu?' · '+event.waktu:''))),event.lokasi&&h('p',{class:'activity-meta'},icon('pin',15),h('span',{},event.lokasi))),S.admin&&h('button',{class:'btn s btn-eh',onclick:async()=>{
+    h('div',{class:'activity-heading'},h('div',{},h('h2',{},event.judul||'Kegiatan komunitas'),h('p',{class:'activity-meta'},icon('calendar',15),h('span',{},dateLabel+(event.waktu?' · '+event.waktu:'')))),h('span',{class:'activity-heading-side'},S.admin&&h('button',{class:'btn s btn-eh',onclick:async e=>{
+      e.stopPropagation();
       if(!confirm('Hapus kegiatan "'+(event.judul||'ini')+'"?'))return;
       try{await S.db.collection('events').doc(event.id).delete()}catch(error){console.error(error);alert('Gagal menghapus kegiatan: '+(error.message||'periksa koneksi'))}
-    }},'Hapus kegiatan')),
+    }},'Hapus kegiatan'),h('span',{class:'activity-chevron','aria-hidden':'true'},'›'))),
     event.deskripsi&&h('p',{class:'activity-description'},event.deskripsi),
-    h('div',{class:'activity-counts'},h('b',{},participants.length+' peserta'),h('b',{},attendees.size+' hadir')),
+    h('div',{class:'activity-counts','aria-label':'Total absensi kegiatan'},h('b',{class:'c-hadir'},'Hadir '+totals.hadir),h('b',{class:'c-izin'},'Izin '+totals.izin),h('b',{class:'c-cuti'},'Cuti '+totals.cuti),h('b',{class:'c-alpha'},'Alpha '+totals.alpha))
+  ];
+  if(expanded)content.push(
+    event.lokasi&&h('p',{class:'activity-meta'},icon('pin',15),h('span',{},event.lokasi)),
     legacyCount>0&&h('p',{class:'warn'},legacyCount+' catatan absensi lama belum terhubung dengan data anggota.'),
     h('h3',{},'Absensi per wilayah'),
     h('p',{class:'activity-help'},'Pilih wilayah yang akan dikerjakan pengabsenannya:'),
     h('div',{class:'activity-region-pick-grid'},...regionPicks)
-  ];
+  );
   if(S.admin){
     const barcodeInput=h('input',{class:'activity-barcode-input',placeholder:'Pindai QR / masukkan ID anggota',autocomplete:'off'});
     const scanButton=h('button',{class:'btn s',type:'button'},icon('camera',16),h('span',{},'Buka kamera'));
@@ -214,14 +227,24 @@ function activityCard(event){
         status.textContent='Kamera tidak dapat dibuka: '+(error.message||'periksa izin kamera atau masukkan ID anggota secara manual');
       }
     };
-    content.push(
-      h('h3',{},'Pemindaian QR'),
-      h('div',{class:'activity-scanner-row'},barcodeInput,h('button',{class:'btn s',onclick:submitBarcode},'Catat hadir')),
-      h('div',{class:'activity-scanner-row'},scanButton),
-      scannerVideo,status
+    if(expanded)content.push(
+      h('div',{class:'activity-scanner',onclick:e=>e.stopPropagation()},
+        h('h3',{},'Pemindaian QR'),
+        h('div',{class:'activity-scanner-row'},barcodeInput,h('button',{class:'btn s',onclick:submitBarcode},'Catat hadir')),
+        h('div',{class:'activity-scanner-row'},scanButton),
+        scannerVideo,status)
     );
   }
-  return h('article',{class:'card activity-card'},...content);
+  const card=h('article',{class:'card activity-card'+(expanded?' open':''),'aria-expanded':expanded?'true':'false',title:expanded?'Ketuk untuk menutup':'Ketuk untuk melihat wilayah'},...content);
+  /* Klik pada badan kartu membuka/menutup daftar wilayah; klik pada
+     tombol/field di dalam kartu (hapus, pemilih wilayah, pemindai)
+     tidak ikut membuka/menutup. */
+  card.addEventListener('click',e=>{
+    if(e.target.closest('button,input,video,a,select,textarea,label'))return;
+    S.activityExpanded=expanded?null:String(event.id);
+    render();
+  });
+  return card;
 }
 /* Tahap 2: halaman fokus mengabsen anggota SATU wilayah untuk satu
    kegiatan. Seluruh anggota wilayah tampil; di kanan tiap baris ada
