@@ -109,15 +109,23 @@ function vApprovals(){
    Pin dibuat langsung dari daftar anggota asli aplikasi (S.members) dan
    ikut berubah setiap data berubah / halaman digambar ulang. Warna pin =
    warna wilayah aplikasi (wilayahEfektif, termasuk wilayah tambahan dari
-   pilihan terkelola). Posisi pin PRESISI di alamat anggota: koordinat
-   dicari lewat geocoding Nominatim atas alamat lengkap (termasuk kode
-   pos, dibatasi ke Jepang) dan dipakai apa adanya — TANPA jitter, tanpa
+   pilihan terkelola). Posisi pin PRESISI di alamat anggota: alamat diurai
+   dulu (kode pos, prefektur, kota, distrik, pola chome-banchi-go, nama
+   gedung dibuang dari kueri utama), lalu dicari koordinatnya lewat
+   geocoder berjenjang khusus Jepang — API alamat resmi GSI, Nominatim
+   terstruktur, lalu varian freeform — dan SETIAP hasil dinilai tingkat
+   rincinya serta diuji kewarasannya (harus di prefektur yang benar dan
+   ≤25 km dari pusat kota anggota); hasil salah kota/prefektur DITOLAK.
+   Koordinat yang lolos dipakai apa adanya — TANPA jitter, tanpa
    penyebaran di layar, tanpa pembulatan — jadi pin beralamat sama
    berimpit persis di titik yang sama dan ujung pin menunjuk titik yang
-   sama di semua tingkat zoom. Selama geocoding belum selesai / gagal,
-   pin sementara memakai koordinat kota dari kamus di bawah (tanpa
-   geseran). Anggota yang alamat/kotanya tidak dikenal TIDAK dibuatkan
-   pin — mereka dihitung dan diberi keterangan di bawah peta.
+   sama di semua tingkat zoom. Cadangan terakhir adalah titik kawasan
+   KODE POS anggota, bukan pusat kota; pusat kota dari kamus di bawah
+   hanya dipakai bila kode pos pun tidak ada / belum ter-geocode, dan
+   tingkat ketepatan tiap pin (Alamat / Kode pos / Perkiraan kota)
+   disimpan bersama koordinatnya dan ditampilkan di kartu detail.
+   Anggota yang alamat/kotanya tidak dikenal TIDAK dibuatkan pin —
+   mereka dihitung dan diberi keterangan di bawah peta.
    Peta dasar dicoba berurutan dari beberapa penyedia ubin gratis; bila
    satu gagal, otomatis pindah ke berikutnya. Bila semuanya gagal, tampil
    peta dasar cadangan lokal (assets/japan-basemap.svg) supaya tidak
@@ -148,47 +156,226 @@ function petaCoords(m){
   return pc?[pc[0],pc[1]]:null;
 }
 /* Bagi anggota menjadi yang terpetakan (punya koordinat) dan yang belum.
-   Bila alamat lengkap anggota sudah pernah ter-geocode (cache), koordinat
-   presisinya langsung dipakai; selain itu mulai dari koordinat kota. */
+   Bila alamat anggota sudah pernah ter-geocode (cache v2), koordinat +
+   tingkat ketepatannya langsung dipakai. Selain itu pin mulai dari titik
+   kawasan kode pos (bila kode pos dikenal kamus kode pos di mesin
+   geocode) atau koordinat kota kamus, berlabel 'Perkiraan kota' sampai
+   geocoding latar menaikkan ketepatannya. */
 function petaEntries(){
   const entries=[],belum=[];
   const cache=petaGeoCacheLoad();
   (S.members||[]).forEach((m,i)=>{
-    let coords=petaCoords(m);
+    let coords=petaCoords(m),lvl='Perkiraan kota';
     const tersimpan=cache[petaGeoKey(m)];
-    if(tersimpan)coords=[tersimpan[0],tersimpan[1]];
-    if(coords)entries.push({m,region:memberRegion(m),coords,key:String(m.id||('idx'+i))});
+    if(tersimpan&&tersimpan.c){coords=[tersimpan.c[0],tersimpan.c[1]];lvl=tersimpan.l||'Alamat'}
+    if(coords)entries.push({m,region:memberRegion(m),coords,lvl,key:String(m.id||('idx'+i))});
     else belum.push(m);
   });
   return {entries,belum};
 }
-/* ===== Geocoding alamat lengkap — Nominatim (gratis, tanpa API key) =====
-   Satu permintaan per alamat, berurutan dengan jeda sopan (±1,1 detik,
-   sesuai aturan pemakaian Nominatim). Hasil disimpan per alamat persis:
-   cermin in-memory selalu ada; localStorage dicoba sebisa mungkin —
-   bila terblokir (mis. pratinjau), kegagalan simpan diabaikan dan proses
-   tetap jalan dari cermin in-memory. Koordinat hasil dipakai APA ADANYA:
-   tidak dibulatkan, tidak digeser. Alamat tak ditemukan mundur ke query
-   tanpa alamat jalan/nomor rumah, lalu tetap di koordinat kota kamus.
-   Kegagalan jaringan TIDAK menghalangi peta/daftar: pin bertahan di
-   koordinat kota dan antrean berhenti sesudah 3 kegagalan beruntun. */
-const PETA_GEO={cache:null,running:false};
+/* ===== Mesin geocoding alamat Jepang — berjenjang, dinilai, diuji wajar =====
+   Mengapa diganti total: cara lama (satu kueri freeform Nominatim atas
+   alamat mentah) mudah menerima titik pusat kota / kota yang salah
+   sebagai "hasil", lalu cache lama mengawetkannya. Mesin baru:
+   1) URAI alamat: kode pos, prefektur, kota, distrik, pola blok
+      (chome-banchi-go / 丁目・番・号), nama gedung & nomor kamar dibuang
+      dari kueri utama (disimpan sebagai varian saja).
+   2) GEOCODER BERJENJANG: (a) API pencarian alamat resmi GSI Jepang
+      (msearch.gsi.go.jp — gratis, tanpa kunci, presisi sampai banchi
+      untuk alamat beraksara Jepang); (b) Nominatim TERSTRUKTUR
+      (postalcode + city + street); (c) Nominatim freeform bertingkat
+      (alamat asli → tanpa gedung → kode pos + kota); (d) titik kawasan
+      KODE POS sebagai cadangan terakhir yang jujur.
+   3) PENILAIAN + UJI KEWARASAN: tiap hasil dinilai tingkat rincinya
+      (blok/gedung/jalan = 'Alamat'; distrik/kawasan kode pos =
+      'Kode pos'; kota = DITOLAK, terlalu kasar) dan diuji: prefektur
+      harus cocok dan jarak ke pusat kota anggota (kamus PETA_KOTA)
+      harus ≤25 km. Hasil salah prefektur / salah kota tidak dipakai.
+   4) Cache BARU 'sf_peta_geo_v2' berisi koordinat + tingkat ketepatan;
+      cache lama v1 (hasil tidak presisi) tidak dibaca lagi dan dibuang.
+   Antrean tetap sekuensial dengan jeda sopan (GSI ±0,4 dtk, Nominatim
+   ±1,1 dtk sesuai aturan pemakaiannya) dan penjaga generasi: halaman
+   diganti → antrean berhenti aman. Kegagalan jaringan tidak menghalangi
+   peta/daftar; antrean berhenti sesudah 3 kegagalan jaringan beruntun
+   dan alamat itu TIDAK di-cache supaya dicoba lagi lain kali. */
+const PETA_GEO={cache:null,running:false,lastNom:0};
+const PETA_PREF_JP={Tokushima:'徳島県',Kagawa:'香川県',Ehime:'愛媛県',Kochi:'高知県',Okayama:'岡山県'};
 function petaGeoCacheLoad(){
   if(PETA_GEO.cache)return PETA_GEO.cache;
   PETA_GEO.cache={};
-  try{const raw=localStorage.getItem('sf_peta_geo_v1');if(raw){const j=JSON.parse(raw);if(j&&typeof j==='object')PETA_GEO.cache=j}}catch(e){}
+  try{localStorage.removeItem('sf_peta_geo_v1')}catch(e){}
+  try{const raw=localStorage.getItem('sf_peta_geo_v2');if(raw){const j=JSON.parse(raw);if(j&&typeof j==='object')PETA_GEO.cache=j}}catch(e){}
   return PETA_GEO.cache;
 }
-function petaGeoCacheSave(){try{localStorage.setItem('sf_peta_geo_v1',JSON.stringify(PETA_GEO.cache))}catch(e){}}
+function petaGeoCacheSave(){try{localStorage.setItem('sf_peta_geo_v2',JSON.stringify(PETA_GEO.cache))}catch(e){}}
 function petaGeoKey(m){return alamatJp(m,true)}
 const petaTunggu=ms=>new Promise(r=>setTimeout(r,ms));
-async function petaGeocode(query){
-  const url='https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=jp&q='+encodeURIComponent(query);
-  const res=await fetch(url,{headers:{'Accept':'application/json'}});
-  if(!res.ok)throw new Error('Geocoding HTTP '+res.status);
+/* Angka lebar penuh → ASCII, tanda minus Jepang → '-' */
+function petaNormAngka(s){return String(s||'').replace(/[０-９]/g,ch=>String.fromCharCode(ch.charCodeAt(0)-0xFEE0)).replace(/[−ー－―]/g,'-')}
+/* Buang nama gedung/apartemen & nomor kamar dari kueri utama: potong di
+   kata penanda gedung, atau sesudah pola blok bila sisa teks bukan angka. */
+function petaBuangGedung(teks){
+  let t=String(teks||'').trim();
+  if(!t)return '';
+  const potong=t.search(/(マンション|アパート|ハイツ|コーポ|ビル|レジデンス|タワー|荘|号室|階|apartment|apartments|building|room|suite|#)/i);
+  if(potong>0)t=t.slice(0,potong).trim();
+  const n=petaNormAngka(t);
+  const bm=n.match(/(\d+\s*丁目\s*\d+\s*番(?:地)?\s*\d+\s*号?|\d+\s*-\s*\d+\s*-\s*\d+|\d+\s*-\s*\d+)/);
+  if(bm){
+    const end=bm.index+bm[0].length;
+    const sisa=n.slice(end).trim();
+    /* Potong sisa sesudah pola blok HANYA bila sisa itu teks Jepang
+       (nama gedung tanpa kata penanda). Sisa romaji pada alamat romaji
+       adalah nama jalan ("1-20 Hamanomachi") — wajib dipertahankan. */
+    if(sisa&&!/^[0-9\-\s]*$/.test(sisa)&&/[\u3040-\u30ff\u4e00-\u9faf]/.test(sisa))t=t.slice(0,end).trim();
+  }
+  return t.replace(/[,、，]+\s*$/,'').trim();
+}
+/* Nama Jepang sebuah kota dari kamus alias aplikasi (untuk kueri GSI). */
+function petaNamaJpKota(kota){
+  if(!kota)return '';
+  const baris=LOCALITY_ALIASES.find(a=>a[2]===kota);
+  if(!baris)return '';
+  return baris[3].find(a=>/[^\u0000-\u007f]/.test(a)&&/市|町/.test(a))||baris[3].find(a=>/[^\u0000-\u007f]/.test(a))||'';
+}
+/* Urai alamat anggota menjadi bagian-bagian yang dipakai rencana kueri. */
+function petaParseAlamat(m){
+  const gabung=[m.kodepos,m.alamat_jp,m.kec_jp,m.kota,m.pref].filter(Boolean).join(' ');
+  const posCocok=gabung.match(/\d{3}[- ]?\d{4}/);
+  const kodepos=posCocok?posCocok[0].replace(/\D/g,'').replace(/(\d{3})(\d{4})/,'$1-$2'):'';
+  const loc=inferJapanLocation(m.alamat_jp,m.kota,m.kec_jp,m.kodepos,m.pref,m.wilayah);
+  const pref=(loc&&loc.pref)||m.pref||'';
+  const kota=(loc&&loc.kota)||m.kota||'';
+  const alamatMentah=String(m.alamat_jp||'').replace(/〒?\s*\d{3}[- ]?\d{4}/g,'').trim();
+  const alamat=petaBuangGedung(alamatMentah);
+  const n=petaNormAngka(alamat);
+  const blok=/(\d+\s*丁目\s*\d+\s*番|\d+\s*-\s*\d+\s*-\s*\d+|\d+\s*-\s*\d+)/.test(n);
+  return {kodepos,pref,kota,alamat,alamatMentah,blok,prefJp:PETA_PREF_JP[pref]||'',kotaJp:petaNamaJpKota(kota),adaJepang:/[\u3040-\u30ff\u4e00-\u9faf]/.test(alamat+(m.kota||''))};
+}
+/* Titik acuan kewarasan: pusat kota anggota dari kamus; cadangan prefektur. */
+function petaAcuan(m,p){
+  const calon=[p.kota,m.kota,m.kec_jp];
+  for(const k of calon){const c=k&&PETA_KOTA[petaNormKey(k)];if(c)return {titik:c,batas:25}}
+  const pc=p.pref&&PETA_PREF[petaNormKey(p.pref)];
+  return pc?{titik:pc,batas:60}:null;
+}
+function petaJarakKm(a,b){
+  const R=6371,toRad=d=>d*Math.PI/180;
+  const dLat=toRad(b[0]-a[0]),dLon=toRad(b[1]-a[1]);
+  const s=Math.sin(dLat/2)**2+Math.cos(toRad(a[0]))*Math.cos(toRad(b[0]))*Math.sin(dLon/2)**2;
+  return 2*R*Math.asin(Math.sqrt(s));
+}
+/* Uji kewarasan satu kandidat koordinat terhadap alamat anggota. */
+function petaLolosUji(coords,p,acuan,provinsiHasil){
+  /* Prefektur hasil yang jelas berbeda = tolak. Prefektur cocok saja
+     TIDAK cukup: jarak ke pusat kota anggota tetap penentu kedua. */
+  if(provinsiHasil&&p.prefJp&&provinsiHasil!==p.prefJp)return false;
+  if(acuan)return petaJarakKm(coords,acuan.titik)<=acuan.batas;
+  return true;
+}
+/* --- Geocoder 1: GSI (resmi, Jepang) --- */
+async function petaGsiCoba(q){
+  const res=await fetch('https://msearch.gsi.go.jp/address-search/AddressSearch?q='+encodeURIComponent(q),{headers:{'Accept':'application/json'}});
+  if(!res.ok)throw new Error('GSI HTTP '+res.status);
   const j=await res.json();
-  if(j&&j[0]&&isFinite(+j[0].lat)&&isFinite(+j[0].lon))return [+j[0].lat,+j[0].lon];
+  const f=Array.isArray(j)?j[0]:null;
+  if(!f||!f.geometry||!Array.isArray(f.geometry.coordinates))return null;
+  const lon=+f.geometry.coordinates[0],lat=+f.geometry.coordinates[1];
+  if(!isFinite(lat)||!isFinite(lon))return null;
+  return {coords:[lat,lon],title:String((f.properties&&f.properties.title)||'')};
+}
+/* Nilai hasil GSI dari judulnya: judul memuat 番…号/番地 = tingkat blok
+   ('Alamat'); hanya sampai 丁目/distrik = tingkat kawasan ('Kode pos');
+   hanya kota/prefektur = terlalu kasar, ditolak (null). */
+function petaNilaiGsi(hasil,p){
+  const t=petaNormAngka(hasil.title);
+  if(/番/.test(t))return 'Alamat';
+  if(/丁目|町|字/.test(t)&&t.length>(p.prefJp?p.prefJp.length:0)+2)return 'Kode pos';
   return null;
+}
+/* --- Geocoder 2 & 3: Nominatim terstruktur / freeform --- */
+async function petaNomCoba(params){
+  const jeda=1100-(Date.now()-PETA_GEO.lastNom);
+  if(PETA_GEO.lastNom&&jeda>0)await petaTunggu(jeda);
+  PETA_GEO.lastNom=Date.now();
+  const qs=Object.keys(params).filter(k=>params[k]).map(k=>k+'='+encodeURIComponent(params[k])).join('&');
+  const res=await fetch('https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=jp&addressdetails=1&'+qs,{headers:{'Accept':'application/json'}});
+  if(!res.ok)throw new Error('Nominatim HTTP '+res.status);
+  const j=await res.json();
+  const r=Array.isArray(j)?j[0]:null;
+  if(!r||!isFinite(+r.lat)||!isFinite(+r.lon))return null;
+  return {coords:[+r.lat,+r.lon],addresstype:String(r.addresstype||''),kategori:String(r.category||''),tipe:String(r.type||''),provinsi:String((r.address&&(r.address.province||r.address.state))||'')};
+}
+/* Nilai hasil Nominatim dari jenis tempatnya: gedung/jalan = 'Alamat';
+   distrik/kode pos = 'Kode pos'; kota/kabupaten/prefektur = ditolak. */
+function petaNilaiNom(hasil){
+  const t=(hasil.addresstype||hasil.tipe||'').toLowerCase(),k=(hasil.kategori||'').toLowerCase();
+  if(k==='building'||['building','house','apartments','detached_house','residential','hotel','station'].includes(t)||hasil.tipe==='station')return 'Alamat';
+  if(k==='highway'||t==='road')return 'Alamat';
+  if(['neighbourhood','suburb','quarter','postcode'].includes(t)||k==='postcode')return 'Kode pos';
+  return null;
+}
+/* Rencana kueri berjenjang untuk satu anggota (urutan = prioritas). */
+function petaRencana(m,p){
+  const rencana=[];
+  const alamatBeda=p.alamat&&p.alamat!==p.alamatMentah;
+  if(p.adaJepang&&p.alamat){
+    const awalan=[p.prefJp,p.kotaJp].filter(x=>x&&!p.alamat.includes(x)).join('');
+    rencana.push({via:'gsi',q:awalan+p.alamat});
+    if(awalan)rencana.push({via:'gsi',q:p.alamat});
+  }
+  if(p.alamat||p.kodepos){
+    rencana.push({via:'nom',params:{postalcode:p.kodepos||undefined,city:p.kota||undefined,street:p.alamat||undefined,state:p.pref||undefined}});
+  }
+  const bebas=(alamat,kodepos)=>[alamat,m.kec_jp,m.kota,m.pref,kodepos,'Japan'].filter(Boolean).join(', ');
+  if(p.alamat)rencana.push({via:'nom',params:{q:bebas(p.alamat,p.kodepos)}});
+  if(alamatBeda)rencana.push({via:'nom',params:{q:bebas(p.alamatMentah,p.kodepos)}});
+  if(p.kodepos)rencana.push({via:'nom',params:{q:[p.kodepos,m.kota,m.pref,'Japan'].filter(Boolean).join(', ')},cap:'Kode pos'});
+  if(p.kodepos)rencana.push({via:'nom',params:{postalcode:p.kodepos},cap:'Kode pos'});
+  return rencana;
+}
+/* Jalankan rencana satu anggota: hasil tingkat 'Alamat' pertama yang
+   lolos nilai + uji wajar langsung menang. Hasil tingkat kawasan
+   ('Kode pos') hanya disimpan sebagai cadangan — jenjang berikutnya
+   tetap dicoba siapa tahu ada titik alamat yang lebih persis; cadangan
+   itu dipakai bila tidak ada hasil 'Alamat' sampai rencana habis.
+   {jaringan:true} bila semua percobaan gagal jaringan. */
+async function petaGeocodeAnggota(m,gen){
+  const p=petaParseAlamat(m);
+  if(!p.alamat&&!p.kodepos)return {hasil:null,jaringan:false};
+  const acuan=petaAcuan(m,p);
+  let jaringan=true,cadanganArea=null;
+  for(const langkah of petaRencana(m,p)){
+    if(gen!==PM.gen)return {hasil:null,jaringan:false,berhenti:true};
+    try{
+      if(langkah.via==='gsi'){
+        const r=await petaGsiCoba(langkah.q);
+        jaringan=false;
+        if(r){
+          const lvl=petaNilaiGsi(r,p);
+          if(lvl&&petaLolosUji(r.coords,p,acuan,'')){
+            if(lvl==='Alamat')return {hasil:{c:r.coords,l:'Alamat'},jaringan:false};
+            if(!cadanganArea)cadanganArea={c:r.coords,l:'Kode pos'};
+          }
+        }
+      }else{
+        const r=await petaNomCoba(langkah.params);
+        jaringan=false;
+        if(r){
+          let lvl=petaNilaiNom(r);
+          if(lvl){
+            if(langkah.cap==='Kode pos'&&lvl==='Alamat')lvl='Kode pos';
+            if(petaLolosUji(r.coords,p,acuan,r.provinsi)){
+              if(lvl==='Alamat')return {hasil:{c:r.coords,l:'Alamat'},jaringan:false};
+              if(!cadanganArea)cadanganArea={c:r.coords,l:'Kode pos'};
+            }
+          }
+        }
+      }
+    }catch(e){/* kegagalan jaringan satu langkah: lanjut ke jenjang berikut */}
+    if(langkah.via==='gsi')await petaTunggu(400);
+  }
+  return {hasil:cadanganArea,jaringan:cadanganArea?false:jaringan};
 }
 function petaSetGeoStatus(txt){
   const el=document.getElementById('peta-geo-status');if(!el)return;
@@ -196,8 +383,8 @@ function petaSetGeoStatus(txt){
 }
 /* Tempatkan pin anggota satu per satu dari alamat lengkapnya. Berjalan di
    latar sesudah peta tampil; pin yang selesai langsung berpindah ke titik
-   alamatnya (progresif). gen = penanda sesi peta; bila halaman diganti /
-   peta dibangun ulang, antrean berhenti dengan aman. */
+   alamatnya beserta tingkat ketepatannya (progresif). gen = penanda sesi
+   peta; bila halaman diganti / peta dibangun ulang, antrean berhenti. */
 async function petaGeocodeEntries(gen){
   if(PETA_GEO.running){
     /* Antrean sesi sebelumnya masih menuntaskan permintaan terakhirnya;
@@ -206,7 +393,7 @@ async function petaGeocodeEntries(gen){
     return;
   }
   const cache=petaGeoCacheLoad();
-  const todo=PM.entries.filter(en=>en.m.alamat_jp&&!(petaGeoKey(en.m) in cache));
+  const todo=PM.entries.filter(en=>(en.m.alamat_jp||en.m.kodepos)&&!(petaGeoKey(en.m) in cache));
   if(!todo.length)return;
   PETA_GEO.running=true;
   let selesai=0,gagalJaringan=0;
@@ -215,24 +402,22 @@ async function petaGeocodeEntries(gen){
       if(gen!==PM.gen)break;
       petaSetGeoStatus('Menempatkan pin dari alamat… ('+selesai+'/'+todo.length+')');
       const key=petaGeoKey(en.m);
-      let coords=null,errorJaringan=false;
-      try{coords=await petaGeocode(key)}catch(e){errorJaringan=true}
-      if(!coords&&!errorJaringan){
-        await petaTunggu(1100);
-        if(gen!==PM.gen)break;
-        try{coords=await petaGeocode(alamatJp(en.m,false))}catch(e){errorJaringan=true}
-      }
-      if(errorJaringan){gagalJaringan++;if(gagalJaringan>=3)break}
-      else gagalJaringan=0;
-      cache[key]=coords||null;petaGeoCacheSave();
-      if(coords){
-        en.coords=[coords[0],coords[1]];
-        const mk=PM.markers[en.key];
-        if(mk&&gen===PM.gen)mk.setLatLng(en.coords);
+      const {hasil,jaringan,berhenti}=await petaGeocodeAnggota(en.m,gen);
+      if(berhenti)break;
+      if(jaringan){gagalJaringan++;if(gagalJaringan>=3)break}
+      else{
+        gagalJaringan=0;
+        cache[key]=hasil||{c:null};petaGeoCacheSave();
+        if(hasil){
+          en.coords=[hasil.c[0],hasil.c[1]];en.lvl=hasil.l;
+          const mk=PM.markers[en.key];
+          if(mk&&gen===PM.gen)mk.setLatLng(en.coords);
+          if(String(S.petaSelected)===en.key&&gen===PM.gen)petaShowDetail(en);
+        }
       }
       selesai++;
       if(gen!==PM.gen)break;
-      await petaTunggu(1100);
+      await petaTunggu(300);
     }
   }catch(e){console.error('Geocoding pin berhenti:',e)}
   PETA_GEO.running=false;
@@ -358,7 +543,7 @@ function petaRenderMarkers(){
     const m=en.m;
     const popup='<div class="peta-pop"><div class="peta-pop-name">'+petaEsc(m.nama||'Tanpa nama')+'</div>'
       +'<div class="peta-pop-badge" style="background:'+regionColor(en.region)+'">'+petaEsc(en.region)+'</div>'
-      +'<div class="peta-pop-addr">'+petaEsc([m.kota,m.pref].filter(Boolean).join(', '))+'<br>'+petaEsc(alamatJp(m,false))+(m.stasiun?'<br>Stasiun terdekat: '+petaEsc(m.stasiun):'')+'</div></div>';
+      +'<div class="peta-pop-addr">'+petaEsc([m.kota,m.pref].filter(Boolean).join(', '))+'<br>'+petaEsc(alamatJp(m,false))+(m.stasiun?'<br>Stasiun terdekat: '+petaEsc(m.stasiun):'')+'<br>Ketepatan pin: '+petaEsc(en.lvl||'Perkiraan kota')+'</div></div>';
     mk.bindPopup(popup,{closeButton:false,maxWidth:280,className:'peta-popup'});
     /* Tooltip hover: nama anggota melayang di atas pin saat kursor diarahkan.
        interactive:false + sticky:false → murni label, hilang saat kursor
@@ -405,7 +590,8 @@ function petaShowDetail(en){
       h('button',{type:'button',class:'btn s',onclick:()=>{S.petaSelected=null;petaHideDetail();petaRenderMarkers();petaRenderList()}},'Kembali ke daftar')),
     h('div',{class:'peta-detail-grid'},
       boxInfo('Alamat di Jepang',alamatJp(m,false)),
-      boxInfo('Stasiun terdekat • Kode pos',[m.stasiun,m.kodepos?('〒'+m.kodepos):''].filter(Boolean).join('  •  '))),
+      boxInfo('Stasiun terdekat • Kode pos',[m.stasiun,m.kodepos?('〒'+m.kodepos):''].filter(Boolean).join('  •  ')),
+      boxInfo('Ketepatan posisi pin',(en.lvl||'Perkiraan kota')+(en.lvl==='Alamat'?' — titik hasil geocoding alamat lengkap':en.lvl==='Kode pos'?' — titik kawasan kode pos alamat':' — perkiraan tingkat kota, alamat belum ter-geocode persis'))),
     h('p',{class:'peta-detail-note'},'Ketuk area peta di luar pin untuk menutup detail ini.'));
   card.style.display='block';
 }
