@@ -11,12 +11,13 @@ function applyLocalUser(user){
   S.admin=user.role==='admin';S.mainAdmin=S.admin&&user.is_main_admin===true;
   S.approvalStatus=user.approval_status||'pending';S.authLoading=false;
 }
-/* Mode lokal paksa: dipilih dari halaman masuk agar pengguna bisa masuk dan
-   melihat isi aplikasi di perangkat ini tanpa bergantung pada akun Supabase. */
+/* Mode lokal sudah dihapus: tidak ada lagi pintu masuk ke mode lokal.
+   Flag lama 'shikoku-family:force-local' yang mungkin tertinggal di peramban
+   dibersihkan saat aplikasi dimuat (lihat main.js) dan selalu diabaikan,
+   supaya selama konfigurasi Supabase ada aplikasi selalu berjalan online. */
 const FORCE_LOCAL_KEY='shikoku-family:force-local';
-function localModeForced(){try{return localStorage.getItem(FORCE_LOCAL_KEY)==='1'}catch(e){return false}}
-function enterLocalMode(){try{localStorage.setItem(FORCE_LOCAL_KEY,'1')}catch(e){}location.reload()}
-function exitLocalMode(){try{localStorage.removeItem(FORCE_LOCAL_KEY)}catch(e){}location.reload()}
+function clearLegacyLocalFlag(){try{localStorage.removeItem(FORCE_LOCAL_KEY)}catch(e){}}
+function localModeForced(){return false}
 function restoreLocalSession(){
   try{
     const id=localStorage.getItem(LOCAL_SESSION_KEY);
@@ -52,7 +53,7 @@ function accountForm(){
     if(!S.supabase){
       const known=localUsers().some(user=>(user.email||'').toLowerCase()===emailValue.toLowerCase());
       notice.className='warn '+(known?'auth-success':'auth-error');
-      notice.textContent=known?'Mode lokal tidak mengirim email. Bila lupa password, minta admin utama membantu menggantinya dari perangkat ini.':'Email tidak terdaftar di perangkat ini.';
+      notice.textContent=known?'Reset password lewat email tidak tersedia. Bila lupa password, minta admin utama membantu menggantinya.':'Email tidak terdaftar.';
       return;
     }
     forgot.disabled=true;notice.textContent='Mengirim tautan reset password...';
@@ -77,9 +78,7 @@ function accountForm(){
   const google=h('button',{class:'btn s auth-alt',style:'width:100%;margin-top:10px',onclick:async()=>{
     if(!S.supabase){
       notice.className='warn auth-error';
-      notice.textContent=localModeForced()
-        ?'Anda sedang memakai mode lokal. Untuk masuk dengan Google, kembali ke mode online (Supabase) terlebih dahulu.'
-        :'Masuk dengan Google memerlukan koneksi Supabase. Periksa koneksi internet Anda, lalu muat ulang aplikasi.';
+      notice.textContent='Masuk dengan Google memerlukan koneksi Supabase. Periksa koneksi internet Anda, lalu muat ulang aplikasi.';
       return;
     }
     notice.className='warn';
@@ -95,15 +94,6 @@ function accountForm(){
       notice.textContent='Gagal masuk dengan Google: '+(e.message||'periksa koneksi');
     }
   }},'Masuk dengan Google');
-  /* Panel pilihan mode lokal: hanya tampil saat mode online (Supabase
-     tersedia dan mode lokal belum aktif) sebagai tawaran masuk mode lokal.
-     Bila mode lokal aktif, tidak ada blok status yang ditampilkan. */
-  const modeSwitch=(!localModeForced()&&S.supabase)
-      ?h('div',{class:'local-mode-box'},
-          h('b',{},'MODE LOKAL — LIHAT ISI APLIKASI'),
-          h('p',{},'Tidak punya akun Supabase? Tekan tombol di bawah untuk beralih ke mode lokal di perangkat ini. Setelah itu daftar akun baru lewat formulir di atas: akun pertama langsung menjadi admin utama dan langsung masuk, jadi seluruh isi aplikasi bisa langsung dilihat.'),
-          h('button',{class:'btn local-mode-btn',style:'width:100%',onclick:()=>enterLocalMode()},'Gunakan Mode Lokal di Perangkat Ini'))
-      :null;
   return h('div',{class:'card auth-card'},title,h('div',{class:'auth-tabs'},loginTab,signupTab),nameLabel,h('label',{class:'lb'},'Email',email),h('label',{class:'lb'},'Password',password),forgotWrap,notice,h('button',{class:'btn',onclick:async()=>{
     const emailValue=email.value.trim();
     notice.className='warn';
@@ -220,67 +210,7 @@ function accountForm(){
       await loadMessages();
       if(!S.messageChannel)await subscribeToMessages();
     }
-  }},submitLabel),google,modeSwitch);
+  }},submitLabel),google);
 }
-/* Jalan pintas pemilik: ketuk tulisan SHIKOKU FAMILY di header 3 kali cepat.
-   Hanya masuk ke MODE LOKAL di perangkat ini (data lokal saja) — tidak pernah
-   membuat sesi Supabase dan tidak membuka data Supabase. Tanpa petunjuk di layar. */
-let brandTapCount=0,brandLastTapAt=0;
-function ensureLocalAdminUser(){
-  const users=localUsers();
-  let admin=users.find(u=>u.is_main_admin===true&&u.approval_status==='approved')
-    ||users.find(u=>u.role==='admin'&&u.approval_status==='approved');
-  if(admin){
-    if(admin.is_main_admin!==true&&!users.some(u=>u.is_main_admin===true)){
-      const idx=users.findIndex(u=>u.id===admin.id);
-      if(idx>=0){users[idx]={...users[idx],is_main_admin:true};admin=users[idx];try{saveLocalUsers(users)}catch(e){}}
-    }
-    return admin;
-  }
-  const salt='q'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
-  admin={id:'local-user-'+salt,name:'Putro',email:'putro@shikoku.local',password_hash:localPasswordHash('lokal-'+salt,salt),salt,role:'admin',is_main_admin:true,approval_status:'approved',created_at:new Date().toISOString()};
-  users.push(admin);
-  try{saveLocalUsers(users)}catch(e){}
-  return admin;
-}
-async function quickLocalLogin(){
-  try{
-    const wasForced=localModeForced();
-    try{localStorage.setItem(FORCE_LOCAL_KEY,'1')}catch(e){}
-    const admin=ensureLocalAdminUser();
-    try{localStorage.setItem(LOCAL_SESSION_KEY,admin.id)}catch(e){}
-    /* Bila sesi saat ini masih mode online (Supabase), muat ulang supaya
-       aplikasi beralih penuh ke basis data lokal sebelum masuk. */
-    if(S.supabase||!S.db||S.authLoading){
-      location.reload();
-      return;
-    }
-    /* Sudah di mode lokal: langsung masuk tanpa formulir, tampilkan Home. */
-    applyLocalUser(admin);
-    S.view='landing';S.adminMenuOpen=false;document.body.classList.remove('open');
-    if(typeof startDataSubscriptions==='function'){try{startDataSubscriptions()}catch(e){}}
-    if(typeof loadPendingUsers==='function'){try{await loadPendingUsers()}catch(e){}}
-    if(typeof render==='function')render();
-    if(typeof loadMessages==='function'){try{await loadMessages()}catch(e){}}
-    /* wasForced dipakai hanya untuk keputusan di atas; bila tadinya belum
-       paksa-lokal dan tidak ada Supabase, sesi lokal di atas sudah cukup. */
-    void wasForced;
-  }catch(e){
-    try{location.reload()}catch(_){}
-  }
-}
-function handleBrandTap(){
-  const now=Date.now();
-  if(now-brandLastTapAt>1000)brandTapCount=0;
-  brandLastTapAt=now;
-  brandTapCount+=1;
-  if(brandTapCount<3)return;
-  brandTapCount=0;brandLastTapAt=0;
-  quickLocalLogin();
-}
-(function initBrandShortcut(){
-  const el=document.getElementById('brand-title')||document.querySelector('header b');
-  if(!el||el.dataset.brandShortcut==='1')return;
-  el.dataset.brandShortcut='1';
-  el.addEventListener('click',handleBrandTap);
-})();
+/* Jalan pintas ketuk 3x pada tulisan SHIKOKU FAMILY sudah dihapus:
+   tidak ada lagi cara masuk mode lokal dari header. */

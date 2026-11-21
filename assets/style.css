@@ -57,11 +57,6 @@ h1{font-size:26px;margin:8px 0 10px}
    kartu putih maupun area hero biru (aturan .hero .btn membuat teks tombol
    kecil putih di atas putih, jadi panel ini memakai warna tegas sendiri) */
 .landing .auth-card .btn.auth-alt{background:#eef6fb;color:var(--acc);border:2px solid var(--acc);box-shadow:none}
-.local-mode-box{margin-top:18px;background:#e8f3fa;border:2px solid var(--acc);border-radius:14px;padding:14px}
-.local-mode-box b{display:block;color:#123c56;font-size:15px;letter-spacing:.02em;margin-bottom:6px}
-.local-mode-box p{color:#33566e;font-size:13.5px;line-height:1.55;margin:0 0 10px}
-.local-mode-box .btn.s{margin-top:0}
-.landing .local-mode-box .btn.local-mode-btn{background:var(--acc);color:#fff;box-shadow:0 6px 16px rgba(47,134,184,.3);margin-top:0}
 .card .e{width:54px;height:54px;border-radius:16px;background:#e3f1f8;display:grid;place-items:center;color:var(--acc);flex:none}
 .btn .app-icon,.chat-file .app-icon,.member-file-link .app-icon,.member-file-row a .app-icon,.activity-meta .app-icon{margin-right:6px}
 .btn,.menu-logout{display:inline-flex;align-items:center;justify-content:center;gap:6px}
@@ -397,36 +392,39 @@ body.bottom-nav-hidden #pet{bottom:calc(10px + env(safe-area-inset-bottom,0px))}
 .activity-empty{color:var(--mut);margin:8px 0}
 @media(max-width:560px){.activity-create-grid{grid-template-columns:1fr;gap:0}.activity-heading{align-items:flex-start}.activity-region-list{grid-template-columns:1fr}.activity-participant{align-items:flex-start;flex-direction:column}.activity-participant-actions{width:100%;flex-wrap:wrap}.activity-add-row,.activity-scanner-row{align-items:stretch}.activity-add-row{flex-direction:column}.activity-region-section .activity-add-row{flex-direction:row}.activity-region-section .activity-add-row .btn{white-space:nowrap}.activity-scanner-row .btn{white-space:nowrap}}
 
-/* ===== Musyawarah: buku catatan rapat gaya OneNote (dari file musyawarah.html) =====
-   Semua aturan ter-scope di .musy-root supaya tidak mengganggu halaman lain,
-   dan gaya halaman lain tidak masuk ke dalam buku catatan. */
-.musy-root{--bg:#f3f2f1;--card:#fff;--tx:#000000;--mu:#3f3d3b;--bd:#d8d4d0;--base:#7719aa;--ac:var(--base);--ac2:color-mix(in srgb,var(--ac) 14%,var(--card));--hd:var(--base);font:15px/1.5 Ubuntu,"Segoe UI",system-ui,-apple-system,Roboto,sans-serif;color:var(--tx);margin:0 -4px}
-@media(prefers-color-scheme:dark){.musy-root:not([data-theme="light"]){--bg:#1b1a19;--card:#252423;--tx:#f3f2f1;--mu:#c8c6c4;--bd:#3b3a39;--ac:color-mix(in srgb,var(--base) 55%,#fff);--ac2:color-mix(in srgb,var(--ac) 18%,var(--card));--hd:color-mix(in srgb,var(--base) 60%,#000)}}
-.musy-root[data-theme="dark"]{--bg:#1b1a19;--card:#252423;--tx:#f3f2f1;--mu:#c8c6c4;--bd:#3b3a39;--ac:color-mix(in srgb,var(--base) 55%,#fff);--ac2:color-mix(in srgb,var(--ac) 18%,var(--card));--hd:color-mix(in srgb,var(--base) 60%,#000)}
+/* ===== Musyawarah: buku catatan rapat (dari file musyawarah.html) =====
+   Semua aturan ter-scope di .musy-root supaya tidak mengganggu halaman lain.
+   Tampilan SUDAH mengikuti tema aplikasi (clay pastel biru-abu, kartu
+   membulat, slate gelap + aksen teal, font Ubuntu, teks gelap terbaca)
+   dari markup & CSS awal — tidak ada gaya lama yang tampil dulu lalu
+   berubah; skrip hanya mengganti aksen bila pengguna memilih warna lain. */
+.musy-root{--bg:#d7e2ea;--bg2:#b9cbd9;--card:#f8fbfc;--tx:#101c28;--mu:#3d5568;--bd:#c3d2dd;--base:#2b7a8c;--ac:var(--base);--ac2:color-mix(in srgb,var(--ac) 13%,#eef4f7);--hd:#2f4359;--nav:#2f4359;font:15px/1.5 Ubuntu,"Segoe UI",system-ui,-apple-system,Roboto,sans-serif;color:var(--tx);margin:0 -4px;background:linear-gradient(160deg,var(--bg),var(--bg2));border-radius:22px;padding:10px}
+.musy-root[data-theme="dark"]{--bg:#22344a;--bg2:#182636;--card:#2c4258;--tx:#eef5f9;--mu:#a9bfd0;--bd:rgba(255,255,255,.18);--ac:color-mix(in srgb,var(--base) 55%,#fff);--ac2:color-mix(in srgb,var(--ac) 20%,transparent);--hd:#141f2d;--nav:#141f2d}
 .musy-root *{box-sizing:border-box}
-.musy-root .musy-top{display:flex;flex-wrap:nowrap;gap:8px;align-items:center;padding:8px 12px;background:var(--hd);color:#fff;position:relative;border-radius:16px 16px 0 0}
-.musy-root .musy-brand{font-weight:700;font-size:17px;margin-right:8px;white-space:nowrap;color:#fff}
+.musy-root .musy-top{display:flex;flex-wrap:nowrap;gap:8px;align-items:center;padding:10px 14px;background:linear-gradient(145deg,#3a5069,#24344a);color:#fff;position:relative;border-radius:18px;box-shadow:0 10px 22px rgba(20,35,50,.3),inset 0 1px 0 rgba(255,255,255,.16)}
+.musy-root .musy-brand{font-weight:700;font-size:16px;margin-right:4px;white-space:nowrap;color:#fff}
+.musy-root .musy-ro-badge{flex:none;font-size:11.5px;font-weight:700;letter-spacing:.02em;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.35);color:#fff;border-radius:999px;padding:3px 10px;white-space:nowrap}
 .musy-root .musy-sw{display:flex;gap:5px;align-items:center}
 .musy-root .musy-dot{width:18px;height:18px;padding:0;border-radius:50%;border:2px solid rgba(255,255,255,.45)}
 .musy-root .musy-dot.on{border-color:#fff;box-shadow:0 0 0 2px rgba(0,0,0,.3)}
-.musy-root .musy-top input{flex:1 1 auto;max-width:480px;min-width:0;width:auto;border:0;border-radius:6px;padding:6px 10px;font:inherit;background:rgba(255,255,255,.18);color:#fff;margin:0;box-shadow:none}
-.musy-root .musy-top input::placeholder{color:rgba(255,255,255,.75)}
-.musy-root button{font:inherit;cursor:pointer;border:1px solid var(--bd);background:var(--card);color:var(--tx);border-radius:6px;padding:4px 10px}
+.musy-root .musy-top input{flex:1 1 auto;max-width:480px;min-width:0;width:auto;border:0;border-radius:999px;padding:7px 14px;font:inherit;background:rgba(255,255,255,.16);color:#fff;margin:0;box-shadow:inset 0 2px 5px rgba(0,20,40,.18)}
+.musy-root .musy-top input::placeholder{color:rgba(255,255,255,.78)}
+.musy-root button{font:inherit;cursor:pointer;border:1px solid var(--bd);background:var(--card);color:var(--tx);border-radius:999px;padding:5px 12px;font-size:13.5px}
 .musy-root button:hover{border-color:var(--ac)}
-.musy-root .musy-top button{background:rgba(255,255,255,.18);border-color:transparent;color:#fff;flex:none}
+.musy-root .musy-top button{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.22);color:#fff;flex:none;border-radius:999px;padding:5px 11px}
 .musy-root .musy-top button.on{background:#fff;color:var(--hd)}
-.musy-root .musy-tabs{display:flex;flex-wrap:wrap;gap:3px;padding:6px 12px 0;background:var(--bg);border-left:1px solid var(--bd);border-right:1px solid var(--bd)}
-.musy-root .musy-tab{--c:#7719aa;padding:4px 12px;border-radius:6px 6px 0 0;border:1px solid var(--bd);border-bottom:0;border-top:4px solid var(--c);background:var(--bd);white-space:nowrap;cursor:pointer;color:var(--tx)}
-.musy-root .musy-tab.on{background:var(--card);font-weight:600}
-.musy-root .musy-tab small{color:var(--mu)}
-.musy-root .musy-app{display:grid;grid-template-columns:1fr 250px;max-width:1300px;margin:0 auto;padding:0 0 12px;gap:0;background:var(--bg);border:1px solid var(--bd);border-top:0;border-radius:0 0 16px 16px}
-@media(max-width:820px){.musy-root .musy-app{grid-template-columns:1fr}.musy-root .musy-pages{order:-1;max-height:210px;overflow:auto;border-left:1px solid var(--bd);border-radius:0}}
-.musy-root .musy-wrap{background:var(--card);border:1px solid var(--bd);min-width:0}
-.musy-root .musy-tools{display:flex;flex-wrap:nowrap;container-type:inline-size;position:relative;align-items:center;padding:4px 6px;background:var(--card);border-bottom:1px solid var(--bd)}
+.musy-root .musy-tabs{display:flex;flex-wrap:wrap;gap:6px;padding:12px 4px 2px;background:none}
+.musy-root .musy-tab{--c:#2b7a8c;padding:5px 14px;border-radius:999px;border:1px solid rgba(255,255,255,.7);background:rgba(248,251,252,.75);white-space:nowrap;cursor:pointer;color:#22384c;font-size:13.5px;box-shadow:0 3px 8px rgba(50,75,95,.12)}
+.musy-root .musy-tab.on{background:var(--c);font-weight:700;color:#fff;border-color:transparent;box-shadow:0 5px 12px rgba(20,40,60,.25)}
+.musy-root .musy-tab small{color:inherit;opacity:.75}
+.musy-root .musy-app{display:grid;grid-template-columns:1fr 252px;max-width:1300px;margin:0 auto;padding:10px 0 2px;gap:14px;background:none;border:0}
+@media(max-width:820px){.musy-root .musy-app{grid-template-columns:1fr}.musy-root .musy-pages{order:-1;max-height:230px;overflow:auto}}
+.musy-root .musy-wrap{background:var(--card);border:1px solid rgba(255,255,255,.85);border-radius:22px;min-width:0;box-shadow:10px 12px 24px rgba(70,95,115,.16),-6px -6px 18px rgba(255,255,255,.5);overflow:hidden}
+.musy-root .musy-tools{display:flex;flex-wrap:nowrap;container-type:inline-size;position:relative;align-items:center;padding:6px 8px;background:#eef4f7;border-bottom:1px solid var(--bd)}
 .musy-root .musy-grp{display:flex;align-items:center;padding:0 6px;border-right:1px solid var(--bd);flex:none}
 .musy-root .musy-grp.rt{margin-left:auto;border-right:0}
 .musy-root .musy-gb{display:flex;gap:1px;align-items:center;min-height:30px}
-.musy-root .musy-tools button{border:0;background:none;min-width:30px;height:30px;padding:0 6px;border-radius:6px;font-size:14px;white-space:nowrap;color:var(--tx)}
+.musy-root .musy-tools button{border:0;background:none;min-width:29px;height:29px;padding:0 6px;border-radius:9px;font-size:13.5px;white-space:nowrap;color:var(--tx)}
 .musy-root .musy-tools button:hover{background:var(--ac2)}
 .musy-root .musy-tools button.on{background:var(--ac2);color:var(--ac);font-weight:700;box-shadow:inset 0 0 0 1px var(--ac)}
 .musy-root .musy-tools .musy-del{color:#b3402f}
@@ -448,42 +446,44 @@ body.bottom-nav-hidden #pet{bottom:calc(10px + env(safe-area-inset-bottom,0px))}
 .musy-root .musy-ed hr{border:0;border-top:1px solid var(--bd)}
 .musy-root .musy-ed [style*="background-color"]{color:#201f1e}
 .musy-root .musy-todo input{vertical-align:middle;margin-right:2px;width:16px;height:16px}
-.musy-root .musy-pages{border:1px solid var(--bd);border-left:0;background:var(--bg);padding:10px;min-width:0}
-.musy-root .musy-pg{padding:8px 10px;border-radius:6px;cursor:pointer;border-left:3px solid transparent;color:var(--tx)}
-.musy-root .musy-pg:hover{background:var(--ac2)}
-.musy-root .musy-pg.on{background:var(--card);border-left-color:var(--ac)}
-.musy-root .musy-pg b{display:block;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--tx)}
-.musy-root .musy-pg span{font-size:12px;color:var(--mu)}
-.musy-root .musy-np{width:100%;margin-bottom:8px;background:var(--ac);color:#fff;border-color:var(--ac)}
-.musy-root .musy-trb{color:var(--tx)}
-.musy-root .musy-empty{color:var(--mu);font-size:13px;padding:6px}
+.musy-root .musy-pages{border:0;background:linear-gradient(170deg,#354b64,#24344a);padding:12px;border-radius:22px;min-width:0;color:#e8f0f6;box-shadow:0 14px 30px rgba(20,35,50,.35)}
+.musy-root .musy-pg{padding:9px 11px;border-radius:12px;cursor:pointer;color:#e8f0f6;margin-bottom:3px}
+.musy-root .musy-pg:hover{background:rgba(255,255,255,.1)}
+.musy-root .musy-pg.on{background:linear-gradient(145deg,#eef5f9,#cfdfe9);color:#1d3347;box-shadow:0 5px 12px rgba(10,25,40,.3)}
+.musy-root .musy-pg b{display:block;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#e8f0f6}
+.musy-root .musy-pg.on b{color:#1d3347}
+.musy-root .musy-pg span{font-size:12px;color:#9db4c6}
+.musy-root .musy-pg.on span{color:#3d5568}
+.musy-root .musy-np{width:100%;margin-bottom:8px;background:linear-gradient(145deg,#3d9db0,#2b7a8c);color:#fff;border:0;border-radius:999px;padding:7px 12px;box-shadow:0 6px 14px rgba(10,30,45,.35),inset 0 1px 0 rgba(255,255,255,.35)}
+.musy-root .musy-trb{background:rgba(255,255,255,.1);color:#e8f0f6;border:1px solid rgba(255,255,255,.18);border-radius:999px}
+.musy-root .musy-empty{color:#9db4c6;font-size:13px;padding:6px}
 .musy-root .musy-ta{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
-.musy-root .musy-ta button{padding:2px 8px;font-size:12px}
-.musy-root .musy-ta .x{color:#b3402f}
+.musy-root .musy-ta button{padding:3px 10px;font-size:12px;background:rgba(255,255,255,.12);color:#e8f0f6;border:1px solid rgba(255,255,255,.2);border-radius:999px}
+.musy-root .musy-ta .x{color:#ffb59f}
 .musy-root .musy-wrap.fs{position:fixed;inset:0;z-index:50;overflow:auto;border:0;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);background:var(--card)}
 .musy-root .fs .musy-tools{position:sticky;top:0;z-index:2}
 .musy-root .fs .musy-canvas{max-width:1000px;margin:0 auto}
 .musy-root .fs .musy-ed{min-height:70vh}
-.musy-root .musy-toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--tx);color:var(--card);padding:8px 16px;border-radius:99px;font-size:13px;opacity:0;transition:.25s;pointer-events:none;z-index:60}
+.musy-root .musy-toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:#24344a;color:#eef5f9;padding:8px 16px;border-radius:99px;font-size:13px;opacity:0;transition:.25s;pointer-events:none;z-index:60;box-shadow:0 10px 24px rgba(20,35,50,.35)}
 .musy-root .musy-toast.s{opacity:1}
 .musy-root .musy-tpb{margin-left:auto}
 @media(max-width:520px){.musy-root .musy-brand span{display:none}}
-.musy-root .musy-tp{display:none;position:absolute;right:12px;top:100%;margin-top:6px;z-index:45;padding:10px;border-radius:12px;background:var(--card);color:var(--tx);border:1px solid var(--bd);box-shadow:0 10px 28px rgba(0,0,0,.25);flex-direction:column;gap:8px;min-width:210px}
+.musy-root .musy-tp{display:none;position:absolute;right:12px;top:100%;margin-top:6px;z-index:45;padding:12px;border-radius:16px;background:var(--card);color:var(--tx);border:1px solid var(--bd);box-shadow:0 14px 30px rgba(20,40,60,.28);flex-direction:column;gap:8px;min-width:210px}
 .musy-root .musy-tp.o{display:flex}
 .musy-root .musy-tp .musy-sw{flex-wrap:wrap}
-.musy-root .musy-tp button{background:var(--bd);color:var(--tx);border-color:var(--bd)}
+.musy-root .musy-tp button{background:#eef4f7;color:var(--tx);border-color:var(--bd)}
 .musy-root .musy-tp button.on{background:var(--ac);color:#fff;outline:0}
 .musy-root .musy-mb{display:none}
-.musy-root .musy-pop{display:none;position:absolute;right:8px;top:100%;margin-top:4px;z-index:20;flex-wrap:wrap;gap:2px;max-width:270px;padding:6px;border-radius:12px;background:var(--card);border:1px solid var(--bd);box-shadow:0 10px 28px rgba(0,0,0,.22)}
+.musy-root .musy-pop{display:none;position:absolute;right:8px;top:100%;margin-top:4px;z-index:20;flex-wrap:wrap;gap:2px;max-width:270px;padding:6px;border-radius:16px;background:var(--card);border:1px solid var(--bd);box-shadow:0 14px 30px rgba(20,40,60,.25)}
 .musy-root .musy-pop.o{display:flex}
 .musy-root .musy-pop button{display:none;align-items:center;justify-content:center}
 @container (max-width:760px){.musy-root .musy-grp .a1{display:none}.musy-root .musy-mb{display:inline-flex}.musy-root .musy-pop .a1{display:inline-flex}}
 @container (max-width:600px){.musy-root .musy-grp.a2,.musy-root .musy-grp .a2{display:none}.musy-root .musy-pop .a2{display:inline-flex}}
 .musy-root.ro .musy-tools .musy-grp:not(.rt){display:none}
-.musy-root.ro .musy-ed{opacity:.92}
+.musy-root.ro .musy-ed{opacity:1;background:#eef4f7;border-radius:14px;padding:10px 12px}
+.musy-root.ro .musy-title,.musy-root.ro .musy-meta input,.musy-root.ro .musy-date{color:var(--mu)}
 /* ===== Mode Fresh buku catatan ===== */
 .musy-root[data-style="fresh"]{--bg:#c3d1da;--bg2:#a8bbc9;--card:rgba(255,255,255,.55);--tx:#1d3347;--mu:#4f6679;--bd:rgba(255,255,255,.7);--ac:var(--base);--ac2:color-mix(in srgb,var(--ac) 16%,rgba(255,255,255,.6));--hd:#2b4560;--nav:#2b4560}
-@media(prefers-color-scheme:dark){.musy-root[data-style="fresh"]:not([data-theme="light"]){--bg:#17232e;--bg2:#22364a;--card:rgba(255,255,255,.07);--tx:#e5eef5;--mu:#97aabb;--bd:rgba(255,255,255,.13);--ac:color-mix(in srgb,var(--base) 55%,#fff);--ac2:color-mix(in srgb,var(--ac) 22%,transparent);--hd:#0f1a24;--nav:#0f1a24}}
 .musy-root[data-style="fresh"][data-theme="dark"]{--bg:#17232e;--bg2:#22364a;--card:rgba(255,255,255,.07);--tx:#e5eef5;--mu:#97aabb;--bd:rgba(255,255,255,.13);--ac:color-mix(in srgb,var(--base) 55%,#fff);--ac2:color-mix(in srgb,var(--ac) 22%,transparent);--hd:#0f1a24;--nav:#0f1a24}
 .musy-root[data-style="fresh"]{background:linear-gradient(160deg,var(--bg),var(--bg2));border-radius:18px;padding:6px}
 .musy-root[data-style="fresh"] .musy-top{margin:4px 6px 0;border-radius:20px;background:var(--card);color:var(--tx);border:1px solid var(--bd);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);box-shadow:0 8px 24px rgba(20,45,70,.16)}
@@ -543,9 +543,6 @@ header .logo{background:#e8f3fa;color:#000000}
 .auth-tab{color:#000000}
 .auth-tab.on{color:#000000;background:#ffffff}
 .auth-card .warn,.auth-forgot .btn.s{background:#e2e8f0;color:#000000!important}
-.local-mode-box{background:#ffffff;border:2px solid #000000}
-.local-mode-box b,.local-mode-box p{color:#000000}
-.landing .local-mode-box .btn.local-mode-btn,.local-mode-box .btn{background:#bfe6f7;color:#000000;border:2px solid #000000;box-shadow:none}
 .hero{background:#d9eef9;color:#000000}
 .hero h1,.hero p{color:#000000}
 .hero .btn{background:#ffffff;color:#000000;border:2px solid #000000}
@@ -593,7 +590,8 @@ body.admin-dark .home-shortcut-icon,body.admin-dark .card .e{background:#e8f3fa;
    slate gelap, hero Home slate gelap, tombol utama teal.
    Teks di permukaan terang tetap hitam/gelap; teks di permukaan gelap
    (sidebar, hero, navigasi bawah) terang agar kontras.
-   Bagian dalam Musyawarah (.musy-root) TIDAK diubah oleh lapisan ini. */
+   Musyawarah (.musy-root) memakai palet yang sama lewat aturan khususnya
+   sendiri di bagian Musyawarah, jadi seluruh aplikasi satu tema. */
 body{background:linear-gradient(160deg,#c7d5df,#aebfd0) fixed}
 main{max-width:1060px}
 header{background:linear-gradient(145deg,#dce8f0,#c6d6e2);color:#16283a;box-shadow:0 10px 24px rgba(50,75,95,.22),inset 0 1px 0 rgba(255,255,255,.7);border-radius:0 0 26px 26px}
@@ -686,7 +684,6 @@ input,textarea,select{background:#f4f8fa;border-color:#bfcfdb}
    tombol utama teal dengan teks putih (bukan putih di atas putih). */
 .landing .auth-card .sub{color:#22384c}
 .landing .auth-card p{color:#16283a}
-.landing .local-mode-box b,.landing .local-mode-box p{color:#000000}
 .hero .auth-card .btn:not(.s){background:linear-gradient(145deg,#3d9db0,#2b7a8c);color:#ffffff;border:0;box-shadow:0 8px 18px rgba(43,122,140,.35)}
 .hero .auth-card .btn:not(.s) *{color:#ffffff}
 
@@ -717,9 +714,14 @@ input,textarea,select{background:#f4f8fa;border-color:#bfcfdb}
 .chat-line.outgoing .chat-bubble{background:#cdeee6}
 /* Tanggal kegiatan di halaman masuk: biru-abu pastel tema */
 .event-date{background:#dcebf3;color:#1d3347}
-/* Bingkai luar buku catatan Musyawarah: bayangan clay lembut senada
-   (isi & gaya OneNote di dalamnya tidak diubah) */
-.musy-root{border-radius:18px;box-shadow:0 14px 34px rgba(50,75,95,.18)}
+/* Bingkai luar buku catatan Musyawarah: bayangan clay lembut senada tema */
+.musy-root{border-radius:22px;box-shadow:0 14px 34px rgba(50,75,95,.18)}
+/* Mode Gelap pilihan pengguna di Musyawarah: tetap keluarga slate aplikasi */
+.musy-root[data-theme="dark"] .musy-tools{background:rgba(255,255,255,.07)}
+.musy-root[data-theme="dark"] .musy-tab{background:rgba(255,255,255,.1);color:#dbe7f0;border-color:rgba(255,255,255,.2)}
+.musy-root[data-theme="dark"] .musy-tab.on{background:var(--c);color:#fff}
+.musy-root[data-theme="dark"] .musy-tp button{background:rgba(255,255,255,.1);color:var(--tx)}
+.musy-root[data-theme="dark"].ro .musy-ed{background:rgba(255,255,255,.06)}
 /* Bilah gulir tipis senada tema (desktop terlihat rapi, tidak mencolok) */
 *{scrollbar-width:thin;scrollbar-color:#8fa9bc transparent}
 ::-webkit-scrollbar{width:9px;height:9px}

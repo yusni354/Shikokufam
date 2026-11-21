@@ -26,20 +26,13 @@ function vPengaturan(){
   if(!S.admin)return [h('p',{class:'warn'},'Halaman ini hanya dapat diakses admin.')];
   const inp=h('textarea',{rows:3,maxlength:200,placeholder:SAMBUTAN_DEFAULT});
   inp.value=S.sambutan||'';
-  const parts=[h('h1',{},'Pengaturan'),
+  return [h('h1',{},'Pengaturan'),
     box(h('b',{},'Pesan sambutan di Home'),
       inp,
       h('div',{class:'fl'},h('button',{class:'btn',onclick:async()=>{
         try{await saveSambutanPesan(inp.value.trim());alert('Pesan sambutan disimpan.');render()}
         catch(e){alert('Gagal menyimpan pesan: '+(e.message||'periksa koneksi'))}
       }},'Simpan')))];
-  /* Perangkat ini sedang memakai mode lokal padahal Supabase tersedia:
-     sediakan jalan kembali ke mode online dari sini juga (selain menu samping). */
-  if(!S.supabase&&typeof localModeForced==='function'&&localModeForced()&&window.SUPABASE_CONFIG?.url&&window.SUPABASE_CONFIG?.anonKey){
-    parts.push(box(h('b',{},'Mode lokal di perangkat ini'),
-      h('div',{class:'fl'},h('button',{class:'btn',onclick:()=>exitLocalMode()},'Kembali ke Mode Online'))));
-  }
-  return parts;
 }
 /* Halaman Home dan Ringkasan */
 function vHome(){

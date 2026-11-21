@@ -29,12 +29,6 @@ function renderDrawer(){
   d.replaceChildren(h('p',{class:'sub',style:'padding:0 14px'},h('b',{style:'color:var(--ink)'},'KOMUNITAS ID-JP')),
     ...ALL.filter(x=>!x[2]||(x[3]?S.mainAdmin:S.admin)).map(x=>h('a',{class:S.view===x[0]?'on':'',href:'#',onclick:navTo(x[0]),...(x[0]==='pesan'?{'data-message-nav':'true'}:{})},
       icon(x[4],19),h('span',{},x[1]),x[0]==='pesan'&&S.unreadMessages>0&&h('span',{class:'nav-badge'},String(S.unreadMessages)))),
-    /* Jalan kembali ke mode online: hanya tampil saat perangkat ini sedang
-       memakai mode lokal padahal Supabase tersedia. Tanpa ini, sekali flag
-       mode lokal terpasang tidak ada jalan keluar yang terlihat. */
-    ...((!S.supabase&&typeof localModeForced==='function'&&localModeForced()&&window.SUPABASE_CONFIG?.url&&window.SUPABASE_CONFIG?.anonKey)
-      ?[h('button',{class:'menu-logout',onclick:()=>exitLocalMode()},icon('back',17),h('span',{},'Kembali ke Mode Online'))]
-      :[]),
     h('button',{class:'menu-logout',onclick:()=>signOut()},icon('logout',17),h('span',{},'Keluar')));
 }
 function render(){

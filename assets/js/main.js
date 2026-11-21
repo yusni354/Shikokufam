@@ -7,31 +7,12 @@ render();
     if (!S.uid) { S.uid = 'u' + Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem('uid', S.uid); }
   } catch (e) { S.uid = 'u' + Math.random().toString(36).slice(2); }
 
-  // Mode lokal dapat dipilih dari halaman masuk (tombol "Mode lokal di perangkat ini")
-  // agar isi aplikasi tetap bisa dibuka di perangkat ini tanpa akun Supabase.
-  let forceLocal = false;
-  try { forceLocal = localStorage.getItem('shikoku-family:force-local') === '1'; } catch (e) {}
+  // Mode lokal sudah dihapus: flag lama 'shikoku-family:force-local' yang
+  // mungkin tertinggal di peramban selalu dibersihkan dan diabaikan.
+  // Selama konfigurasi Supabase ada, aplikasi SELALU memakai jalur online.
+  try { localStorage.removeItem('shikoku-family:force-local'); } catch (e) {}
   const supabaseReady = Boolean(window.supabase && window.SUPABASE_CONFIG?.url && window.SUPABASE_CONFIG?.anonKey);
-  if (forceLocal && supabaseReady) {
-    /* Sesi Supabase yang masih valid SELALU menang atas mode lokal.
-       Flag mode lokal bisa tertinggal di peramban (tombol mode lokal atau
-       jalan pintas lama); tanpa pemeriksaan ini aplikasi menampilkan data
-       lokal yang kosong padahal pengguna sebenarnya masih masuk ke
-       Supabase dan datanya utuh di sana. Bila ada sesi, flag dibersihkan
-       dan aplikasi berjalan online seperti biasa. */
-    try {
-      const probe = window.supabase.createClient(window.SUPABASE_CONFIG.url, window.SUPABASE_CONFIG.anonKey);
-      const probed = await Promise.race([
-        probe.auth.getSession(),
-        new Promise(resolve => setTimeout(() => resolve(null), 4000))
-      ]);
-      if (probed?.data?.session?.user) {
-        try { localStorage.removeItem('shikoku-family:force-local'); } catch (e) {}
-        forceLocal = false;
-      }
-    } catch (e) { /* Pemeriksaan gagal: boot ini tetap mode lokal, dicoba lagi pada muat berikutnya */ }
-  }
-  const hasSupabase = !forceLocal && supabaseReady;
+  const hasSupabase = supabaseReady;
   if (!hasSupabase) {
     // Tanpa Supabase: pakai penyimpanan lokal di perangkat (mode uji coba),
     // dengan sesi akun lokal agar alur masuk/persetujuan tetap berjalan penuh

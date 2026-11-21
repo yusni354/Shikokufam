@@ -6,8 +6,8 @@
    aplikasi bila di perangkat ini). Kunci localStorage asli file itu
    ('musyawarah-v1') tetap ditulis sebagai cermin/cadangan. */
 const MUSY_KEY='musyawarah-v1';
-const MUSY_COL=['#7719aa','#0078d4','#107c10','#d83b01','#c239b3','#038387'];
-const MUSY_TH=[['Ungu','#7719aa'],['Biru','#0078d4'],['Hijau','#107c10'],['Oranye','#d83b01'],['Magenta','#c239b3'],['Teal','#038387'],['Merah','#c50f1f'],['Abu-abu','#5c6b7a']];
+const MUSY_COL=['#2b7a8c','#3985c6','#2a8f7d','#d98a4a','#8e7cc3','#4f772d'];
+const MUSY_TH=[['Teal','#2b7a8c'],['Biru','#3985c6'],['Hijau','#2a8f7d'],['Oranye','#d98a4a'],['Ungu lembut','#8e7cc3'],['Slate','#5c6b7a'],['Merah lembut','#c65b4e'],['Hijau daun','#4f772d']];
 const MUSY_MD=[['auto','🌓 Otomatis'],['light','☀ Terang'],['dark','🌙 Gelap']];
 const MUSY_G=[['Riwayat',[['undo','↶','Urungkan (Ctrl+Z)'],['redo','↷','Ulangi (Ctrl+Y)']],'a2'],
 ['Gaya',[['h','H','Judul bagian'],['p','¶','Teks biasa']],'a2'],
@@ -240,6 +240,7 @@ function musyawarahView(){
   root.innerHTML=
     '<div class="musy-top">'
     +'<div class="musy-brand">📓 <span>Musyawarah</span></div>'
+    +(RO?'<span class="musy-ro-badge">Hanya baca</span>':'')
     +'<input class="musy-q" type="search" placeholder="Cari di semua halaman…">'
     +'<button class="musy-tpb" title="Tampilan: warna, mode terang/gelap, Fresh">🎨</button>'
     +'<button class="musy-copy" title="Salin teks">📋</button>'
@@ -374,7 +375,11 @@ function musyawarahView(){
   }
   q('.musy-sw').innerHTML=MUSY_TH.map(t=>'<button class="musy-dot" data-c="'+t[1]+'" title="'+t[0]+'" style="background:'+t[1]+'"></button>').join('');
   q('.musy-sw').addEventListener('click',e=>{const d=e.target.closest('.musy-dot');if(d)setTheme(d.dataset.c)});
-  let c0='#7719aa';try{c0=localStorage.getItem(MUSY_KEY+'-tema')||c0}catch(e){}
+  /* Warna bawaan = teal tema aplikasi. Warna ungu bawaan lama dari versi
+     sebelumnya diperlakukan sebagai bawaan juga, supaya tampilan langsung
+     selaras sejak pertama dibuka; pilihan warna lain dari pengguna tetap dipakai. */
+  let c0='#2b7a8c';try{c0=localStorage.getItem(MUSY_KEY+'-tema')||c0}catch(e){}
+  if(c0==='#7719aa')c0='#2b7a8c';
   setTheme(c0,true);
   function setMode(k,keep){
     if(k==='auto')root.removeAttribute('data-theme');else root.dataset.theme=k;
@@ -394,7 +399,7 @@ function musyawarahView(){
   setFresh(fr,true);
   q('.musy-fresh').addEventListener('click',()=>{
     fr=!fr;
-    if(fr&&root.style.getPropertyValue('--base').trim()==='#7719aa')setTheme('#038387');
+    if(fr&&root.style.getPropertyValue('--base').trim()==='#2b7a8c')setTheme('#038387');
     setFresh(fr);
   });
   if(RO){
