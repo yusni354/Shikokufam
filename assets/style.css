@@ -386,7 +386,21 @@ body.admin-dark .card .e{background:#293946;color:var(--acc)}
 .activity-repeat-sub select{display:block;width:100%;margin:4px 0 0;min-width:0;color:var(--ink);font-weight:400}
 .activity-repeat-week{display:grid;grid-template-columns:1fr;gap:6px;align-items:start}
 .activity-create .activity-feedback{margin:8px 0 0}
-.activity-list{display:grid;gap:12px}
+/* Daftar kartu kegiatan: grid menyamping — 2 kolom di HP, 4 kolom di
+   desktop (≥1024px), 1 kolom di layar sangat sempit (≤340px). Kartu
+   yang sedang terbuka (akordeon) melebar selebar baris grid supaya
+   pemilih wilayah & pemindai QR di dalamnya tetap lega; kartu lain
+   tetap pada susunannya. */
+.activity-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;align-items:start}
+.activity-list>.activity-card{margin-bottom:0;min-width:0;padding:13px}
+.activity-list .activity-card h2{font-size:17px;margin-bottom:6px;overflow-wrap:anywhere}
+.activity-list .activity-meta{font-size:12.5px;align-items:flex-start}
+.activity-list .activity-counts{gap:6px;margin-top:10px}
+.activity-list .activity-counts b{padding:6px 8px;font-size:12px}
+.activity-list .activity-chart-legend{gap:3px 10px}
+.activity-card.open{grid-column:1/-1}
+@media(min-width:1024px){.activity-list{grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}}
+@media(max-width:340px){.activity-list{grid-template-columns:1fr}}
 .activity-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
 .activity-heading .btn{flex:none}
 .activity-meta,.activity-description,.activity-help{color:var(--mut);margin:4px 0}
