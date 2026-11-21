@@ -1,10 +1,9 @@
-/* Maskot: bisa digeser, ketuk untuk tanya admin */
-const ADMIN_WA=''; /* isi nomor WhatsApp admin, contoh: 6281234567890 */
-const pet=$('#pet');let drag=null;
-const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
-function closeMenu(){const m=$('#pm');if(m)m.remove()}
+/* Tanya Admin: formulir pertanyaan ke admin.
+   Dulu dibuka lewat maskot melayang di pojok kanan bawah; maskot itu
+   sudah dihapus atas permintaan pengguna, jadi formulir ini sekarang
+   dibuka lewat tombol 'Butuh bantuan? Hubungi Admin' di Home dan lewat
+   halaman Pesan. Fungsi askForm dipertahankan apa adanya. */
 function askForm(){
-  closeMenu();
   if(!S.uid){alert('Silakan daftar atau login terlebih dahulu agar dapat menerima balasan admin.');go('pesan');return}
   const nama=h('input',{placeholder:'Nama lengkap',autocomplete:'name'});
   nama.value=S.name||'';
@@ -34,17 +33,3 @@ function askForm(){
       }},'Kirim pertanyaan'),
       h('button',{class:'btn s',onclick:()=>m.remove()},'Batal'))));
   document.body.append(m);ta.focus()}
-function openMenu(){
-  if($('#pm'))return closeMenu();
-  document.body.append(h('div',{id:'pm'},h('b',{},icon('messages',18),h('span',{},'Mau tanya apa?')),
-    h('button',{class:'btn',onclick:askForm},icon('edit',16),h('span',{},'Tulis pertanyaan ke Admin')),
-    ADMIN_WA&&h('a',{class:'btn s',href:'https://wa.me/'+ADMIN_WA+'?text='+encodeURIComponent('Halo Admin, saya mau bertanya...'),target:'_blank'},icon('messages',16),h('span',{},'Chat WhatsApp Admin')),
-    h('button',{class:'btn s',onclick:closeMenu},'Tutup')))}
-pet.addEventListener('pointerdown',e=>{const r=pet.getBoundingClientRect();drag={x:e.clientX,y:e.clientY,l:r.left,t:r.top,m:false};try{pet.setPointerCapture(e.pointerId)}catch(_){}});
-pet.addEventListener('pointermove',e=>{
-  if(!drag)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;
-  if(!drag.m){if(Math.hypot(dx,dy)<8)return;drag.m=true;closeMenu();pet.style.right=pet.style.bottom='auto'}
-  pet.style.left=clamp(drag.l+dx,0,innerWidth-pet.offsetWidth)+'px';pet.style.top=clamp(drag.t+dy,60,innerHeight-pet.offsetHeight-4)+'px'});
-pet.addEventListener('pointerup',()=>{if(!drag)return;const moved=drag.m;drag=null;if(!moved)openMenu()});
-pet.addEventListener('pointercancel',()=>{drag=null});
-addEventListener('resize',()=>{if(pet.style.left){pet.style.left=clamp(pet.offsetLeft,0,innerWidth-pet.offsetWidth)+'px';pet.style.top=clamp(pet.offsetTop,60,innerHeight-pet.offsetHeight-4)+'px'}});

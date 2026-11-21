@@ -53,7 +53,7 @@ function renderDrawer(){
       icon(x[4],19),h('span',{},x[1]),x[0]==='pesan'&&S.unreadMessages>0&&h('span',{class:'nav-badge'},String(S.unreadMessages)))),
     h('button',{class:'menu-logout',onclick:()=>signOut()},icon('logout',17),h('span',{},'Keluar')));
 }
-/* Gerbang awal: kerangka (header, drawer, maskot) hanya tampil untuk
+/* Gerbang awal: kerangka (header, drawer) hanya tampil untuk
    pengguna yang sudah masuk dan disetujui. Selama terkunci, body
    ber-class auth-locked dan CSS menyembunyikan semua kerangka — yang
    terlihat hanya halaman login / menunggu persetujuan di #app. Sesudah
@@ -64,7 +64,6 @@ function setAuthLocked(locked){
   document.body.classList.toggle('auth-locked',!!locked);
   if(locked){
     document.body.classList.remove('open');
-    const pm=document.querySelector('#pm');if(pm)pm.remove();
     const qm=document.querySelector('#qm');if(qm)qm.remove();
   }
 }
@@ -77,7 +76,6 @@ function render(){
     setAuthLocked(true);
     $('#dr').replaceChildren();
     $('#app').replaceChildren(h('p',{class:'warn',style:'text-align:center;padding:40px 16px'},'Memeriksa sesi login...'));
-    $('#pet').style.display='none';
     $('#sw').style.display='none';
     return;
   }
@@ -89,7 +87,6 @@ function render(){
       h('h1',{},'Selamat datang!'),
       accountForm()
     )));
-    $('#pet').style.display='none';
     $('#sw').style.display='none';
     document.body.classList.remove('open');
     return;
@@ -99,7 +96,6 @@ function render(){
     $('#dr').replaceChildren();
     const status=S.approvalStatus==='rejected'?'Akun ini ditolak admin.':'Akun ini belum disetujui admin.';
     $('#app').replaceChildren(h('section',{class:'card auth-card'},h('b',{},status),h('p',{class:'sub'},'Data anggota, kegiatan, dan wilayah hanya dimuat setelah akun disetujui. Hubungi admin utama untuk memeriksa status akun.'),h('button',{class:'btn',onclick:()=>signOut()},'Keluar')));
-    $('#pet').style.display='none';
     $('#sw').style.display='none';
     document.body.classList.remove('open');
     return;
@@ -125,7 +121,6 @@ function render(){
   /* Panel 'Letakkan Pin di Peta' di formulir anggota: bangun petanya
      sesudah DOM formulir terpasang, bersihkan bila panel ditutup. */
   if(typeof initFormPinMap==='function')initFormPinMap();
-  $('#pet').style.display=S.form?'none':'block';
 }
 function sub(name,key){
   return S.db.collection(name).onSnapshot(s=>{

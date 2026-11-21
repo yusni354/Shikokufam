@@ -345,10 +345,6 @@ body.open #dr{transform:none}body.open #ov{display:block}
 body.admin-dark .home-shortcut-icon{background:#293946}
 body.admin-dark .card .e{background:#293946;color:var(--acc)}
 @media (max-width:560px){.duty-card{align-items:flex-start;flex-wrap:wrap}.duty-info{padding-top:2px}.duty-actions{width:100%;padding-left:72px;justify-content:flex-start}.duty-heading{align-items:flex-start}.duty-count{margin-top:14px}}
-#pet{position:fixed;right:12px;bottom:calc(10px + env(safe-area-inset-bottom,0px));z-index:7;cursor:grab;touch-action:none;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none}
-#pet img{display:block;height:96px;pointer-events:none;-webkit-user-drag:none}
-#pm{position:fixed;left:16px;right:16px;bottom:calc(118px + env(safe-area-inset-bottom,0px));max-width:360px;margin:auto;background:var(--card);border:1px solid var(--line);border-radius:22px;padding:16px;display:flex;flex-direction:column;gap:10px;box-shadow:0 12px 40px rgba(47,134,184,.3);z-index:11}
-#pm .btn{text-align:center;text-decoration:none;display:flex}
 #qm{position:fixed;inset:0;background:rgba(23,50,77,.45);display:grid;place-items:center;padding:16px;z-index:12}
 .activity-create,.activity-card{display:block}
 .activity-create h2,.activity-card h2{margin:0 0 8px;font-size:20px}
@@ -514,7 +510,7 @@ body.admin-dark .card .e{background:#293946;color:var(--acc)}
 .musy-root[data-style="fresh"] .musy-pages .musy-empty{color:rgba(232,240,246,.7)}
 .musy-root[data-style="fresh"] .musy-toast{color:var(--bg)}
 .musy-root[data-style="fresh"] .musy-pop,.musy-root[data-style="fresh"] .musy-tp{background:var(--bg)}
-@media print{header,#dr,#pet,#ov,#pm{display:none!important}main{padding:0!important;max-width:none!important}body{background:#fff!important}.musy-root{--card:#fff;--tx:#000;--mu:#444;--bd:#ccc;margin:0}.musy-root .musy-top,.musy-root .musy-tabs,.musy-root .musy-pages,.musy-root .musy-tools,.musy-root .noprint{display:none!important}.musy-root .musy-app{display:block;padding:0;border:0}.musy-root .musy-wrap{border:0!important;box-shadow:none!important;border-radius:0!important;background:#fff!important}}
+@media print{header,#dr,#ov{display:none!important}main{padding:0!important;max-width:none!important}body{background:#fff!important}.musy-root{--card:#fff;--tx:#000;--mu:#444;--bd:#ccc;margin:0}.musy-root .musy-top,.musy-root .musy-tabs,.musy-root .musy-pages,.musy-root .musy-tools,.musy-root .noprint{display:none!important}.musy-root .musy-app{display:block;padding:0;border:0}.musy-root .musy-wrap{border:0!important;box-shadow:none!important;border-radius:0!important;background:#fff!important}}
 
 /* Aksesibilitas: tanda fokus jelas untuk pengguna keyboard */
 a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,[role="button"]:focus-visible{outline:3px solid #f59e0b;outline-offset:2px}
@@ -616,7 +612,16 @@ input,textarea,select{background:#f4f8fa;border-color:#bfcfdb}
 .home-welcome h1{color:#ffffff}
 .home-welcome p{color:#d7e5ee}
 .home-welcome div,.home-welcome span{color:inherit}
-.home-welcome-mascot{height:124px;width:auto;max-width:38%;object-fit:contain;flex:none;filter:drop-shadow(0 10px 16px rgba(0,0,0,.35))}
+.home-welcome-mascot{height:124px;width:auto;max-width:38%;object-fit:contain;flex:none;filter:drop-shadow(0 10px 16px rgba(0,0,0,.35));transform-origin:50% 85%;animation:mascotFloat 3.6s ease-in-out infinite;will-change:transform,filter}
+/* Maskot Home melayang lembut: naik-turun (bobbing) + ayunan miring
+   (sway). Murni transform pada gambar di dalam kotaknya, jadi tata
+   letak di sekitarnya tidak bergeser; bayangan ikut berdenyut —
+   melebar & menipis saat maskot naik, rapat saat turun. */
+@keyframes mascotFloat{
+  0%,100%{transform:translateY(0) rotate(-2deg);filter:drop-shadow(0 10px 14px rgba(0,0,0,.35))}
+  50%{transform:translateY(-9px) rotate(2.5deg);filter:drop-shadow(0 19px 20px rgba(0,0,0,.22))}
+}
+@media (prefers-reduced-motion:reduce){.home-welcome-mascot{animation:none}}
 .home-welcome-cta{margin-top:14px;background:linear-gradient(145deg,#38bda6,#2a8f7d);box-shadow:0 8px 18px rgba(20,60,50,.4),inset 0 1px 0 rgba(255,255,255,.4)}
 @media (max-width:560px){.home-welcome-mascot{height:94px}}
 /* Kartu statistik pastel empat warna */
@@ -906,17 +911,15 @@ span.org-mini{display:grid;place-items:center;font-size:14px}
 /* ===== Gerbang awal: hanya halaman login tanpa kerangka =====
    Selama body ber-class auth-locked (belum masuk, sesi masih diperiksa,
    atau akun menunggu persetujuan), SEMUA kerangka aplikasi disembunyikan:
-   header atas, drawer/navigasi samping, maskot, lapisan
-   gelap drawer, dan menu maskot. Yang tampil hanya isi #app (halaman
-   login / menunggu persetujuan). Class ini sudah ada di HTML sejak awal
-   muat, jadi tidak ada kilasan header/navigasi sebelum login tampil.
-   Sesudah login disetujui, render() melepas class ini dan kerangka
-   tampil persis seperti sebelumnya. */
+   header atas, drawer/navigasi samping, dan lapisan gelap drawer.
+   Yang tampil hanya isi #app (halaman login / menunggu persetujuan).
+   Class ini sudah ada di HTML sejak awal muat, jadi tidak ada kilasan
+   header/navigasi sebelum login tampil. Sesudah login disetujui,
+   render() melepas class ini dan kerangka tampil persis seperti
+   sebelumnya. */
 body.auth-locked header,
 body.auth-locked #dr,
-body.auth-locked #pet,
-body.auth-locked #ov,
-body.auth-locked #pm{display:none!important}
+body.auth-locked #ov{display:none!important}
 body.auth-locked main{padding:22px 16px 28px}
 body.auth-locked .landing{padding-top:0}
 @media (max-width:560px){body.auth-locked main{padding:14px 12px 22px}}
