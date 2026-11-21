@@ -54,12 +54,25 @@ function renderDrawer(){
       icon(x[4],19),h('span',{},x[1]),x[0]==='pesan'&&S.unreadMessages>0&&h('span',{class:'nav-badge'},String(S.unreadMessages)))),
     h('button',{class:'menu-logout',onclick:()=>signOut()},icon('logout',17),h('span',{},'Keluar')));
 }
+/* Gerbang awal: kerangka (header, drawer, navigasi bawah, maskot) hanya
+   tampil untuk pengguna yang sudah masuk dan disetujui. Selama terkunci,
+   body ber-class auth-locked dan CSS menyembunyikan semua kerangka —
+   yang terlihat hanya halaman login / menunggu persetujuan di #app. */
+function setAuthLocked(locked){
+  document.body.classList.toggle('auth-locked',!!locked);
+  if(locked){
+    document.body.classList.remove('open');
+    const pm=document.querySelector('#pm');if(pm)pm.remove();
+    const qm=document.querySelector('#qm');if(qm)qm.remove();
+  }
+}
 function render(){
   if(S.activityScannerStop)S.activityScannerStop();
   if(S.view!=='musyawarah')window.__musyAlive=false;
   if(!S.mainAdmin)S.adminMenuOpen=false;
   syncAdminTheme();
   if(S.authLoading){
+    setAuthLocked(true);
     $('#dr').replaceChildren();
     $('#app').replaceChildren(h('p',{class:'warn',style:'text-align:center;padding:40px 16px'},'Memeriksa sesi login...'));
     $('#tb').style.display='none';
@@ -68,6 +81,7 @@ function render(){
     return;
   }
   if(!S.uid){
+    setAuthLocked(true);
     $('#dr').replaceChildren();
     $('#app').replaceChildren(h('div',{class:'landing'},h('section',{class:'hero'},
       h('p',{style:'font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-bottom:10px',onclick:()=>handleBrandTap()},'SHIKOKU FAMILY'),
@@ -81,6 +95,7 @@ function render(){
     return;
   }
   if(S.uid&&S.approvalStatus!=='approved'&&!S.admin){
+    setAuthLocked(true);
     $('#dr').replaceChildren();
     const status=S.approvalStatus==='rejected'?'Akun ini ditolak admin.':'Akun ini belum disetujui admin.';
     $('#app').replaceChildren(h('section',{class:'card auth-card'},h('b',{},status),h('p',{class:'sub'},'Data anggota, kegiatan, dan wilayah hanya dimuat setelah akun disetujui. Hubungi admin utama untuk memeriksa status akun.'),h('button',{class:'btn',onclick:()=>signOut()},'Keluar')));
@@ -90,6 +105,7 @@ function render(){
     document.body.classList.remove('open');
     return;
   }
+  setAuthLocked(false);
   renderDrawer();
   $('#sw').style.display=S.mainAdmin?'flex':'none';
   updateApprovalBadges();
