@@ -599,32 +599,100 @@ async function kembalikanSusunanAwal(){
    Simpan/Batal; satu panel tampil pada satu waktu di atas halaman) ===== */
 function bukaPanelSusunan(jenis,id){S.susunanPanel={jenis,id:id||null};render();window.scrollTo({top:0,behavior:'smooth'})}
 function tutupPanelSusunan(){S.susunanPanel=null;render()}
-/* Pemilih pemegang jabatan: kotak cari nama di atas dropdown anggota.
-   Mengetik menyaring isi dropdown (nama mengandung teks ketikan, tidak
-   peka huruf besar/kecil); mengosongkan kotak mengembalikan daftar
-   lengkap. Wadah meneruskan properti .value ke dropdown di dalamnya,
-   jadi pemanggil memakai .value seperti sebelumnya. */
+/* Pemilih pemegang jabatan: SATU field gabungan (combobox/autocomplete).
+   Field menampilkan nama pemegang saat ini; mengetik langsung memunculkan
+   daftar saran melayang di bawah field, bersumber dari daftar anggota
+   (nama mengandung ketikan, tidak peka huruf besar/kecil, cocok dari
+   tengah nama). Menyentuh field dengan ketikan kosong menampilkan
+   seluruh daftar anggota. Baris teratas selalu '— Tanpa pemegang —'
+   untuk mengosongkan jabatan. Daftar menutup saat memilih saran atau
+   menyentuh bidang di luar field/daftar. Nilai komponen (.value) tetap
+   uid anggota terpilih atau '' supaya pemanggil tidak berubah. */
 function susunanPilihAnggota(currentId){
   const daftar=[...S.members].sort((a,b)=>(a.nama||'').localeCompare(b.nama||'','id'));
-  const sel=h('select',{});
-  const catatan=h('p',{class:'sub anggota-cari-note',style:'display:none'},'Tidak ada anggota dengan nama itu.');
-  const isiDaftar=query=>{
-    const q=(query||'').trim().toLowerCase();
-    const pilihanSebelumnya=sel.value;
-    const cocok=daftar.filter(m=>!q||(m.nama||'').toLowerCase().includes(q));
-    sel.replaceChildren(
-      h('option',{value:''},'— Belum ditetapkan —'),
-      ...cocok.map(member=>h('option',{value:member.id},(member.nama||'Tanpa nama')+' · '+memberRegion(member)))
-    );
-    if(pilihanSebelumnya&&cocok.some(m=>m.id===pilihanSebelumnya))sel.value=pilihanSebelumnya;
-    catatan.style.display=(q&&!cocok.length)?'':'none';
+  const cariNama=id=>daftar.find(m=>m.id===id)||null;
+  let terpilih=cariNama(currentId)?currentId:'';
+  let sorot=-1;
+  let barisPilihan=[];
+  const input=h('input',{type:'text',placeholder:'Ketik nama anggota…',autocomplete:'off',role:'combobox','aria-expanded':'false','aria-autocomplete':'list'});
+  if(terpilih)input.value=cariNama(terpilih).nama||'';
+  const daftarEl=h('div',{class:'anggota-saran',role:'listbox'});
+  daftarEl.style.display='none';
+  const tutup=()=>{
+    daftarEl.style.display='none';
+    daftarEl.replaceChildren();
+    sorot=-1;barisPilihan=[];
+    input.setAttribute('aria-expanded','false');
   };
-  isiDaftar('');
-  sel.value=currentId||'';
-  const cari=h('input',{type:'text',placeholder:'Cari nama anggota…',autocomplete:'off'});
-  cari.addEventListener('input',()=>isiDaftar(cari.value));
-  const wadah=h('div',{class:'anggota-picker'},cari,sel,catatan);
-  Object.defineProperty(wadah,'value',{get:()=>sel.value,set:v=>{sel.value=v||''}});
+  const pilih=id=>{
+    terpilih=id||'';
+    const m=terpilih?cariNama(terpilih):null;
+    input.value=m?(m.nama||''):'';
+    tutup();
+  };
+  const buka=()=>{
+    const teks=input.value;
+    const pemegang=terpilih?cariNama(terpilih):null;
+    /* Bila isi field masih nama pemegang terpilih (baru disentuh), tampilkan
+       daftar lengkap; selain itu saring menurut ketikan. */
+    const q=pemegang&&teks===(pemegang.nama||'')?'':teks.trim().toLowerCase();
+    const cocok=daftar.filter(m=>!q||(m.nama||'').toLowerCase().includes(q));
+    barisPilihan=[];sorot=-1;
+    const barisKosong=h('div',{class:'anggota-opt anggota-opt-clear',role:'option'},'— Tanpa pemegang —');
+    barisKosong.addEventListener('pointerdown',ev=>{ev.preventDefault();pilih('')});
+    barisPilihan.push({el:barisKosong,id:''});
+    const anak=[barisKosong];
+    if(!cocok.length){
+      anak.push(h('div',{class:'anggota-opt anggota-opt-note'},'Tidak ada anggota dengan nama itu'));
+    }else{
+      cocok.forEach(member=>{
+        const baris=h('div',{class:'anggota-opt',role:'option'},
+          member.foto?h('img',{class:'org-mini',...memberMediaAttributes(member.foto,'src'),alt:''}):h('span',{class:'org-mini org-avatar-ph'},(member.nama||'?').trim().slice(0,1).toUpperCase()),
+          h('span',{class:'anggota-opt-info'},h('b',{},member.nama||'Tanpa nama'),h('small',{},memberRegion(member))));
+        baris.addEventListener('pointerdown',ev=>{ev.preventDefault();pilih(member.id)});
+        barisPilihan.push({el:baris,id:member.id});
+        anak.push(baris);
+      });
+    }
+    daftarEl.replaceChildren(...anak);
+    daftarEl.style.display='block';
+    input.setAttribute('aria-expanded','true');
+    if(typeof hydrateMemberMedia==='function')hydrateMemberMedia();
+  };
+  input.addEventListener('focus',buka);
+  input.addEventListener('input',()=>{
+    const m=terpilih?cariNama(terpilih):null;
+    if(!m||input.value!==(m.nama||''))terpilih='';
+    buka();
+  });
+  input.addEventListener('keydown',ev=>{
+    if(daftarEl.style.display==='none'){
+      if(ev.key==='ArrowDown'){ev.preventDefault();buka()}
+      return;
+    }
+    if(ev.key==='ArrowDown'||ev.key==='ArrowUp'){
+      ev.preventDefault();
+      if(!barisPilihan.length)return;
+      sorot=ev.key==='ArrowDown'?(sorot+1)%barisPilihan.length:(sorot-1+barisPilihan.length)%barisPilihan.length;
+      barisPilihan.forEach((b,i)=>b.el.classList.toggle('on',i===sorot));
+      barisPilihan[sorot].el.scrollIntoView({block:'nearest'});
+    }else if(ev.key==='Enter'){
+      if(sorot>=0&&barisPilihan[sorot]){ev.preventDefault();pilih(barisPilihan[sorot].id)}
+    }else if(ev.key==='Escape'){
+      tutup();
+    }
+  });
+  input.addEventListener('blur',()=>{setTimeout(()=>{if(document.activeElement!==input)tutup()},150)});
+  const wadah=h('div',{class:'anggota-picker'},input,daftarEl);
+  /* Sentuhan di luar field/daftar menutup daftar saran (tanpa tombol X).
+     Pendengar membersihkan dirinya sendiri begitu komponen terlepas
+     dari dokumen karena panel digambar ulang. */
+  const onDocPointer=ev=>{
+    if(!wadah.isConnected){document.removeEventListener('pointerdown',onDocPointer,true);return}
+    if(!wadah.contains(ev.target))tutup();
+  };
+  document.addEventListener('pointerdown',onDocPointer,true);
+  Object.defineProperty(wadah,'value',{get:()=>terpilih,set:v=>pilih(v||'')});
   return wadah;
 }
 /* Pemilih induk: semua jabatan dalam urutan pohon, menjorok menurut
@@ -658,7 +726,7 @@ function susunanPanelPemegang(node){
   const current=pemegangJabatan(node);
   const sel=susunanPilihAnggota(current?current.id:'');
   return box(h('b',{},'Tetapkan pengurus — '+node.nama),
-    h('p',{class:'sub'},'Ketik nama untuk mencari, atau pilih pemegang jabatan dari daftar anggota. Kosongkan bila jabatan belum ada pemegangnya.'),
+    h('p',{class:'sub'},'Ketik nama anggota di kotak berikut — saran dari daftar anggota muncul otomatis. Pilih "— Tanpa pemegang —" bila jabatan belum ada pemegangnya.'),
     sel,
     h('div',{class:'fl'},
       h('button',{class:'btn',onclick:async()=>{

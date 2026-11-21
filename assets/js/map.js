@@ -11,15 +11,20 @@ async function loadMapSettings(){
 }
 async function loadPendingUsers(){
   if(!S.supabase){
-    if(!S.mainAdmin){S.pendingUsers=[];return}
-    S.pendingUsers=localUsers().filter(user=>user.approval_status==='pending')
-      .map(user=>({id:user.id,name:user.name,email:user.email,created_at:user.created_at,approval_status:user.approval_status}));
+    if(!S.mainAdmin){S.pendingUsers=[];S.approvedUsers=[];return}
+    const ringkas=user=>({id:user.id,name:user.name,email:user.email,created_at:user.created_at,approval_status:user.approval_status,approved_at:user.approved_at||null,approved_by:user.approved_by||'',role:user.role,is_main_admin:user.is_main_admin===true,avatar_url:user.avatar_url||''});
+    S.pendingUsers=localUsers().filter(user=>user.approval_status==='pending').map(ringkas);
+    S.approvedUsers=localUsers().filter(user=>user.approval_status==='approved').map(ringkas);
     return;
   }
-  if(!S.mainAdmin){S.pendingUsers=[];return}
+  if(!S.mainAdmin){S.pendingUsers=[];S.approvedUsers=[];return}
   const {data,error}=await S.supabase.from('profiles').select('id,name,email,created_at,approval_status').eq('approval_status','pending').order('created_at',{ascending:true});
-  if(error){console.error(error);S.pendingUsers=[];return}
-  S.pendingUsers=data||[];
+  if(error){console.error(error);S.pendingUsers=[]}else S.pendingUsers=data||[];
+  /* Catatan akun yang sudah disetujui untuk tab 'Sudah Disetujui'.
+     select('*') supaya kolom tambahan (approved_at, approved_by, avatar_url,
+     region warisan) ikut terbaca bila ada, tanpa gagal bila belum ada. */
+  const disetujui=await S.supabase.from('profiles').select('*').eq('approval_status','approved');
+  if(disetujui.error){console.error(disetujui.error);S.approvedUsers=[]}else S.approvedUsers=disetujui.data||[];
 }
 function csvEsc(v){v=String(v==null?'':v);return(v.includes(',')||v.includes('"')||v.includes(String.fromCharCode(10)))?'"'+v.split('"').join('""')+'"':v}
 async function exportMyMaps(det){
@@ -61,28 +66,85 @@ function mapEmbed(){
 function vPeta(){return [mapEmbed()]}
 async function setApproval(id,status){
   if(!S.mainAdmin)return;
+  /* Setiap persetujuan baru mencatat waktu persetujuan (approved_at) dan
+     nama admin penyetuju dari sesi (approved_by) ke data akun. */
+  const oleh=S.name||S.email||'';
   if(!S.supabase){
     const users=localUsers(),user=users.find(item=>item.id===id);
     if(!user){alert('Pendaftar tidak ditemukan.');return}
     user.approval_status=status;
     user.approved_at=status==='approved'?new Date().toISOString():null;
+    user.approved_by=status==='approved'?(oleh||null):null;
     try{saveLocalUsers(users)}catch(e){alert('Gagal memperbarui persetujuan: '+e.message);return}
     await loadPendingUsers();render();
     return;
   }
-  const {error}=await S.supabase.from('profiles').update({
-    approval_status:status,
-    approved_at:status==='approved'?new Date().toISOString():null
-  }).eq('id',id);
+  const dasar={approval_status:status,approved_at:status==='approved'?new Date().toISOString():null};
+  let {error}=await S.supabase.from('profiles').update({...dasar,approved_by:status==='approved'?(oleh||null):null}).eq('id',id);
+  if(error&&/approved_by/.test(error.message||'')){
+    /* Kolom approved_by belum ada di database lama: ulangi tanpa kolom itu
+       supaya persetujuan tidak gagal hanya karena catatan nama penyetuju. */
+    ({error}=await S.supabase.from('profiles').update(dasar).eq('id',id));
+  }
   if(error){alert('Gagal memperbarui persetujuan: '+error.message);return}
   await loadPendingUsers();render();
 }
+function peranAkun(user){
+  if(user.is_main_admin)return 'Admin Utama';
+  if(user.role==='admin')return 'Admin';
+  return 'Anggota';
+}
+function tanggalAkun(value){
+  if(!value)return '';
+  const d=new Date(value);
+  return Number.isNaN(d.getTime())?'':d.toLocaleString('id-ID');
+}
+/* Wilayah akun: dari kolom profil bila ada, selain itu dicocokkan dari
+   daftar anggota lewat email yang sama. Kosong bila tidak ditemukan. */
+function wilayahAkun(user){
+  if(user.region)return String(user.region);
+  if(user.email){
+    const member=(S.members||[]).find(m=>(m.email||'').toLowerCase()===String(user.email).toLowerCase());
+    if(member)return memberRegion(member);
+  }
+  return '';
+}
 function vApprovals(){
   if(!S.mainAdmin)return [h('p',{class:'warn'},'Halaman ini hanya dapat diakses admin utama.')];
-  const rows=S.pendingUsers.map(user=>h('div',{class:'card approval-row'},
-    h('div',{style:'flex:1;min-width:0'},h('b',{},user.name||'Nama belum diisi'),h('small',{},user.email||'-'),h('small',{},new Date(user.created_at).toLocaleString('id-ID'))),
-    h('div',{class:'fl'},h('button',{class:'btn',onclick:()=>setApproval(user.id,'approved')},'Setujui'),h('button',{class:'btn s',onclick:()=>setApproval(user.id,'rejected')},'Tolak'))));
-  return [h('h1',{},'Persetujuan Akun'),...(rows.length?rows:[h('p',{class:'warn'},'Tidak ada pendaftar yang menunggu persetujuan.')])];
+  const tab=S.approvalsTab==='disetujui'?'disetujui':'menunggu';
+  const toggle=h('div',{class:'org-toggle'},
+    h('button',{class:'org-toggle-btn'+(tab==='menunggu'?' on':''),onclick:()=>{S.approvalsTab='menunggu';render()}},'Menunggu ('+S.pendingUsers.length+')'),
+    h('button',{class:'org-toggle-btn'+(tab==='disetujui'?' on':''),onclick:()=>{S.approvalsTab='disetujui';render()}},'Sudah Disetujui ('+S.approvedUsers.length+')'));
+  if(tab==='menunggu'){
+    const rows=S.pendingUsers.map(user=>h('div',{class:'card approval-row'},
+      h('div',{style:'flex:1;min-width:0'},h('b',{},user.name||'Nama belum diisi'),h('small',{},user.email||'-'),h('small',{},new Date(user.created_at).toLocaleString('id-ID'))),
+      h('div',{class:'fl'},h('button',{class:'btn',onclick:()=>setApproval(user.id,'approved')},'Setujui'),h('button',{class:'btn s',onclick:()=>setApproval(user.id,'rejected')},'Tolak'))));
+    return [h('h1',{},'Persetujuan Akun'),toggle,...(rows.length?rows:[h('p',{class:'warn'},'Tidak ada pendaftar yang menunggu persetujuan.')])];
+  }
+  /* Tab catatan: akun yang sudah disetujui, persetujuan terbaru di atas.
+     Tanggal persetujuan diambil dari approved_at bila tersimpan; akun lama
+     tanpa catatan itu ditampilkan jujur dengan label tanggal daftarnya. */
+  const urut=[...S.approvedUsers].sort((a,b)=>{
+    const ta=new Date(a.approved_at||a.created_at||0).getTime()||0;
+    const tb=new Date(b.approved_at||b.created_at||0).getTime()||0;
+    return tb-ta;
+  });
+  const rows=urut.map(user=>{
+    const wilayah=wilayahAkun(user);
+    const tglSetuju=tanggalAkun(user.approved_at);
+    const tglDaftar=tanggalAkun(user.created_at);
+    const barisTanggal=tglSetuju
+      ?'Disetujui '+tglSetuju+(user.approved_by?' oleh '+user.approved_by:'')
+      :(tglDaftar?'Terdaftar '+tglDaftar:'—');
+    return h('div',{class:'card approval-row'},
+      user.avatar_url?h('img',{class:'av',src:user.avatar_url,alt:'Foto '+(user.name||'akun'),style:'object-fit:cover'}):h('div',{class:'av'},(user.name||user.email||'?').trim().slice(0,1).toUpperCase()),
+      h('div',{style:'flex:1;min-width:0'},
+        h('b',{},user.name||'Nama belum diisi',h('span',{class:'tag'},peranAkun(user))),
+        h('small',{},user.email||'-'),
+        wilayah?h('small',{},'Wilayah: '+wilayah):null,
+        h('small',{},barisTanggal)));
+  });
+  return [h('h1',{},'Persetujuan Akun'),toggle,...(rows.length?rows:[h('p',{class:'warn'},'Belum ada akun yang disetujui.')])];
 }
 function vPetaSettings(){
   const mid=mapMid(),det=h('input',{type:'checkbox'}),inp=h('textarea',{rows:4,placeholder:'Tempel kode embed (iframe) dari Google My Maps'});

@@ -861,8 +861,16 @@ span.org-mini{display:grid;place-items:center;font-size:14px}
 .org-c-aksi .org-tools{justify-content:flex-end;max-width:260px}
 .org-grip{cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none;color:var(--mut);font-size:15px;line-height:1;letter-spacing:2px;padding:3px 12px;border-radius:8px}
 .org-grip:active{cursor:grabbing}
-.anggota-picker{display:block}
-.anggota-picker .anggota-cari-note{margin:2px 0 0}
+.anggota-picker{position:relative;display:block}
+.anggota-saran{position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:30;background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:0 14px 34px rgba(31,58,80,.22);max-height:264px;overflow-y:auto;padding:6px}
+.anggota-opt{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:11px;cursor:pointer;color:var(--ink)}
+.anggota-opt:hover,.anggota-opt.on{background:#e3f1f8}
+.anggota-opt-clear{font-weight:600;color:var(--mut)}
+.anggota-opt-note{color:var(--mut);cursor:default;font-size:14px}
+.anggota-opt-note:hover{background:none}
+.anggota-opt-info{flex:1;min-width:0}
+.anggota-opt-info b{display:block;font-size:14px;overflow-wrap:anywhere}
+.anggota-opt-info small{display:block;color:var(--mut);font-size:12px;margin-top:1px}
 .org-node.org-dragging{opacity:.45}
 .org-ghost{position:fixed;z-index:300;pointer-events:none;opacity:.88;margin:0;box-shadow:0 14px 34px rgba(31,58,80,.35)}
 .org-node-main.org-drop-ok{outline:3px solid var(--acc);outline-offset:2px}
