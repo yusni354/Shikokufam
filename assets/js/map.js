@@ -170,63 +170,64 @@ async function simpanPinManualAnggota(member,pin,alamatHasil){
 }
 /* ===== Geocoding TERBALIK untuk pin manual: titik pin -> TEKS ALAMAT =====
    Peletakan pin manual mencatat ALAMAT titik itu, bukan angka lintang/
-   bujurnya. Sumber utama: Nominatim reverse berbahasa Jepang (tanpa
-   kunci API) — memberi prefektur, kota, distrik, blok, jalan, nomor,
-   dan kode pos. Cadangan: GSI reverse resmi Jepang (nama distrik
-   lv01Nm) untuk melengkapi hasil Nominatim yang hanya setingkat kota,
-   atau berdiri sendiri bila Nominatim tidak terjangkau.
+   bujurnya — dan alamatnya ditulis dalam ROMAJI (huruf Latin), bukan
+   huruf Jepang. Sumbernya Nominatim reverse berbahasa Inggris (tanpa
+   kunci API): untuk alamat Jepang layanan ini mengembalikan
+   transliterasi romaji (prefektur, kota, distrik, blok, jalan, nomor,
+   dan kode pos). Komponen yang tetap berhuruf Jepang (nama yang belum
+   punya nama Latin di peta, mis. sebagian nama jalan / blok 字) dibuang
+   dari susunan; bila rincian di bawah tingkat kota TIDAK ada yang
+   tersedia dalam romaji, hasilnya dianggap tidak tersedia.
+   GSI reverse tidak lagi dipakai di jalur ini: hasilnya selalu nama
+   distrik berhuruf Jepang, jadi tidak bisa ditulis ke field alamat.
    Mengembalikan {alamat, kodepos} atau null bila titik itu memang
-   tidak beralamat (mis. tengah laut): pemanggil lalu TIDAK menimpa
-   alamat lama anggota. */
+   tidak beralamat (mis. tengah laut) atau alamat romaji tidak
+   tersedia: pemanggil lalu TIDAK menimpa alamat lama anggota. */
 function petaKodeposFormat(v){const d=String(v||'').replace(/\D/g,'');return d.length===7?d.slice(0,3)+'-'+d.slice(3):''}
+/* Huruf Jepang (hiragana, katakana, kanji, kana setengah lebar):
+   komponen alamat yang masih mengandung huruf ini tidak ditulis. */
+const PETA_HURUF_JP=/[぀-ヿ㐀-䶿一-鿿豈-﫿ｦ-ﾝ]/;
 async function petaNomReverse(coords){
   const jeda=1100-(Date.now()-PETA_GEO.lastNom);
   if(PETA_GEO.lastNom&&jeda>0)await petaTunggu(jeda);
   PETA_GEO.lastNom=Date.now();
-  const res=await fetch('https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat='+coords[0]+'&lon='+coords[1]+'&zoom=18&addressdetails=1&accept-language=ja',{headers:{'Accept':'application/json'}});
+  /* accept-language=en: Nominatim mengembalikan nama tempat Jepang
+     dalam transliterasi romaji (huruf Latin). */
+  const res=await fetch('https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat='+coords[0]+'&lon='+coords[1]+'&zoom=18&addressdetails=1&accept-language=en',{headers:{'Accept':'application/json'}});
   if(!res.ok)throw new Error('Nominatim reverse HTTP '+res.status);
   const j=await res.json();
   if(!j||j.error||!j.address)return null;
   const a=j.address;
   if(a.country_code&&a.country_code!=='jp')return null;
   const ambil=(...ks)=>{for(const k of ks){if(a[k])return String(a[k])}return ''};
-  const pref=ambil('province','state');
-  const kota=ambil('city','town','village')||ambil('county');
+  const romaji=v=>{const s=String(v||'').trim();return s&&!PETA_HURUF_JP.test(s)?s:''};
+  const pref=romaji(ambil('province','state'));
+  const kota=romaji(ambil('city','town','village')||ambil('county'));
   /* Detail di bawah tingkat kota (distrik/blok/jalan/nomor) adalah bukti
      titik ini benar-benar beralamat; hasil yang hanya setingkat kota
      (mis. titik di perairan yang menempel batas administrasi kota)
-     tidak dianggap alamat. */
-  const rinci=['city_block','quarter','neighbourhood','suburb','city_district','road','house_number'].some(k=>a[k]);
-  /* Susun mengikuti urutan alamat Jepang: prefektur → kota → distrik →
-     blok → jalan → nomor; bagian yang sudah tercakup tidak diulang. */
-  const urutan=[pref,kota,ambil('city_district'),ambil('suburb'),ambil('quarter'),ambil('neighbourhood'),ambil('city_block'),ambil('road'),ambil('house_number')];
-  let alamat='';
-  urutan.forEach(bag=>{if(bag&&!alamat.includes(bag))alamat+=bag});
+     tidak dianggap alamat. Rincian hanya dihitung bila tersedia dalam
+     ROMAJI: rincian yang seluruhnya berhuruf Jepang berarti alamat
+     romaji tidak tersedia dari layanan. */
+  const kunciRinci=['city_block','quarter','neighbourhood','suburb','city_district','road','house_number'];
+  const rinci=kunciRinci.some(k=>romaji(a[k]));
+  /* Susun urutan alamat romaji: nomor/jalan → blok → distrik → kawasan →
+     kota → prefektur, dipisah koma; komponen berhuruf Jepang dibuang
+     dan bagian yang sama tidak diulang. */
+  const jalan=[romaji(a.house_number),romaji(a.road)].filter(Boolean).join(' ');
+  const urutan=[jalan,romaji(a.city_block),romaji(a.neighbourhood),romaji(a.quarter),romaji(a.suburb),romaji(a.city_district),kota,pref];
+  const bagian=[];
+  urutan.forEach(bag=>{if(bag&&!bagian.some(x=>x.toLowerCase()===bag.toLowerCase()))bagian.push(bag)});
+  const alamat=bagian.join(', ');
   return {alamat,kodepos:petaKodeposFormat(a.postcode),rinci:rinci&&!!alamat,pref,kota};
-}
-async function petaGsiReverse(coords){
-  const res=await fetch('https://mreversegeocoder.gsi.go.jp/reverse-geocoder/LonLatToAddress?lat='+coords[0]+'&lon='+coords[1],{headers:{'Accept':'application/json'}});
-  if(!res.ok)throw new Error('GSI reverse HTTP '+res.status);
-  const j=await res.json();
-  const nama=j&&j.results?String(j.results.lv01Nm||'').trim():'';
-  return nama||null;
 }
 async function petaReverseGeocode(coords){
   let nom=null;
-  try{nom=await petaNomReverse(coords)}catch(e){/* lanjut ke GSI */}
-  if(nom&&nom.rinci)return {alamat:nom.alamat,kodepos:nom.kodepos};
-  let gsi=null;
-  try{gsi=await petaGsiReverse(coords)}catch(e){/* kedua sumber gagal */}
-  if(gsi){
-    if(nom&&(nom.pref||nom.kota)){
-      let alamat='';
-      [nom.pref,nom.kota,gsi].forEach(bag=>{if(bag&&!alamat.includes(bag))alamat+=bag});
-      return {alamat,kodepos:nom.kodepos||''};
-    }
-    return {alamat:gsi,kodepos:nom?nom.kodepos||'':''};
-  }
-  /* Nominatim hanya memberi tingkat kota / kedua layanan kosong:
-     titik dianggap tidak beralamat. */
+  try{nom=await petaNomReverse(coords)}catch(e){nom=null}
+  if(nom&&nom.rinci&&nom.alamat)return {alamat:nom.alamat,kodepos:nom.kodepos};
+  /* Alamat romaji tidak tersedia (titik tidak beralamat, atau rincian
+     alamatnya hanya ada dalam huruf Jepang): kembalikan null supaya
+     pemanggil tidak menimpa alamat lama dengan teks Jepang. */
   return null;
 }
 /* Bagi anggota menjadi yang terpetakan dan yang belum. Di v3, pin

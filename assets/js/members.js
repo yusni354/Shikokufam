@@ -919,8 +919,8 @@ function orgTombolHapus(nodes,node){
    kelompok per dapukan yang mempunyai bawahan, dengan nama dapukan itu
    sebagai kepala kelompok; terakhir kelompok-kelompok tambahan buatan
    admin. Semua baris RATA SEJAJAR (tanpa indentasi dan tanpa garis
-   pemandu) dan diberi nomor urut berjalan 1, 2, 3, … yang berlanjut
-   melewati semua kartu kelompok mengikuti urutan struktur. */
+   pemandu) dan diberi nomor urut yang MULAI DARI 1 PADA SETIAP KARTU
+   kelompok (baris pertama tiap kartu selalu nomor 1). */
 /* Kepala kelompok: pemisah ringan antar kelompok pada tabel. Bagi admin
    tulisannya bisa disunting langsung lewat ikon pensil di sampingnya:
    kepala kelompok puncak menyunting label tersimpan 'labelKelompokPuncak',
@@ -1161,7 +1161,6 @@ function orgTabel(nodes){
   const root=susunanAkar(nodes);
   if(!root)return h('p',{class:'warn'},'Susunan kepengurusan belum tersedia.');
   const groups=orgKelompokTampil(nodes);
-  let urutGlobal=0;
   const groupEls=groups.map((grup,gi)=>{
     const anakTabel=[h('div',{class:'org-row org-row-head org-row-head-v2'},
       S.admin?h('span',{},''):null,
@@ -1170,9 +1169,8 @@ function orgTabel(nodes){
       h('span',{},'Wilayah'),
       h('span',{},'Kontak'),
       S.admin?h('span',{},''):null)];
-    grup.items.forEach(item=>{
-      urutGlobal+=1;
-      anakTabel.push(orgRow(nodes,item,urutGlobal));
+    grup.items.forEach((item,idx)=>{
+      anakTabel.push(orgRow(nodes,item,idx+1));
       /* Pengaturan baris ini melebar TEPAT di bawah barisnya, di dalam
          tabel — bukan panel terpisah di atas halaman. */
       if(S.admin&&S.susunanInline&&S.susunanInline.jenis==='atur'&&S.susunanInline.id===item.id){
