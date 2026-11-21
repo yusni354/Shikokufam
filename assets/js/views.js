@@ -67,7 +67,41 @@ function setAuthLocked(locked){
     const qm=document.querySelector('#qm');if(qm)qm.remove();
   }
 }
+/* ===== Perlindungan field yang sedang diedit (perbaikan "force close"
+   saat mengetik) =====
+   render() menggambar ulang SELURUH #app (replaceChildren), jadi render
+   yang dipicu data latar — snapshot realtime koleksi mana pun, pesan baru
+   yang tiba, perubahan susunan/pilihan/sambutan dari pengguna lain,
+   kegagalan media, atau pemeriksaan berkala admin — menghancurkan field
+   yang sedang difokuskan beserta ketikan yang belum tersimpan. Itulah
+   sebabnya mengetik di formulir mana pun kadang tertutup sendiri dan
+   harus diulang dari awal. Jalur data latar kini memakai
+   renderDariData(): selama ada field (input/textarea/select/
+   contenteditable) di dalam #app yang sedang difokuskan, gambar ulang
+   DITUNDA dan dijalankan otomatis begitu fokus berpindah dari field.
+   Render dari aksi pengguna sendiri (klik tombol, pindah menu) tetap
+   langsung seperti biasa. */
+let renderTertundaTimer=null;
+function fieldSedangDiedit(){
+  const aktif=document.activeElement;
+  if(!aktif||aktif===document.body)return false;
+  const app=document.getElementById('app');
+  if(!app||!app.contains(aktif))return false;
+  const tag=aktif.tagName;
+  return tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT'||aktif.isContentEditable===true;
+}
+function renderDariData(){
+  if(!fieldSedangDiedit()){render();return}
+  if(renderTertundaTimer)return;
+  const cek=()=>{
+    renderTertundaTimer=null;
+    if(fieldSedangDiedit()){renderTertundaTimer=setTimeout(cek,700);return}
+    render();
+  };
+  renderTertundaTimer=setTimeout(cek,700);
+}
 function render(){
+  if(renderTertundaTimer){clearTimeout(renderTertundaTimer);renderTertundaTimer=null}
   if(S.activityScannerStop)S.activityScannerStop();
   if(S.view!=='musyawarah')window.__musyAlive=false;
   if(!S.mainAdmin)S.adminMenuOpen=false;
@@ -139,12 +173,12 @@ function sub(name,key){
       /* Buku catatan Musyawarah mengelola tampilannya sendiri saat terbuka:
          data baru digabungkan tanpa menggambar ulang editor yang sedang dipakai. */
       if(key==='musyawarah'&&window.__musyAlive&&typeof window.__musyOnRemote==='function')window.__musyOnRemote();
-      else render();
+      else renderDariData();
     }
   },error=>{
     console.error('Koleksi Supabase '+name+' gagal dimuat:',error);
     S.storageErrors[name]=error.message||'Koneksi gagal';
-    render();
+    renderDariData();
   });
 }
 let dataUnsubscribers=[];

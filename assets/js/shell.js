@@ -4,7 +4,7 @@ function syncAdminTheme(){
   document.body.classList.toggle('admin-dark',S.mainAdmin&&(S.adminMenuOpen||isAdminSettingsView()));
   $('#st').setAttribute('aria-expanded',String(S.adminMenuOpen));
 }
-function go(v){S.view=v;simpanViewTerakhir(v);S.adminMenuOpen=false;S.form=S.detail=S.dutyForm=null;S.financeForm=null;S.financePhoto=null;S.detailOrigin=null;if(v==='pesan'&&S.admin)S.openConversation=null;document.body.classList.remove('open');syncAdminTheme();render();if(v==='pesan'&&!S.admin)markMessagesRead()}
+function go(v){S.view=v;simpanViewTerakhir(v);S.adminMenuOpen=false;S.form=S.detail=S.dutyForm=null;S.financeForm=null;S.financePhoto=null;S.idPhoto=null;S.detailOrigin=null;if(v==='pesan'&&S.admin)S.openConversation=null;document.body.classList.remove('open');syncAdminTheme();render();if(v==='pesan'&&!S.admin)markMessagesRead()}
 $('#mn').onclick=()=>document.body.classList.add('open');
 $('#mn').replaceChildren(icon('menu',21));
 $('#st').replaceChildren(icon('settings',19));

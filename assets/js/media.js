@@ -31,7 +31,7 @@ function hydrateMemberMedia(){
       S.memberMediaFailed.add(path);
       S.memberMediaError=error.message||'Gagal membuka media anggota';
       console.error('Media privat anggota gagal dimuat:',error);
-      render();
+      renderDariData();
     }).finally(()=>S.memberMediaPending.delete(path));
   });
 }

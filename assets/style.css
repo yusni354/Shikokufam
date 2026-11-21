@@ -92,7 +92,7 @@ input[type=checkbox]{width:20px;height:20px;margin:0;flex:none;accent-color:var(
 .member-filters select{margin:0}
 .member-results-count{margin:12px 4px;font-size:13px;color:var(--mut)}
 .member-grid{display:grid;gap:10px}
-.member-card{display:flex;align-items:center;gap:12px;padding:14px;background:var(--card);border:1px solid var(--line);border-radius:20px;box-shadow:0 4px 14px rgba(47,134,184,.08)}
+.member-card{display:flex;align-items:center;gap:12px;padding:14px;background:var(--card);border:1px solid var(--line);border-radius:20px;box-shadow:0 4px 14px rgba(47,134,184,.08);cursor:pointer}
 .member-card{border-left:4px solid var(--region-color,#718096)}
 .member-avatar{width:54px;height:54px;flex:none;object-fit:cover;border-radius:17px}
 .member-avatar-placeholder{display:grid;place-items:center;background:linear-gradient(145deg,#dff2e7,#dceef8);color:#258a73;font-size:22px;font-weight:700}
@@ -176,6 +176,7 @@ input[type=checkbox]{width:20px;height:20px;margin:0;flex:none;accent-color:var(
 .member-id-banner .member-region-tag{background:rgba(255,255,255,.2);color:#fff}
 .member-id-main{display:flex;align-items:center;gap:15px;padding:18px 16px 14px}
 .member-id-photo{width:104px;height:126px;flex:none;object-fit:cover;border-radius:16px;background:var(--bg)}
+.member-id-photo-zoom{cursor:pointer}
 .member-id-photo.member-avatar-placeholder{font-size:44px}
 .member-id-info{min-width:0}
 .member-id-info>small{color:var(--region-color,#718096);font-size:10px;font-weight:700;letter-spacing:.12em}
@@ -826,7 +827,7 @@ input,textarea,select{background:#f4f8fa;border-color:#bfcfdb}
    foto, dan huruf turun satu tingkat kecil — tetap nyaman dibaca dan
    diketuk di HP. */
 .org-row{display:grid;grid-template-columns:28px minmax(0,1fr) auto auto;gap:10px;align-items:center;padding:11px 14px;border-top:1px solid var(--line);position:relative}
-.org-table-admin .org-row{grid-template-columns:30px 28px minmax(0,1fr) auto auto auto}
+.org-table-admin .org-row{grid-template-columns:28px minmax(0,1fr) auto auto auto}
 .org-row:first-child{border-top:0}
 .org-row-head{background:#eef4f7;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;padding-top:9px;padding-bottom:9px}
 .org-row-head span{color:#33566e}
@@ -893,9 +894,9 @@ span.org-mini{display:grid;place-items:center;font-size:14px}
   /* HP: baris menjadi kartu lega — jabatan & pengurus di baris pertama,
      wilayah + kontak mengalir di baris kedua, tombol Atur di kanan. */
   .org-table .org-row-v2,.org-table-admin .org-row-v2{display:flex;flex-wrap:wrap;align-items:center;gap:7px 9px;padding:12px}
-  .org-c-main{flex:1 1 calc(100% - 78px);min-width:0;order:1}
+  .org-c-main{flex:1 1 calc(100% - 41px);min-width:0;order:1}
   .org-num{order:0}
-  .org-c-wilayah{order:2;margin-left:70px}
+  .org-c-wilayah{order:2;margin-left:28px}
   .org-c-kontak{order:3}
   .org-c-aksi{order:4;margin-left:auto}
   .org-group-count{display:none}
@@ -903,17 +904,14 @@ span.org-mini{display:grid;place-items:center;font-size:14px}
   .org-jabatan{font-size:9px}
 }
 
-/* ===== Kepengurusan: pegangan seret baris, tombol aksi baris, dan
-   pemilih anggota =====
-   Pegangan seret (.org-drag) hanya dirender untuk admin: tombol
-   bergaya pil dengan glyph titik-titik, touch-action:none supaya
-   seretan jari di HP menggeser baris, bukan menggulir halaman.
-   Baris yang sedang diseret terangkat (bayangan + sedikit tembus),
-   dan baris tujuan ditandai garis sisip teal di tepi atas/bawahnya. */
-.org-drag{flex:none;width:30px;height:40px;border:1px solid var(--pal-line,#c4dde9);background:var(--pal-soft,#eef6fa);color:#33566e;border-radius:10px;display:grid;place-items:center;cursor:grab;font-size:15px;line-height:1;padding:0;touch-action:none;user-select:none;-webkit-user-select:none;font-family:inherit}
-.org-drag:active{cursor:grabbing;background:var(--pal-chip,#dceef7)}
-.org-drag-ph{visibility:hidden;border:0;background:transparent;cursor:default}
-.org-row-dragging{z-index:20;opacity:.94;background:var(--pal-bg,#eef6fa);box-shadow:0 14px 30px rgba(31,58,80,.28);border-radius:12px}
+/* ===== Kepengurusan: seret baris dengan tekan lama, tombol aksi
+   baris, dan pemilih anggota =====
+   Tidak ada pegangan seret: admin menekan lama baris (±450 ms) untuk
+   masuk mode seret. Baris yang masuk mode seret terangkat (bayangan
+   besar + cincin teal + latar menonjol), dan baris tujuan ditandai
+   garis sisip teal di tepi atas/bawahnya. */
+.org-table-admin .org-row-v2{-webkit-touch-callout:none}
+.org-row-dragging{z-index:20;opacity:.97;background:var(--pal-bg,#eef6fa);box-shadow:0 14px 30px rgba(31,58,80,.28),inset 0 0 0 2px #2b7a8c;border-radius:12px;user-select:none;-webkit-user-select:none}
 .org-drop-above{box-shadow:inset 0 3px 0 #2b7a8c}
 .org-drop-below{box-shadow:inset 0 -3px 0 #2b7a8c}
 .org-aksi-btns{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
@@ -1081,3 +1079,19 @@ body.auth-locked .landing{padding-top:0}
 #form-pin-map{height:340px;width:100%;background:#dbe5ee;border-radius:12px;overflow:hidden;z-index:1}
 @media (max-width:640px){#form-pin-map{height:300px}}
 .form-pin-coords{margin:9px 0 0;font-size:12.5px;font-weight:700;color:#2b7a8c}
+
+/* ===== Tema warna wilayah pada kartu ID anggota =====
+   --region-color pada .member-profile-page diisi detailCard() dari
+   regionColor() — sumber warna wilayah yang sama dengan pin peta dan
+   kartu daftar anggota (constants WILAYAH via wilayahEfektif()).
+   Pita kartu dan bingkai kartu memakai warna wilayah anggota; lencana
+   nama wilayah di pita memakai warna wilayahnya sebagai teks di atas
+   lencana putih agar tetap terbaca di atas pita berwarna. Wilayah yang
+   tidak dikenal memakai cadangan #718096 dari regionColor().
+   Aturan ini sengaja lebih spesifik daripada blok "font hitam" di atas
+   yang sempat menimpa pita kartu ID menjadi abu-abu muda. */
+.member-profile-page .member-id-card{border:2px solid var(--region-color,#718096);box-shadow:0 12px 30px rgba(23,50,77,.14),0 0 0 4px color-mix(in srgb,var(--region-color,#718096) 12%,transparent)}
+.member-profile-page .member-id-banner{background:var(--region-color,#718096);color:#ffffff}
+.member-profile-page .member-id-banner span{color:#ffffff}
+.member-profile-page .member-id-banner .member-region-tag{background:#ffffff;color:var(--region-color,#718096)}
+.member-profile-page .member-id-info>small{color:var(--region-color,#718096)}

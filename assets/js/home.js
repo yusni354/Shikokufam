@@ -13,7 +13,7 @@ function subscribeSambutan(){
       const doc=(snap.docs||[]).find(d=>d.id==='sambutan');
       const data=doc&&typeof doc.data==='function'?doc.data():null;
       const next=data&&typeof data.pesan==='string'?data.pesan:'';
-      if(next!==S.sambutan){S.sambutan=next;if(S.view==='landing'&&S.uid)render()}
+      if(next!==S.sambutan){S.sambutan=next;if(S.view==='landing'&&S.uid)renderDariData()}
     },error=>{console.error('Pesan sambutan gagal dimuat:',error)});
   }catch(error){console.error('Pesan sambutan gagal dimuat:',error);return ()=>{}}
 }

@@ -116,7 +116,7 @@ async function loadMessages(){
     const seen=userMessageSeen();
     S.unreadMessages=incomingMessageItems().filter(item=>!seen[item.id]).length;
     updateMessageBadges();
-    if(changed&&S.view==='pesan')render();
+    if(changed&&S.view==='pesan')renderDariData();
     return;
   }
   let query=S.supabase.from('messages').select('*').order('created_at',{ascending:true});
@@ -141,7 +141,7 @@ async function loadMessages(){
   const seen=userMessageSeen();
   S.unreadMessages=incomingMessageItems().filter(item=>!seen[item.id]).length;
   updateMessageBadges();
-  if(changed&&S.view==='pesan')render();
+  if(changed&&S.view==='pesan')renderDariData();
 }
 async function submitMessage(data){
   if(!S.uid)throw new Error('Silakan login terlebih dahulu');

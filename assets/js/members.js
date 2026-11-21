@@ -17,13 +17,19 @@ function vMembers(){
     count.textContent='Menampilkan '+rows.length+' dari '+S.members.length+' anggota';
     list.replaceChildren(...(rows.length?rows.map(member=>{
       const code=memberCode(member),area=memberRegion(member),location=[member.kota,member.pref].filter(Boolean).join(', ');
-      return h('article',{class:'member-card',style:'--region-color:'+regionColor(area)},
+      /* Seluruh badan kartu bisa diklik untuk membuka kartu ID anggota
+         (pengganti tombol 'Lihat kartu ID' yang sudah dihapus). Klik
+         yang berasal dari tombol/tautan di dalam kartu (Edit, Hapus,
+         dan aksi lain) TIDAK ikut membuka kartu ID. */
+      return h('article',{class:'member-card',style:'--region-color:'+regionColor(area),title:'Lihat kartu ID '+(member.nama||'anggota'),onclick:ev=>{
+          if(ev.target&&ev.target.closest&&ev.target.closest('button,a,input,select,textarea'))return;
+          openMember(member,'members');
+        }},
         member.foto?h('img',{class:'member-avatar',...memberMediaAttributes(member.foto,'src'),alt:'Foto '+(member.nama||'anggota')}):h('div',{class:'member-avatar member-avatar-placeholder'},(member.nama||'?').trim().slice(0,1).toUpperCase()),
         h('div',{class:'member-card-info'},h('div',{class:'member-name-line'},h('b',{},(member.nama||'Nama belum diisi').toUpperCase()),h('span',{class:'member-region-tag'},area.toUpperCase())),
           h('small',{},[code,location].filter(Boolean).join(' · ').toUpperCase()),
           h('small',{},member.wa?memberValue('wa',member.wa):member.email||'Kontak belum diisi')),
         h('div',{class:'member-card-actions'},
-          h('button',{class:'btn s',onclick:()=>openMember(member,'members')},'Lihat kartu ID'),
           S.admin&&h('button',{class:'btn s btn-eh',onclick:()=>{S.form={...member};S.detail=null;S.formPinAlamatHasil='';render()}},icon('edit',15),h('span',{},'Edit')),
           S.admin&&h('button',{class:'btn s member-delete btn-eh',onclick:async()=>{
             if(!confirm('Hapus data anggota '+(member.nama||'ini')+'?'))return;
@@ -93,17 +99,21 @@ function detailCard(){
   ];
   const qrValue=memberQrValue(member);
   return h('section',{class:'member-profile-page',style:'--region-color:'+regionColor(area)},
-    h('div',{class:'member-profile-toolbar'},h('button',{class:'btn s',onclick:()=>{S.detail=null;const origin=S.detailOrigin;S.detailOrigin=null;S.view=origin==='landing'?'landing':'members';render()}},'← Kembali'),
-      S.admin&&h('button',{class:'btn s btn-eh',onclick:()=>{S.form={...member};S.detail=null;S.detailOrigin=null;S.formPinAlamatHasil='';render()}},icon('edit',15),h('span',{},'Edit data'))),
+    h('div',{class:'member-profile-toolbar'},h('button',{class:'btn s',onclick:()=>{S.detail=null;S.idPhoto=null;const origin=S.detailOrigin;S.detailOrigin=null;S.view=origin==='landing'?'landing':'members';render()}},'← Kembali'),
+      S.admin&&h('button',{class:'btn s btn-eh',onclick:()=>{S.form={...member};S.detail=null;S.idPhoto=null;S.detailOrigin=null;S.formPinAlamatHasil='';render()}},icon('edit',15),h('span',{},'Edit data'))),
     h('article',{class:'member-id-card'},
       h('div',{class:'member-id-banner'},h('span',{},'SHIKOKU FAMILY'),h('span',{class:'member-region-tag'},area)),
       h('div',{class:'member-id-main'},
-        member.foto?h('img',{class:'member-id-photo',...memberMediaAttributes(member.foto,'src'),alt:'Foto '+(member.nama||'anggota')}):h('div',{class:'member-id-photo member-avatar-placeholder'},(member.nama||'?').trim().slice(0,1).toUpperCase()),
+        member.foto?h('img',{class:'member-id-photo member-id-photo-zoom',...memberMediaAttributes(member.foto,'src'),alt:'Foto '+(member.nama||'anggota'),title:'Klik untuk memperbesar foto',onclick:()=>{S.idPhoto=member.foto;render()}}):h('div',{class:'member-id-photo member-avatar-placeholder'},(member.nama||'?').trim().slice(0,1).toUpperCase()),
         h('div',{class:'member-id-info'},h('small',{},'KARTU ANGGOTA'),h('h1',{},(member.nama||'Nama belum diisi').toUpperCase()),member.wa&&h('p',{class:'member-id-phone'},icon('phone',14),h('span',{},member.wa)),h('b',{},code.toUpperCase()),h('p',{},[member.kota,member.pref].filter(Boolean).join(' · ').toUpperCase()||area.toUpperCase()))),
       h('div',{class:'member-id-barcode'},h('b',{class:'member-barcode-label'},'QR CODE ABSENSI'),qrValue?h('img',{class:'member-qr-code','data-member-qr':qrValue,alt:'QR code untuk ID anggota'}):h('p',{class:'member-barcode-help'},'ID anggota belum tersedia.'),h('small',{class:'member-barcode-help','data-member-qr-status':'true'},qrValue?'Membuat QR code...':'QR code akan tersedia setelah ID anggota tersimpan.'))),
     ...sections.filter(([,rows])=>rows.some(([,value])=>value)).map(([title,rows])=>h('section',{class:'member-detail-section'},h('h3',{},title.toUpperCase()),h('div',{class:'member-detail-grid'},...rows.filter(([,value])=>value).map(([label,value])=>h('div',{class:'member-detail-item'},h('small',{},label.toUpperCase()),h('span',{},memberValue(label==='Nomor HP / WhatsApp'?'wa':label==='Nomor HP pengurus daerah'?'hp_pengurus':label==='Nomor HP orang tua'?'hp_ortu':label.toLowerCase(),value))))))),
     (member.surat||[]).length>0&&h('section',{class:'member-detail-section'},h('h3',{},'Foto Surat Sambung'),...(member.surat||[]).map((id,index)=>h('a',{class:'member-file-link',...memberMediaAttributes(id,'href'),target:'_blank',rel:'noopener'},icon('attachment',16),h('span',{},'Buka lampiran '+(index+1))))),
-    S.admin&&h('div',{class:'member-detail-actions'},h('button',{class:'btn btn-eh',onclick:()=>{S.form={...member};S.detail=null;S.detailOrigin=null;S.formPinAlamatHasil='';render()}},icon('edit',16),h('span',{},'Edit data anggota')))
+    S.admin&&h('div',{class:'member-detail-actions'},h('button',{class:'btn btn-eh',onclick:()=>{S.form={...member};S.detail=null;S.idPhoto=null;S.detailOrigin=null;S.formPinAlamatHasil='';render()}},icon('edit',16),h('span',{},'Edit data anggota'))),
+    /* Penampil foto besar kartu ID: klik foto di kartu membuka lapisan ini;
+       mengetuk bidang di luar foto menutupnya (tanpa tombol X, mengikuti
+       pola penampil foto nota di Laporan Keuangan). */
+    S.idPhoto&&h('div',{class:'fin-lightbox',onclick:()=>{S.idPhoto=null;render()}},h('img',{...memberMediaAttributes(S.idPhoto,'src'),alt:'Foto '+(member.nama||'anggota')+' ukuran besar',onclick:ev=>ev.stopPropagation()}))
   );
 }
 
@@ -650,7 +660,7 @@ function subscribeSusunan(){
         S.susunanSimpul=next;
         const map={};(next||[]).forEach(n=>{if(n.pemegang)map[n.id]=n.pemegang});
         S.susunanPemegang=map;
-        if(S.view==='susunan')render();
+        if(S.view==='susunan')renderDariData();
       }
     },error=>{console.error('Susunan pengurus gagal dimuat:',error)});
   }catch(error){console.error('Susunan pengurus gagal dimuat:',error);return ()=>{}}
@@ -851,10 +861,14 @@ function susunanPilihAnggota(currentId){
    isian — Nama Dapukan dan Pemegang Dapukan (combobox anggota yang
    sama) — dan SATU tombol 'Simpan'. Perubahan nama/pemegang TIDAK
    langsung diterapkan per ketukan; keduanya baru tersimpan saat
-   tombol Simpan ditekan. Menggeser urutan dilakukan dengan menyeret
-   barisnya langsung (pegangan seret di baris), dan menghapus lewat
+   tombol Simpan ditekan. Menggeser urutan dilakukan dengan menekan
+   lama barisnya lalu menyeretnya, dan menghapus lewat
    tombol Hapus kecil pada baris itu sendiri — keduanya di luar panel
-   ini. Menutup panel lewat tombol Atur/Tutup pada baris. */
+   ini. Sesudah tombol Simpan BERHASIL menyimpan, panel otomatis
+   tertutup sendiri (S.susunanInline dikosongkan sebelum render);
+   bila penyimpanan gagal, panel tetap terbuka dan pesan kesalahan
+   tampil seperti pola aplikasi. Panel juga bisa ditutup manual lewat
+   tombol Atur/Tutup pada baris. */
 function orgPengaturanInline(nodes,node){
   const current=pemegangJabatan(node);
   const inputNama=h('input',{type:'text',value:node.nama,maxlength:'60',placeholder:'Nama dapukan'});
@@ -870,7 +884,7 @@ function orgPengaturanInline(nodes,node){
     h('div',{class:'fl'},h('button',{class:'btn',onclick:async()=>{
       const nama=inputNama.value.trim();
       if(!nama){alert('Nama dapukan tidak boleh kosong.');return}
-      try{await simpanPengaturanDapukan(node.id,nama,selPemegang.value||'');render()}
+      try{await simpanPengaturanDapukan(node.id,nama,selPemegang.value||'');S.susunanInline=null;render()}
       catch(error){console.error(error);alert('Gagal menyimpan pengaturan dapukan: '+(error.message||'periksa koneksi'))}
     }},'Simpan')));
 }
@@ -974,94 +988,120 @@ function orgKepalaKelompok(grup){
     }},'Hapus'):null,
     h('span',{class:'org-group-count'},terisi+'/'+grup.items.length+' terisi'));
 }
-/* ===== Seret baris (drag) untuk mengatur urutan dapukan =====
-   Admin menyeret baris lewat pegangannya (pointer events — bekerja
-   dengan sentuhan di HP maupun mouse). Seretan hanya berlaku di dalam
-   KELOMPOK TAMPIL baris itu sendiri. Selama menyeret, baris yang
-   diseret mengikuti jari/kursor (transform), baris tujuan ditandai
-   garis sisip di tepi atas/bawahnya, dan nomor urut pada baris-baris
-   diperbarui langsung mengikuti posisi seret. Saat dilepas, urutan
-   baru disimpan otomatis lewat susunanAturUrutanGrup lalu halaman
-   digambar ulang. */
-function orgMulaiSeret(ev,rowEl,node,nodes){
-  if(ev.button!=null&&ev.button>0)return;
-  const table=rowEl.closest('.org-table');
-  if(!table)return;
-  const grup=susunanSaudaraKelompok(nodes,node);
-  if(grup.length<2)return;
-  const rows=grup.map(n=>table.querySelector('.org-row-v2[data-node-id="'+n.id+'"]')).filter(Boolean);
-  if(rows.length!==grup.length)return;
-  const startIdx=rows.indexOf(rowEl);
-  if(startIdx<0)return;
-  ev.preventDefault();
-  const pid=ev.pointerId;
-  const startY=ev.clientY;
-  const rects=rows.map(r=>r.getBoundingClientRect());
-  const minDy=rects[0].top-rects[startIdx].top;
-  const maxDy=rects[rects.length-1].bottom-rects[startIdx].bottom;
-  let aktif=false,targetIdx=startIdx,selesai=false;
-  const bersih=()=>{
-    rowEl.classList.remove('org-row-dragging');
-    rowEl.style.transform='';
-    rows.forEach(r=>r.classList.remove('org-drop-above','org-drop-below'));
-  };
-  const lepas=()=>{
-    document.removeEventListener('pointermove',onMove);
-    document.removeEventListener('pointerup',onUp);
-    document.removeEventListener('pointercancel',onUp);
-  };
-  const onMove=e=>{
-    if(e.pointerId!==pid||selesai)return;
-    let dy=e.clientY-startY;
-    if(!aktif){
-      if(Math.abs(dy)<7)return;
-      aktif=true;
-      rowEl.classList.add('org-row-dragging');
-    }
-    e.preventDefault();
-    dy=Math.max(minDy,Math.min(maxDy,dy));
-    rowEl.style.transform='translateY('+dy+'px)';
-    /* Indeks tujuan: baris pertama yang titik tengahnya dilewati oleh
-       titik tengah baris yang diseret. */
-    const tengah=rects[startIdx].top+rects[startIdx].height/2+dy;
-    let t=rows.length-1;
-    for(let i=0;i<rows.length;i++){
-      if(tengah<rects[i].top+rects[i].height/2){t=i;break}
-    }
-    targetIdx=t;
-    rows.forEach((r,i)=>{
-      r.classList.toggle('org-drop-above',i===targetIdx&&targetIdx<startIdx);
-      r.classList.toggle('org-drop-below',i===targetIdx&&targetIdx>startIdx);
-    });
-    /* Nomor urut mengikuti posisi seret secara langsung. */
-    const urutanBaru=rows.slice();
-    urutanBaru.splice(startIdx,1);
-    urutanBaru.splice(targetIdx,0,rowEl);
-    const numAwal=rows[0].querySelector('.org-num');
-    const base=numAwal?parseInt(numAwal.textContent,10)||1:1;
-    urutanBaru.forEach((r,i)=>{
-      const numEl=r.querySelector('.org-num');
-      if(numEl)numEl.textContent=String(base+i);
-    });
-  };
-  const onUp=async e=>{
-    if(e.pointerId!==pid||selesai)return;
-    selesai=true;
-    lepas();
-    const t=targetIdx,pernahAktif=aktif;
-    bersih();
-    if(pernahAktif&&t!==startIdx){
+/* ===== Geser urutan dapukan dengan TEKAN LAMA pada baris =====
+   Tidak ada lagi pegangan '⠿': admin menekan dan menahan baris
+   dapukan (±450 ms tanpa bergerak) sampai baris terangkat masuk mode
+   seret, lalu menggesernya ke atas/bawah di dalam KELOMPOK TAMPIL-nya
+   sendiri sambil tetap menekan, dan melepas untuk menjatuhkan. Selama
+   menyeret, baris mengikuti jari/kursor (transform), baris tujuan
+   ditandai garis sisip di tepi atas/bawahnya, dan nomor urut pada
+   baris-baris diperbarui langsung mengikuti posisi seret. Saat
+   dilepas di posisi baru, urutan disimpan otomatis lewat
+   susunanAturUrutanGrup lalu halaman digambar ulang.
+   Bedakan dengan gulir halaman: sentuhan yang BERGERAK sebelum batas
+   tekan lama tercapai membatalkan niat seret dan halaman bergulir
+   seperti biasa; sesudah mode seret aktif, gerakan menggeser baris
+   (gulir dicegah lewat pendengar touchmove non-pasif). Tekan lama
+   pada tombol/tautan di baris (Atur, Hapus, WA, kartu ID) tidak
+   memicu seret, dan melepas jauh di luar kelompok atau membatalkan
+   sentuhan tidak mengubah urutan. */
+function orgPasangSeretTekanLama(rowEl,node,nodes){
+  rowEl.addEventListener('pointerdown',ev=>{
+    if(ev.button!=null&&ev.button>0)return;
+    if(ev.target&&ev.target.closest&&ev.target.closest('button,a,input,select,textarea,[contenteditable="true"]'))return;
+    const table=rowEl.closest('.org-table');
+    if(!table)return;
+    const grup=susunanSaudaraKelompok(nodes,node);
+    if(grup.length<2)return;
+    const rows=grup.map(n=>table.querySelector('.org-row-v2[data-node-id="'+n.id+'"]')).filter(Boolean);
+    if(rows.length!==grup.length)return;
+    const startIdx=rows.indexOf(rowEl);
+    if(startIdx<0)return;
+    const pid=ev.pointerId;
+    const startX=ev.clientX,startY=ev.clientY;
+    const rects=rows.map(r=>r.getBoundingClientRect());
+    const minDy=rects[0].top-rects[startIdx].top;
+    const maxDy=rects[rects.length-1].bottom-rects[startIdx].bottom;
+    let aktif=false,targetIdx=startIdx,selesai=false,timer=null;
+    const bersih=()=>{
+      rowEl.classList.remove('org-row-dragging');
+      rowEl.style.transform='';
+      rows.forEach(r=>r.classList.remove('org-drop-above','org-drop-below'));
+    };
+    const cegahGulir=e=>{if(aktif)e.preventDefault()};
+    const lepas=()=>{
+      if(timer){clearTimeout(timer);timer=null}
+      document.removeEventListener('pointermove',onMove);
+      document.removeEventListener('pointerup',onUp);
+      document.removeEventListener('pointercancel',onUp);
+      document.removeEventListener('touchmove',cegahGulir);
+    };
+    const onMove=e=>{
+      if(e.pointerId!==pid||selesai)return;
+      if(!aktif){
+        /* Bergerak sebelum tekan lama matang = niat menggulir:
+           batalkan seret, biarkan halaman bergulir seperti biasa. */
+        if(Math.hypot(e.clientX-startX,e.clientY-startY)>10){selesai=true;lepas()}
+        return;
+      }
+      e.preventDefault();
+      const dy=Math.max(minDy,Math.min(maxDy,e.clientY-startY));
+      rowEl.style.transform='translateY('+dy+'px)';
+      /* Indeks tujuan: baris pertama yang titik tengahnya dilewati oleh
+         titik tengah baris yang diseret. */
+      const tengah=rects[startIdx].top+rects[startIdx].height/2+dy;
+      let t=rows.length-1;
+      for(let i=0;i<rows.length;i++){
+        if(tengah<rects[i].top+rects[i].height/2){t=i;break}
+      }
+      targetIdx=t;
+      rows.forEach((r,i)=>{
+        r.classList.toggle('org-drop-above',i===targetIdx&&targetIdx<startIdx);
+        r.classList.toggle('org-drop-below',i===targetIdx&&targetIdx>startIdx);
+      });
+      /* Nomor urut mengikuti posisi seret secara langsung. */
+      const urutanBaru=rows.slice();
+      urutanBaru.splice(startIdx,1);
+      urutanBaru.splice(targetIdx,0,rowEl);
+      const numAwal=rows[0].querySelector('.org-num');
+      const base=numAwal?parseInt(numAwal.textContent,10)||1:1;
+      urutanBaru.forEach((r,i)=>{
+        const numEl=r.querySelector('.org-num');
+        if(numEl)numEl.textContent=String(base+i);
+      });
+    };
+    const onUp=async e=>{
+      if(e.pointerId!==pid||selesai)return;
+      selesai=true;
+      lepas();
+      const t=targetIdx,pernahAktif=aktif;
+      bersih();
+      if(!pernahAktif)return;
+      /* Batal: sentuhan dibatalkan sistem, atau dilepas jauh di luar
+         kelompok — urutan tidak berubah, gambar ulang untuk
+         mengembalikan nomor urut seperti semula. */
+      const batal=e.type==='pointercancel'||e.clientY<rects[0].top-24||e.clientY>rects[rects.length-1].bottom+24;
+      if(batal){render();return}
+      if(t===startIdx)return;
       const idsBaru=grup.map(n=>n.id);
       const pindah=idsBaru.splice(startIdx,1)[0];
       idsBaru.splice(t,0,pindah);
       try{await susunanAturUrutanGrup(grup,idsBaru)}
       catch(error){console.error(error);alert('Gagal menyimpan urutan baru: '+(error.message||'periksa koneksi'))}
-    }
-    render();
-  };
-  document.addEventListener('pointermove',onMove);
-  document.addEventListener('pointerup',onUp);
-  document.addEventListener('pointercancel',onUp);
+      render();
+    };
+    timer=setTimeout(()=>{
+      timer=null;
+      if(selesai)return;
+      aktif=true;
+      rowEl.classList.add('org-row-dragging');
+      if(navigator.vibrate){try{navigator.vibrate(15)}catch(_){}}
+    },450);
+    document.addEventListener('pointermove',onMove);
+    document.addEventListener('pointerup',onUp);
+    document.addEventListener('pointercancel',onUp);
+    document.addEventListener('touchmove',cegahGulir,{passive:false});
+  });
 }
 function orgRow(nodes,node,urut){
   const member=pemegangJabatan(node);
@@ -1099,19 +1139,6 @@ function orgRow(nodes,node,urut){
   const rowClass='org-row org-row-v2'
     +(depth===0?' org-row-root':'')
     +(member?'':' org-row-vacant-row');
-  /* Sel pegangan seret (khusus admin): baris puncak mendapat tempat
-     kosong tak terlihat supaya kolomnya tetap sejajar; baris lain
-     mendapat pegangan seret sungguhan. Anggota biasa tidak melihat
-     sel ini sama sekali. */
-  let dragEl=null,dragBtn=null;
-  if(S.admin){
-    if(node.induk===null){
-      dragEl=h('span',{class:'org-drag org-drag-ph','aria-hidden':'true'});
-    }else{
-      dragBtn=h('button',{class:'org-drag',type:'button',title:'Seret untuk menggeser urutan dapukan ini','aria-label':'Seret untuk menggeser urutan '+node.nama},'⠿');
-      dragEl=dragBtn;
-    }
-  }
   /* Sel aksi (khusus admin): tombol Atur/Tutup panel pengaturan inline
      dan — untuk baris non-puncak — tombol Hapus kecil di sampingnya. */
   let aksiEl=null;
@@ -1121,7 +1148,6 @@ function orgRow(nodes,node,urut){
       h('div',{class:'org-aksi-btns'},aturBtn,node.induk!==null?orgTombolHapus(nodes,node):null));
   }
   const rowEl=h('div',{class:rowClass,'data-depth':String(depth),'data-node-id':node.id},
-    dragEl,
     h('span',{class:'org-num','aria-hidden':'true'},String(urut)),
     h('div',{class:'org-c-main'},personEl),
     h('div',{class:'org-c-wilayah'},
@@ -1130,7 +1156,10 @@ function orgRow(nodes,node,urut){
         :h('span',{class:'org-kontak-none'},'—')),
     h('div',{class:'org-c-kontak'},kontakEl),
     aksiEl);
-  if(dragBtn)dragBtn.addEventListener('pointerdown',ev=>orgMulaiSeret(ev,rowEl,node,nodes));
+  /* Admin menggeser urutan baris ini dengan TEKAN LAMA pada barisnya
+     (baris puncak tidak bisa digeser). Anggota biasa tidak mendapat
+     pendengar apa pun: barisnya bersih tanpa alat seret. */
+  if(S.admin&&node.induk!==null)orgPasangSeretTekanLama(rowEl,node,nodes);
   return rowEl;
 }
 /* Kelompok-kelompok tampil pada tabel: kelompok puncak (label
@@ -1163,7 +1192,6 @@ function orgTabel(nodes){
   const groups=orgKelompokTampil(nodes);
   const groupEls=groups.map((grup,gi)=>{
     const anakTabel=[h('div',{class:'org-row org-row-head org-row-head-v2'},
-      S.admin?h('span',{},''):null,
       h('span',{},'No'),
       h('span',{},'Dapukan & Pengurus'),
       h('span',{},'Wilayah'),
@@ -1214,7 +1242,7 @@ function orgTabel(nodes){
    halaman hanya judul, lalu langsung kartu-kartu kelompok — tidak ada
    ringkasan angka dan tidak ada tombol susunan awal. Tidak ada mode
    khusus untuk mengatur: bagi ADMIN semua alat pengaturan tampil
-   langsung dan selalu di tabel — pegangan seret pada tiap baris untuk
+   langsung dan selalu di tabel — tekan lama pada baris untuk
    menggeser urutannya, tombol Atur pada tiap baris yang membuka
    pengaturannya MELEBAR TEPAT DI BAWAH BARIS ITU di dalam tabel,
    tombol Hapus kecil di sampingnya, tombol '+ Tambah Dapukan Baru' di
@@ -1225,6 +1253,9 @@ function orgTabel(nodes){
 function vSusunan(){
   const nodes=susunanSimpul();
   const out=[h('h1',{},'Kepengurusan'),guard()];
+  /* Satu baris petunjuk kecil khusus admin tentang cara menggeser
+     urutan (tekan lama pada baris) — bukan keterangan panjang. */
+  if(S.admin)out.push(h('p',{class:'sub',style:'margin:0 0 10px'},'Tekan lama baris dapukan untuk menggeser urutannya.'));
   out.push(orgTabel(nodes));
   return out;
 }
