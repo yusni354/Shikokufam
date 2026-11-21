@@ -34,134 +34,121 @@ function vPengaturan(){
         catch(e){alert('Gagal menyimpan pesan: '+(e.message||'periksa koneksi'))}
       }},'Simpan')))];
 }
-/* Maskot Home: gambar ASLI assets/mascot.webp (latarnya memang
-   transparan), dianimasikan sebagai boneka berlapis — BUKAN video
-   atau gif, jadi tidak ada latar yang perlu dipotong dan tidak ada
-   putaran yang berulang. Beberapa salinan gambar yang sama ditumpuk
-   persis sejajar: lapisan dasar utuh DIAM sebagai penopang, lalu di
-   atasnya salinan yang dipotong clip-path mengikuti pose gambar —
-   kepala+topi (poros di leher ±47%/50%), lengan terangkat (poros di
-   bahu ±69%/56%), dan burung kecil (poros di kakinya ±88%/72%).
-   Satu-satunya gerak kontinu adalah NAPAS (skala ±0,7% berporos di
-   bawah, ±4,6 detik — disengaja pelan). Gerakan lain dijalankan
-   penjadwal JavaScript lewat Web Animations API dengan jeda dan
-   besar ACAK dalam rentang manusiawi dan durasi yang santai,
-   sehingga tidak pernah membentuk pola yang bisa ditebak.
-   SESEKALI (jeda acak jarang, ±25–60 detik) maskot JALAN-JALAN:
-   seluruh panggung berjalan PELAN (±3–5 detik) ke titik lain di
-   dalam jalur khususnya (.mascot-walk) di sisi kanan kartu
-   sambutan — jalurnya adalah ruang tata letak tersendiri, jadi
-   maskot tidak pernah menutupi teks sambutan dan tidak pernah
-   keluar kartu; di HP jalurnya lebih pendek. Saat berjalan ada
-   goyangan langkah mungil dan arah hadap dibalik (scaleX)
-   mengikuti arah jalan; gerakan mikro lain dijeda selama
-   berjalan lalu dilanjutkan sesudahnya.
-   Penjadwal berhenti sendiri begitu elemen maskot lepas dari
+/* Maskot Home: VIDEO transparan pilihan pengguna — karakter dari
+   video yang dipilihnya, latarnya sudah dipisahkan dengan AI menjadi
+   kanal alfa (VP9 WebM 400x626, 15 fps, 10 detik) sehingga menyatu
+   langsung dengan kartu sambutan: tanpa bingkai, tanpa kotak latar.
+   Berkas video + poster diamnya TIDAK dimuat di index.html; keduanya
+   tersimpan sebagai data URI base64 di assets/js/maskot-video-alpha.js
+   (dibuat dari berkas sumbernya, ±749 KB) dan berkas itu DIMUAT MALAS
+   hanya di sini, saat Home dibuka — halaman lain tidak menanggung
+   bebannya sama sekali. Salinan berkas aslinya juga ada di
+   assets/maskot-alpha-c42.webm dan assets/maskot-poster.png.
+   Gerakannya dibuat terasa hidup, ACAK, dan PELAN mengikuti
+   permintaan pengguna: kecepatan putar 0.85, penjadwal memberi JEDA
+   DIAM acak (berhenti 2-6 detik setiap sela acak 8-20 detik, lalu
+   lanjut lagi) supaya tidak terasa seperti putaran video, dan
+   SESEKALI (jeda acak ±25-60 detik) maskot JALAN-JALAN pelan
+   (±3-5 detik) ke titik lain di jalur khususnya (.mascot-walk) di
+   sisi kanan kartu sambutan — jalurnya ruang tata letak tersendiri,
+   jadi tidak pernah menutupi teks dan tidak pernah keluar kartu;
+   hadap membalik (scaleX) mengikuti arah jalan.
+   Semua penjadwal berhenti sendiri begitu elemen maskot lepas dari
    halaman (pindah menu) dan mulai lagi saat Home dibuka kembali.
-   Bila pengguna mengaktifkan pengurangan gerak
-   (prefers-reduced-motion), yang tampil gambar diam utuh dan
-   penjadwal — termasuk jalan-jalan — tidak jalan sama sekali. */
+   Cadangan jujur: bila peramban tidak bisa memutar WebM VP9
+   (canPlayType kosong) yang tampil gambar POSTER DIAM transparan
+   dari karakter yang sama — bukan video berlatar buram. Mode
+   prefers-reduced-motion juga hanya menampilkan poster diam. */
+let maskotVideoDataPromise=null;
+function muatDataMaskotVideo(){
+  if(window.MASKOT_VIDEO_WEBM&&window.MASKOT_POSTER_PNG)return Promise.resolve(true);
+  if(maskotVideoDataPromise)return maskotVideoDataPromise;
+  maskotVideoDataPromise=new Promise(resolve=>{
+    const s=document.createElement('script');
+    s.src='assets/js/maskot-video-alpha.js?v=20270206';
+    s.async=true;
+    s.onload=()=>resolve(!!(window.MASKOT_VIDEO_WEBM&&window.MASKOT_POSTER_PNG));
+    s.onerror=()=>{maskotVideoDataPromise=null;resolve(false)};
+    document.head.appendChild(s);
+  });
+  return maskotVideoDataPromise;
+}
 function homeMascot(){
-  const kurangiGerak=!!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-  if(kurangiGerak)return h('img',{class:'home-welcome-mascot',src:'assets/mascot.webp',alt:'Maskot Shikoku Family'});
-  const lapis=kelas=>h('img',{class:'mascot-layer '+kelas,src:'assets/mascot.webp',alt:'','aria-hidden':'true',draggable:'false'});
-  const head=lapis('mascot-head'),arm=lapis('mascot-arm'),bird=lapis('mascot-bird');
-  const breath=h('div',{class:'mascot-breath'},lapis('mascot-body'),head,arm,bird);
-  const sway=h('div',{class:'mascot-sway'},breath);
-  const stage=h('div',{class:'home-welcome-mascot mascot-live',role:'img','aria-label':'Maskot Shikoku Family'},
-    h('img',{class:'mascot-layer',src:'assets/mascot.webp',alt:'','aria-hidden':'true',draggable:'false'}),sway);
-  /* Jalur jalan-jalan: ruang khusus di kanan kartu sambutan tempat
-     panggung maskot bebas berpindah tempat tanpa menyentuh teks. */
-  const walk=h('div',{class:'mascot-walk','aria-hidden':'false'},stage);
-  mulaiGerakMaskot(stage,breath,sway,head,arm,bird);
+  const stage=h('div',{class:'home-welcome-mascot mascot-video-stage',role:'img','aria-label':'Maskot Shikoku Family'});
+  const walk=h('div',{class:'mascot-walk'},stage);
+  muatDataMaskotVideo().then(ok=>{
+    if(!stage.isConnected)return;
+    if(!ok||!window.MASKOT_POSTER_PNG){
+      /* Data video gagal dimuat (mis. berkas belum ada): tampilkan
+         gambar transparan lama supaya Home tidak kosong/rusak. */
+      stage.replaceChildren(h('img',{class:'mascot-poster-img',src:'assets/mascot.webp',alt:'Maskot Shikoku Family',draggable:'false'}));
+      return;
+    }
+    pasangMaskotVideo(stage);
+  });
   return walk;
 }
-function mulaiGerakMaskot(stage,breath,sway,head,arm,bird){
-  const acak=(a,b)=>a+Math.random()*(b-a);
-  const hidup=()=>stage.isConnected;
-  /* Napas: gerak kontinu satu-satunya, sangat halus dan pelan. */
-  const napas=breath.animate([{transform:'scale(1)'},{transform:'scale(1.007)'}],{duration:2300,iterations:Infinity,direction:'alternate',easing:'ease-in-out'});
-  const matikan=()=>{try{napas.cancel()}catch(e){}};
-  /* Keadaan jalan-jalan: selama 'berjalan' true, semua gerakan
-     mikro dijeda (rantainya tetap berputar tapi aksinya dilewati)
-     dan napas ditahan; posisi & arah hadap terakhir diingat supaya
-     perjalanan berikutnya menyambung dari tempat berhenti. */
-  let berjalan=false,posX=0,posY=0,hadap=1;
-  /* Jalankan satu gerakan; saat selesai hasilnya ditanam sebagai gaya
-     tetap supaya animasi lama tidak menumpuk di elemen. Animasi yang
-     sedang berjalan didaftar supaya bisa dihentikan rapi saat
-     maskot mulai berjalan. */
-  const animAktif=new Set();
-  const gerak=(el,kf,dur)=>{const an=el.animate(kf,{duration:dur,easing:'ease-in-out',fill:'forwards'});
-    animAktif.add(an);
-    an.addEventListener('finish',()=>animAktif.delete(an));
-    an.addEventListener('cancel',()=>animAktif.delete(an));
-    an.onfinish=()=>{try{an.commitStyles()}catch(e){}try{an.cancel()}catch(e){}};return an};
-  /* Rantai penjadwal per bagian tubuh: tidur selama jeda acak,
-     bergerak sekali, lalu menjadwalkan dirinya lagi. Berhenti rapi
-     saat maskot sudah tidak tampil di halaman. */
-  const rantai=(jedaAwal,jedaMin,jedaMax,aksi)=>{
-    const putar=()=>{if(!hidup()){matikan();return}
-      setTimeout(()=>{if(!hidup()){matikan();return}if(!berjalan)aksi();putar()},acak(jedaMin,jedaMax))};
-    setTimeout(()=>{if(!hidup()){matikan();return}if(!berjalan)aksi();putar()},jedaAwal);
+function pasangMaskotVideo(stage){
+  const posterSrc=window.MASKOT_POSTER_PNG;
+  const tampilPosterDiam=()=>{
+    stage.replaceChildren(h('img',{class:'mascot-poster-img',src:posterSrc,alt:'Maskot Shikoku Family',draggable:'false'}));
   };
-  /* Kepala: miring halus ke sudut diam baru (maks ±1,8°), kadang
-     angguk kecil. Sudut terakhir diingat supaya gerakan menyambung.
-     Durasi disengaja santai (tidak terburu-buru). */
-  let sudutKepala=0;
-  rantai(acak(1200,2600),4000,9000,()=>{
-    const dari='rotate('+sudutKepala.toFixed(2)+'deg)';
-    if(Math.random()<0.3){
-      gerak(head,[{transform:dari},{transform:'rotate('+(sudutKepala+acak(1,1.6)).toFixed(2)+'deg)',offset:0.45},{transform:dari}],acak(800,1200));
-    }else{
-      const target=acak(-1.8,1.8);
-      const an=gerak(head,[{transform:dari},{transform:'rotate('+target.toFixed(2)+'deg)'}],acak(1400,2300));
-      an.onfinish=()=>{sudutKepala=target;try{an.commitStyles()}catch(e){}try{an.cancel()}catch(e){}};
-    }
+  const kurangiGerak=!!(window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  if(kurangiGerak){tampilPosterDiam();return}
+  let dukung='';
+  try{
+    const uji=document.createElement('video');
+    dukung=uji.canPlayType('video/webm; codecs="vp9"')||uji.canPlayType('video/webm')||'';
+  }catch(e){dukung=''}
+  if(!dukung||!window.MASKOT_VIDEO_WEBM){tampilPosterDiam();return}
+  const video=h('video',{class:'mascot-video-el',poster:posterSrc,'aria-label':'Maskot Shikoku Family'});
+  video.muted=true;
+  video.loop=true;
+  video.autoplay=true;
+  video.playsInline=true;
+  video.setAttribute('muted','');
+  video.setAttribute('playsinline','');
+  video.setAttribute('webkit-playsinline','');
+  video.preload='auto';
+  video.src=window.MASKOT_VIDEO_WEBM;
+  const setRate=()=>{try{video.playbackRate=0.85}catch(e){}};
+  video.addEventListener('loadedmetadata',setRate);
+  video.addEventListener('canplay',()=>{
+    setRate();
+    try{const pr=video.play();if(pr&&pr.catch)pr.catch(()=>{})}catch(e){}
   });
-  /* Lengan terangkat: satu-dua ayunan kecil seperti melambai. */
-  rantai(acak(3000,6000),6000,13000,()=>{
-    const dua=Math.random()<0.4;
-    const kf=dua
-      ?[{transform:'rotate(0deg)'},{transform:'rotate(-5deg)',offset:0.2},{transform:'rotate(3deg)',offset:0.4},{transform:'rotate(-4deg)',offset:0.6},{transform:'rotate(2deg)',offset:0.8},{transform:'rotate(0deg)'}]
-      :[{transform:'rotate(0deg)'},{transform:'rotate(-5deg)',offset:0.3},{transform:'rotate(3.2deg)',offset:0.6},{transform:'rotate(0deg)'}];
-    gerak(arm,kf,dua?acak(1700,2100):acak(1100,1500));
-  });
-  /* Burung kecil: lompat mungil, kadang dua kali berturut. */
-  rantai(acak(4000,8000),7000,15000,()=>{
-    const dua=Math.random()<0.3;
-    const kf=[{transform:'translateY(0px) scale(1,1)'},
-      {transform:'translateY(1.5px) scale(1.05,0.9)',offset:0.16},
-      {transform:'translateY(-7px) scale(0.97,1.04)',offset:0.32},
-      {transform:'translateY(0px) scale(1.02,0.96)',offset:0.46},
-      {transform:'translateY(0px) scale(1,1)',offset:0.56}];
-    if(dua)kf.push({transform:'translateY(1px) scale(1.04,0.92)',offset:0.68},{transform:'translateY(-5px) scale(0.98,1.03)',offset:0.82},{transform:'translateY(0px) scale(1,1)',offset:1});
-    else kf.push({transform:'translateY(0px) scale(1,1)',offset:1});
-    gerak(bird,kf,dua?acak(1150,1400):acak(700,900));
-  });
-  /* Sesekali seluruh badan menoleh sangat halus lalu kembali. */
-  rantai(acak(6000,10000),11000,20000,()=>{
-    const besar=((Math.random()<0.5?-1:1)*acak(0.4,0.7)).toFixed(2);
-    gerak(sway,[{transform:'rotate(0deg)'},{transform:'rotate('+besar+'deg)',offset:0.5},{transform:'rotate(0deg)'}],acak(3000,4000));
-  });
+  stage.replaceChildren(video);
+  mulaiHidupMaskotVideo(stage,video);
+}
+function mulaiHidupMaskotVideo(stage,video){
+  const acak=(a,b)=>a+Math.random()*(b-a);
+  const hidup=()=>stage.isConnected&&video.isConnected;
+  const nanti=(fn,ms)=>setTimeout(()=>{if(hidup())fn()},ms);
+  /* Jeda diam acak: video berhenti 2-6 detik pada sela acak
+     8-20 detik, lalu lanjut lagi — ritmenya tidak berpola putaran. */
+  const jadwalJeda=()=>{
+    if(!hidup())return;
+    nanti(()=>{
+      try{video.pause()}catch(e){}
+      nanti(()=>{
+        try{video.playbackRate=0.85;const pr=video.play();if(pr&&pr.catch)pr.catch(()=>{})}catch(e){}
+        jadwalJeda();
+      },acak(2000,6000));
+    },acak(8000,20000));
+  };
+  jadwalJeda();
   /* ===== Jalan-jalan di dalam box sambutan =====
-     Panggung berpindah di dalam jalur .mascot-walk saja: titik
-     tujuan dipilih acak di sepanjang jalur (kadang kembali ke
-     tempat awal di kiri jalur), tidak pernah keluar jalur, tidak
-     pernah menutupi teks karena jalur adalah kolom tata letak
-     tersendiri di kanan kartu. Perjalanan LAMBAT (±3–5 detik,
-     makin jauh makin lama), dengan goyangan langkah mungil
-     (naik-turun ±1–2px dan miring ±1° bergantian tiap langkah)
-     dan hadap dibalik mengikuti arah jalan: ke kanan tampil
-     seperti aslinya, ke kiri dicerminkan (scaleX -1). */
+     Panggung (elemen video) berpindah di dalam jalur .mascot-walk
+     saja, sama seperti rig sebelumnya: tujuan acak di sepanjang
+     jalur (kadang kembali ke tempat awal), perjalanan LAMBAT
+     (±3-5 detik) dengan goyangan langkah mungil dan hadap dibalik
+     mengikuti arah jalan. */
+  let berjalan=false,posX=0,posY=0,hadap=1;
   const jalanSekali=selesai=>{
     const jalur=stage.parentElement;
     if(!jalur||berjalan){selesai();return}
     const maksX=Math.max(0,jalur.clientWidth-stage.offsetWidth);
     if(maksX<20){selesai();return}
-    /* Tujuan: 35% kembali ke tempat awal, selain itu titik acak
-       yang cukup jauh dari posisi sekarang supaya terlihat
-       benar-benar berpindah tempat. */
     let tujuan;
     if(Math.random()<0.35&&posX>10){tujuan=0}
     else{
@@ -175,11 +162,7 @@ function mulaiGerakMaskot(stage,breath,sway,head,arm,bird){
     const hadapBaru=tujuan>posX?1:-1;
     const dur=Math.min(5000,Math.max(3000,jarak*65));
     const langkah=Math.max(4,Math.min(12,Math.round(jarak/9)));
-    /* Jedakan gerakan mikro yang sedang berjalan & tahan napas. */
     berjalan=true;
-    animAktif.forEach(an=>{try{an.cancel()}catch(e){}});
-    animAktif.clear();
-    try{napas.pause()}catch(e){}
     const kf=[];
     for(let i=0;i<=langkah;i++){
       const p=i/langkah;
@@ -192,11 +175,8 @@ function mulaiGerakMaskot(stage,breath,sway,head,arm,bird){
       kf.push({transform:'translate('+x.toFixed(1)+'px,'+y.toFixed(1)+'px) scaleX('+sx+') rotate('+miring+'deg)',offset:p});
     }
     const an=stage.animate(kf,{duration:dur,easing:'linear',fill:'forwards'});
-    /* Penjaga supaya 'selesai' hanya terpanggil sekali: akhiri()
-       membatalkan animasinya sendiri, dan pembatalan itu juga
-       memicu oncancel. */
     let sudahSelesai=false;
-    const tuntaskan=()=>{if(sudahSelesai)return;sudahSelesai=true;berjalan=false;try{napas.play()}catch(e){}selesai()};
+    const tuntaskan=()=>{if(sudahSelesai)return;sudahSelesai=true;berjalan=false;selesai()};
     const akhiri=()=>{
       posX=tujuan;posY=tujuanY;hadap=hadapBaru;
       try{an.commitStyles()}catch(e){}
@@ -206,15 +186,10 @@ function mulaiGerakMaskot(stage,breath,sway,head,arm,bird){
     an.onfinish=akhiri;
     an.oncancel=()=>tuntaskan();
   };
-  /* Penjadwal jalan-jalan: perjalanan pertama sedikit lebih awal
-     (±16–28 detik) supaya terasa hidup tidak lama sesudah Home
-     dibuka, berikutnya jarang dan acak (±25–60 detik). Berhenti
-     rapi saat maskot lepas dari halaman. */
+  /* Penjadwal jalan-jalan: perjalanan pertama ±16-28 detik sesudah
+     Home dibuka, berikutnya jarang dan acak (±25-60 detik). */
   const jadwalJalan=delay=>{
-    setTimeout(()=>{
-      if(!hidup()){matikan();return}
-      jalanSekali(()=>{if(hidup())jadwalJalan(acak(25000,60000));else matikan()});
-    },delay);
+    nanti(()=>{jalanSekali(()=>{if(hidup())jadwalJalan(acak(25000,60000))})},delay);
   };
   jadwalJalan(acak(16000,28000));
 }
