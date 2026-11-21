@@ -92,7 +92,8 @@ function accountForm(){
   let signup=false;
   const titleText=h('span',{},'Masuk ke Shikoku Family');
   const submitLabel=h('span',{},'Masuk');
-  const title=h('b',{},icon('lock',20),titleText);
+  const lockTap=h('button',{type:'button',id:'login-lock',class:'login-lock-tap','aria-label':'Masuk ke Shikoku Family'},icon('lock',20));
+  const title=h('b',{},lockTap,titleText);
   const forgot=h('button',{class:'btn s',onclick:async()=>{
     const emailValue=email.value.trim();
     if(!emailValue){notice.textContent='Masukkan email terlebih dahulu untuk menerima tautan reset password.';email.focus();return}
@@ -318,6 +319,7 @@ async function enterLocalMainAdmin(){
        kembali online. */
     applyLocalUser(user);
     S.authLoading=false;
+    document.body.classList.remove('auth-locked','bottom-nav-hidden');
     if(typeof startDataSubscriptions==='function')startDataSubscriptions();
     /* Kegagalan memuat daftar sampingan tidak boleh membatalkan masuk:
        Home tetap digambar apa pun hasil kedua pemuatan ini. */
@@ -333,6 +335,7 @@ async function enterLocalMainAdmin(){
       S.view='landing';S.adminMenuOpen=false;document.body.classList.remove('open');
       applyLocalUser({id:'local-user-memory',name:'Putro',email:LOCAL_ADMIN_EMAIL,role:'admin',is_main_admin:true,approval_status:'approved'});
       S.authLoading=false;
+      document.body.classList.remove('auth-locked','bottom-nav-hidden');
       if(typeof startDataSubscriptions==='function')startDataSubscriptions();
       render();
     }catch(e2){console.error('Masuk lokal cadangan juga gagal:',e2)}
@@ -370,3 +373,36 @@ document.addEventListener(brandTapEventName,event=>{
   const target=event.target;
   if(target&&typeof target.closest==='function'&&target.closest('#brand-title'))handleBrandTap();
 },true);
+/* Sasaran ketuk 3x UTAMA: gambar gembok di judul kartu masuk
+   ("Masuk ke Shikoku Family"). Elemennya tombol sungguhan (#login-lock,
+   .login-lock-tap) berukuran area ketuk 44px — mudah kena jari di HP dan
+   mudah diketuk alat uji — tapi tampilannya persis ikon gembok semula:
+   tanpa latar, tanpa teks tambahan, tanpa petunjuk apa pun.
+   1-2 ketukan tidak melakukan apa-apa; ketukan ke-3 dalam jendela
+   1,2 detik antar-ketukan memanggil jalur masuk yang SAMA dengan ketuk
+   3x tulisan (enterLocalMainAdmin): admin utama lokal khusus sesi.
+   Didengar dua isyarat sekaligus — 'pointerdown' (paling awal & andal
+   di webview HP) dan 'click' (cadangan bila hanya klik yang terkirim,
+   mis. ketuk via .click()) — dengan penjaga anti-ganda: klik yang
+   datang <700ms sesudah pointerdown pada ketukan yang sama diabaikan,
+   jadi satu ketukan fisik selalu terhitung satu. */
+let lockTapCount=0,lockTapLast=0,lockTapPointerAt=0;
+function handleLockTap(eventType){
+  const now=Date.now();
+  if(eventType==='click'&&now-lockTapPointerAt<700)return;
+  if(eventType==='pointerdown')lockTapPointerAt=now;
+  if(now-lockTapLast>1200)lockTapCount=0;
+  lockTapLast=now;
+  lockTapCount+=1;
+  if(lockTapCount>=3){
+    lockTapCount=0;lockTapLast=0;lockTapPointerAt=0;
+    enterLocalMainAdmin();
+  }
+}
+function lockTapTarget(event){
+  const target=event&&event.target;
+  if(!target||typeof target.closest!=='function')return null;
+  return target.closest('#login-lock,.login-lock-tap');
+}
+document.addEventListener('pointerdown',event=>{if(lockTapTarget(event))handleLockTap('pointerdown')},true);
+document.addEventListener('click',event=>{if(lockTapTarget(event))handleLockTap('click')},true);

@@ -40,6 +40,9 @@ h1{font-size:26px;margin:8px 0 10px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:16px;margin-bottom:12px;display:flex;align-items:center;gap:14px;width:100%;text-align:left;color:var(--ink);box-shadow:0 4px 16px rgba(47,134,184,.1)}
 .auth-card{max-width:480px;margin:20px auto 0;padding:24px;display:block;text-align:left;box-shadow:0 12px 30px rgba(47,134,184,.14)}
 .auth-card> b{display:flex;align-items:center;gap:9px;font-size:21px;margin-bottom:8px}
+.login-lock-tap{display:inline-grid;place-items:center;width:44px;height:44px;padding:0;margin:-12px -10px -12px -12px;border:0;background:transparent;color:inherit;border-radius:999px;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;flex:none;font:inherit}
+.login-lock-tap svg,.login-lock-tap .app-icon{pointer-events:none}
+.login-lock-tap:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
 .auth-card .sub{line-height:1.5}
 .auth-tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:4px;margin:12px 0 4px;background:var(--line);border-radius:14px}
 .auth-tab{padding:9px;border:0;border-radius:10px;background:transparent;color:var(--mut);font-weight:700}
@@ -777,7 +780,14 @@ input,textarea,select{background:#f4f8fa;border-color:#bfcfdb}
    .org-join dari tengah baris puncak. Di HP pohon menumpuk ke bawah
    dengan rel vertikal di sisi kiri tiap kelompok anak: siku dari
    bawah kartu induk masuk ke rel, dan tiap anak terhubung ke rel
-   lewat garis pendek, tanpa geser menyamping. */
+   lewat garis pendek, tanpa geser menyamping.
+   Supaya TIDAK ADA garis yang putus: .org-node memakai gap 6px antar
+   elemen, jadi .org-kids ditarik naik margin-top:-6px dan .org-join
+   margin-top:-6px — garis vertikal pun mulai persis di bawah kartu
+   induk (atau baris puncak) dan menyambung utuh sampai batang
+   mendatar, lalu turun utuh ke tiap kartu anak. Kelompok anak yang
+   membungkus multi-baris disambung tulang vertikal + potongan ujung
+   per baris dari rapikanGarisBagan() di members.js. */
 .org-toggle{display:inline-flex;gap:4px;padding:4px;background:var(--card);border:1px solid var(--line);border-radius:999px;margin-bottom:14px;box-shadow:0 4px 14px rgba(47,134,184,.08)}
 .org-toggle-btn{border:0;background:transparent;padding:8px 24px;border-radius:999px;font-weight:700;font-size:14px;color:var(--mut);cursor:pointer;font-family:inherit}
 .org-toggle-btn.on{background:var(--g);color:#ffffff;box-shadow:0 4px 10px rgba(43,122,140,.25)}
@@ -792,7 +802,7 @@ button.org-node-main:hover{border-color:var(--acc)}
 .org-node-empty .org-node-name{color:var(--mut);text-transform:none;font-weight:600;font-size:13px}
 .org-avatar{width:46px;height:46px;flex:none;border-radius:15px;object-fit:cover}
 .org-avatar-ph{display:grid;place-items:center;background:linear-gradient(145deg,#dff2e7,#dceef8);color:#000000;font-size:19px;font-weight:700}
-.org-kids{display:flex;flex-wrap:wrap;justify-content:center;list-style:none;margin:0;padding:28px 0 0;position:relative;max-width:100%}
+.org-kids{display:flex;flex-wrap:wrap;justify-content:center;list-style:none;margin:-6px 0 0;padding:28px 0 0;position:relative;max-width:100%}
 .org-kids::before{content:'';position:absolute;top:0;left:50%;height:28px;border-left:3px solid #527f9f}
 .org-kids>li{position:relative;padding:28px 10px 0;display:flex;justify-content:center}
 .org-kids>li::before,.org-kids>li::after{content:'';position:absolute;top:0;right:50%;width:50%;height:28px;border-top:3px solid #527f9f}
@@ -808,7 +818,7 @@ button.org-node-main:hover{border-color:var(--acc)}
 .org-node-head{display:flex;flex-direction:column;align-items:center;gap:6px}
 .org-top-row .org-node-main{width:160px}
 .org-pair-link{flex:none;width:34px;height:3px;background:#527f9f;margin-top:64px}
-.org-join{width:3px;height:22px;background:#527f9f;flex:none}
+.org-join{width:3px;height:22px;background:#527f9f;flex:none;margin:-6px 0 0}
 .org-group{display:flex;flex-direction:column;align-items:center;width:100%}
 .org-group-title{padding:7px 18px;border-radius:999px;background:#dcebf3;color:#000000;font-weight:700;font-size:13px;letter-spacing:.04em;text-transform:uppercase}
 .org-grid{position:relative;display:flex;flex-wrap:wrap;justify-content:center;width:100%}
@@ -877,7 +887,21 @@ body.org-drag-on,body.org-drag-on *{cursor:grabbing!important}
    Anak yang sendirian di barisnya tidak menggambar segmen batang
    menyamping — garis lurus tulang → kartunya yang berbicara. */
 .org-kids-wrapped::after{content:'';position:absolute;left:50%;top:var(--spine-top,28px);height:var(--spine-h,0);border-left:3px solid #527f9f}
+/* Tulang multi-baris lewat DI BELAKANG kartu & tombol anak (bukan
+   menimpa isinya): kartu anak berada di lapisan atas, jadi garis
+   tampak mengalir di belakang kartu dan muncul lagi di celah antar
+   baris — jalurnya tetap utuh dari batang pertama ke batang terakhir. */
+.org-kids-wrapped>li{position:relative;z-index:1}
 .org-kids>li.org-li-solo::before{display:none}
+.org-kids>li.org-li-solo::after{border-top:0}
+/* Ujung batang tiap baris pada kelompok multi-baris (kelas diatur JS
+   lewat rapikanGarisBagan): segmen menyamping berhenti tepat di
+   tengah kartu pertama/terakhir baris itu, sama seperti potongan
+   :first-child/:last-child untuk baris tunggal — tanpa ini ujung
+   baris lanjutan menyisakan garis menggantung yang tampak putus.
+   Garis vertikal turun ke kartu (::after border-left) tidak disentuh. */
+.org-kids>li.org-li-rowfirst::before{border-top:0}
+.org-kids>li.org-li-rowlast::after{border-top:0}
 .org-node-main.org-drop-ok{outline:3px solid var(--acc);outline-offset:2px}
 .org-node-main.org-drop-before{outline:2px solid var(--acc);outline-offset:2px;box-shadow:inset 0 7px 0 var(--acc)}
 .org-node-main.org-drop-after{outline:2px solid var(--acc);outline-offset:2px;box-shadow:inset 0 -7px 0 var(--acc)}
@@ -904,3 +928,91 @@ body.auth-locked #pm{display:none!important}
 body.auth-locked main{padding:22px 16px 28px}
 body.auth-locked .landing{padding-top:0}
 @media (max-width:560px){body.auth-locked main{padding:14px 12px 22px}}
+
+/* ===== Peta & Wilayah (Leaflet, pin dari daftar anggota) =====
+   Peta tampil paling atas halaman. Tema mengikuti clay aplikasi: kartu
+   terang membulat, teks hitam/slate gelap, aksen teal. Pin memakai warna
+   wilayah masing-masing. */
+.leaflet-container{font-family:Ubuntu,"Segoe UI",system-ui,-apple-system,Roboto,sans-serif}
+.peta-map-card{background:#f8fbfc;border:1px solid rgba(255,255,255,.85);border-radius:24px;overflow:hidden;box-shadow:10px 12px 24px rgba(70,95,115,.16),-6px -6px 18px rgba(255,255,255,.6);margin-bottom:12px}
+.peta-map-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding:13px 15px 11px;flex-wrap:wrap}
+.peta-map-head h2{margin:0;font-size:16px;color:#16283a}
+.peta-map-head p{margin:3px 0 0;font-size:12.5px;color:#3d5568;line-height:1.45}
+.peta-count-badge{display:inline-flex;align-items:center;background:linear-gradient(145deg,#3d9db0,#2b7a8c);color:#fff;font-size:12.5px;font-weight:700;padding:5px 11px;border-radius:999px;white-space:nowrap}
+#peta-map{height:480px;width:100%;background:#dbe5ee;z-index:1}
+@media (max-width:640px){#peta-map{height:400px}}
+.peta-notice{padding:10px 15px;background:#fdf3d7;border-top:1px solid #f0dfa0;font-size:12.5px;color:#6b5410;line-height:1.55}
+.peta-map-foot{padding:10px 15px 12px;display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;justify-content:space-between;border-top:1px solid #e3ecf2}
+.peta-map-foot span{font-size:12.5px;color:#3d5568}
+.peta-nomap{padding:30px 18px;text-align:center;color:#3d5568;line-height:1.7}
+.peta-nomap b{display:block;color:#16283a;font-size:16px}
+.peta-nomap span{display:block;font-size:13.5px}
+.peta-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px}
+.peta-stat{border-radius:20px;padding:13px 14px 11px;box-shadow:8px 10px 20px rgba(70,95,115,.16),-4px -4px 12px rgba(255,255,255,.55),inset 0 1px 0 rgba(255,255,255,.7)}
+.peta-stat:nth-child(1){background:#bcd9ea}
+.peta-stat:nth-child(2){background:#a9dcd2}
+.peta-stat:nth-child(3){background:#d9e8ef}
+.peta-stat b{font-size:22px;display:block;line-height:1;color:#16283a}
+.peta-stat span{font-size:12.5px;color:#3d5568;display:block;margin-top:4px;line-height:1.3;font-weight:600}
+@media (max-width:640px){.peta-stat b{font-size:18px}.peta-stat span{font-size:11.5px}}
+.peta-belum{margin:0 4px 12px}
+/* Kartu detail anggota terpilih */
+.peta-detail{background:#f8fbfc;border:1px solid rgba(255,255,255,.85);border-radius:22px;padding:16px;margin-bottom:12px;box-shadow:10px 12px 24px rgba(70,95,115,.16),-6px -6px 18px rgba(255,255,255,.6)}
+.peta-detail-top{display:flex;flex-wrap:wrap;gap:10px;justify-content:space-between;align-items:flex-start}
+.peta-detail-top .btn{flex:none}
+.peta-detail-label{font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#2b7a8c}
+.peta-detail h3{margin:4px 0 0;font-size:22px;line-height:1.15;color:#111827}
+.peta-detail-meta{margin-top:8px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.peta-badge{display:inline-flex;align-items:center;padding:4px 10px;border-radius:999px;color:#fff;font-size:12.5px;font-weight:700}
+.peta-detail-kota{font-size:13px;color:#3d5568}
+.peta-detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+@media (max-width:560px){.peta-detail-grid{grid-template-columns:1fr}}
+.peta-detail-box{background:#eef4f7;border:1px solid #dde7ee;border-radius:14px;padding:11px 12px}
+.peta-detail-box label{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#2b7a8c;font-weight:700}
+.peta-detail-box p{margin:4px 0 0;font-size:14px;line-height:1.45;color:#111827}
+.peta-detail-note{margin:10px 0 0;font-size:12.5px;color:#3d5568}
+/* Kontrol: pencarian + legenda */
+.peta-controls-row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.peta-search{flex:1 1 230px;display:flex;align-items:center;gap:8px;background:#f4f8fa;border:2px solid #bfcfdb;border-radius:999px;padding:2px 6px 2px 14px;color:#3d5568}
+.peta-search input{flex:1;border:0;background:transparent;outline:none;font-size:15px;color:#111827;min-height:36px;margin:0;padding:0;width:auto}
+.peta-search input::placeholder{color:#7d94a6}
+.peta-legend-head{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:baseline;justify-content:space-between;margin-top:16px;padding-top:13px;border-top:1px solid #e3ecf2}
+.peta-legend-head h3{margin:0;font-size:14px;color:#16283a}
+.peta-legend-head span{font-size:12px;color:#3d5568;line-height:1.4}
+.peta-chips{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:8px;margin-top:10px}
+.peta-chip{border:1.5px solid #c3d2dd;background:#fff;border-radius:999px;padding:7px 11px 7px 9px;display:flex;align-items:center;gap:7px;cursor:pointer;font-size:13px;font-weight:600;color:#111827;min-height:38px;width:100%;text-align:left;line-height:1.25;font-family:inherit}
+.peta-chip .peta-dot{width:12px;height:12px;border-radius:50%;flex:none;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.12)}
+.peta-chip .peta-chip-name{flex:1;min-width:0}
+.peta-chip .peta-count{background:#eef4f7;border-radius:999px;padding:2px 7px;font-size:12px;color:#3d5568;flex:none}
+.peta-chip.on{border-color:#354b64;background:#354b64;color:#fff}
+.peta-chip.on .peta-count{background:rgba(255,255,255,.18);color:#fff}
+/* Daftar anggota di bawah peta */
+.peta-h2{font-size:17px;margin:0 0 6px;color:#16283a}
+.peta-member-list{list-style:none;margin:12px 0 0;padding:0;display:grid;grid-template-columns:1fr;gap:8px}
+@media (min-width:640px){.peta-member-list{grid-template-columns:1fr 1fr}}
+@media (min-width:1024px){.peta-member-list{grid-template-columns:1fr 1fr 1fr}}
+.peta-member-item{width:100%;text-align:left;background:#f4f8fa;border:1.5px solid #e3ecf2;border-radius:16px;padding:11px 12px;cursor:pointer;display:flex;gap:11px;align-items:flex-start;font-family:inherit;color:#111827}
+.peta-member-item:hover{border-color:#b9cbd8}
+.peta-member-item.on{border-color:#354b64;background:#fff;box-shadow:0 4px 14px rgba(50,75,95,.12)}
+.peta-avatar{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;font-size:14px;flex:none}
+.peta-member-main{flex:1;min-width:0}
+.peta-member-main strong{font-size:14.5px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#111827}
+.peta-member-main span{font-size:12.5px;color:#3d5568;display:block;margin-top:2px;line-height:1.4}
+.peta-mini-badge{font-size:11px;font-weight:700;color:#fff;padding:3px 7px;border-radius:999px;white-space:nowrap;margin-top:2px;flex:none}
+.peta-empty{padding:18px;text-align:center;color:#3d5568;font-size:13.5px;line-height:1.6;background:#f4f8fa;border-radius:14px;border:1px dashed #b9cbd8;margin-top:12px}
+/* Pin & popup Leaflet */
+.peta-pin-wrap{background:transparent;border:none}
+.peta-pin{width:30px;height:38px;position:relative;display:flex;justify-content:center}
+.peta-pin-body{width:28px;height:28px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);border:2.5px solid #fff;box-shadow:0 4px 10px rgba(0,0,0,.28);display:flex;align-items:center;justify-content:center}
+.peta-pin-body::after{content:"";width:10px;height:10px;background:#fff;border-radius:50%;display:block}
+.peta-pin-selected .peta-pin-body{outline:3px solid #16283a;outline-offset:1px}
+.leaflet-tooltip.pin-tip{background:#fff;border:1.5px solid #c3d2dd;border-radius:12px;box-shadow:0 8px 22px rgba(46,58,77,.20);color:#111827;font-family:Ubuntu,"Segoe UI",sans-serif;padding:7px 11px 8px;opacity:1;pointer-events:none;white-space:nowrap}
+.leaflet-tooltip.pin-tip:before{display:none}
+.pin-tip-name{font-size:14.5px;font-weight:800;line-height:1.15;color:#111827}
+.pin-tip-sub{display:flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;color:#3d5568;margin-top:3px;line-height:1.2}
+.pin-tip-sub i{width:9px;height:9px;border-radius:50%;display:block;flex-shrink:0;border:1.5px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.14)}
+.peta-popup .leaflet-popup-content-wrapper{border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.18)}
+.peta-popup .leaflet-popup-content{margin:14px 16px;line-height:1.45;font-family:Ubuntu,"Segoe UI",sans-serif;min-width:200px}
+.peta-pop-name{font-size:18px;font-weight:700;line-height:1.15;color:#111827}
+.peta-pop-badge{display:inline-block;margin-top:6px;padding:3px 9px;border-radius:999px;color:#fff;font-size:12px;font-weight:700}
+.peta-pop-addr{font-size:13px;color:#3d5568;margin-top:6px}

@@ -59,7 +59,6 @@ render();
           await loadMessages();
           await subscribeToMessages();
         }
-        await loadMapSettings();
         await loadPendingUsers();
         if (session?.user && (S.approvalStatus === 'approved' || S.admin)) startDataSubscriptions();
       } catch (error) {

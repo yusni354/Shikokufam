@@ -787,28 +787,28 @@ function susunanPanelGeser(nodes,node){
       }},'Pindahkan'),
       h('button',{class:'btn s',onclick:tutupPanelSusunan},'Selesai')));
 }
-/* Panel Tambah Jabatan: nama jabatan baru, induk tempat ia berada
+/* Panel Tambah Dapukan: nama dapukan baru, induk tempat ia berada
    (terpilih awal mengikuti tombol yang membuka panel: tombol besar
-   '+ Tambah Jabatan Baru' memilih jabatan puncak; tombol '＋ Bawahan'
+   '+ Tambah Jabatan Baru' memilih jabatan puncak; tombol '＋ Tambah Dapukan'
    pada sebuah jabatan memilih jabatan itu), dan pemegang lewat field
    combobox anggota yang sama seperti panel Tetapkan. */
 function susunanPanelTambah(nodes,indukAwal){
   const root=susunanAkar(nodes);
   const awal=indukAwal&&susunanCari(nodes,indukAwal)?indukAwal:(root?root.id:'');
-  const input=h('input',{type:'text',maxlength:'60',placeholder:'Nama jabatan baru'});
+  const input=h('input',{type:'text',maxlength:'60',placeholder:'Nama dapukan baru'});
   const selInduk=susunanPilihInduk(nodes,awal,null);
   const selPemegang=susunanPilihAnggota('');
-  return box(h('b',{},'Tambah jabatan baru'),
-    h('p',{class:'sub'},'Nama jabatan:'),input,
-    h('p',{class:'sub',style:'margin-top:10px'},'Berada di bawah jabatan:'),selInduk,
-    h('p',{class:'sub',style:'margin-top:10px'},'Pemegang jabatan (boleh dikosongkan dulu):'),selPemegang,
+  return box(h('b',{},'Tambah dapukan baru'),
+    h('p',{class:'sub'},'Nama dapukan:'),input,
+    h('p',{class:'sub',style:'margin-top:10px'},'Dapukan ini berada di bawah jabatan:'),selInduk,
+    h('p',{class:'sub',style:'margin-top:10px'},'Pemegang dapukan (boleh dikosongkan dulu):'),selPemegang,
     h('div',{class:'fl'},
       h('button',{class:'btn',onclick:async()=>{
         const nama=input.value.trim();
-        if(!nama){alert('Isi nama jabatan baru terlebih dahulu.');return}
+        if(!nama){alert('Isi nama dapukan baru terlebih dahulu.');return}
         if(!selInduk.value){alert('Pilih jabatan induk terlebih dahulu.');return}
         try{await tambahJabatanBaru(nama,selInduk.value,selPemegang.value||'');tutupPanelSusunan()}
-        catch(error){console.error(error);alert('Gagal menambah jabatan: '+(error.message||'periksa koneksi'))}
+        catch(error){console.error(error);alert('Gagal menambah dapukan: '+(error.message||'periksa koneksi'))}
       }},'Simpan'),
       h('button',{class:'btn s',onclick:tutupPanelSusunan},'Batal')));
 }
@@ -830,7 +830,7 @@ function orgAlat(nodes,node){
   return h('div',{class:'org-tools'},
     h('button',{class:'btn s',onclick:()=>bukaPanelSusunan('nama',node.id)},'Nama'),
     h('button',{class:'btn s',onclick:()=>bukaPanelSusunan('pemegang',node.id)},pemegangJabatan(node)?'Pemegang':'Tetapkan'),
-    h('button',{class:'btn s',onclick:()=>bukaPanelSusunan('tambah',node.id)},'＋ Bawahan'),
+    h('button',{class:'btn s',onclick:()=>bukaPanelSusunan('tambah',node.id)},'＋ Tambah Dapukan'),
     !isRoot&&h('button',{class:'btn s',onclick:()=>bukaPanelSusunan('geser',node.id)},'Geser'),
     !isRoot&&orgTombolHapus(nodes,node));
 }
@@ -1010,11 +1010,18 @@ function orgBagan(nodes){
    tulang vertikal di sumbu tengah kelompok (CSS var --spine-top/
    --spine-h pada .org-kids-wrapped::after) dari batang baris pertama
    turun ke batang baris terakhir, jadi semua baris tersambung ke
-   garis turun induk; (2) anak yang sendirian di barisnya kehilangan
-   segmen batang menyampingnya (kelas org-li-solo) — cukup garis lurus
-   di sumbu tengah dari tulang ke kartunya. Di HP tidak dipakai:
-   bagan HP memakai rel kiri. Dijalankan dari render() dan saat
-   ukuran jendela berubah; aman berulang (kelas dibersihkan dulu). */
+   garis turun induk; (2) anak pertama/terakhir TIAP baris ditandai
+   (org-li-rowfirst/org-li-rowlast) supaya segmen batang menyamping
+   berhenti tepat di tengah kartu ujung baris itu — tanpa tanda ini
+   CSS bawaan hanya memotong segmen di anak pertama/terakhir
+   keseluruhan, jadi ujung baris lanjutan menyisakan garis
+   menggantung yang tampak putus; (3) anak yang sendirian di barisnya
+   kehilangan segmen batang menyampingnya (kelas org-li-solo) — cukup
+   garis lurus di sumbu tengah dari tulang ke kartunya. Di HP tidak
+   dipakai: bagan HP memakai rel kiri. Dijalankan dari render(), saat
+   ukuran jendela berubah, dan sesudah font/muat halaman selesai
+   (lebar kartu bisa bergeser halus saat font tiba); aman berulang
+   (kelas dibersihkan dulu). */
 function rapikanGarisBagan(){
   const tree=document.querySelector('.org-tree');
   if(!tree)return;
@@ -1023,7 +1030,7 @@ function rapikanGarisBagan(){
     ul.classList.remove('org-kids-wrapped');
     ul.style.removeProperty('--spine-top');
     ul.style.removeProperty('--spine-h');
-    [...ul.children].forEach(li=>li.classList.remove('org-li-solo'));
+    [...ul.children].forEach(li=>li.classList.remove('org-li-solo','org-li-rowfirst','org-li-rowlast'));
     if(!desktop)return;
     const lis=[...ul.children];
     if(lis.length<2)return;
@@ -1037,11 +1044,17 @@ function rapikanGarisBagan(){
     ul.classList.add('org-kids-wrapped');
     ul.style.setProperty('--spine-top',rows[0].t+'px');
     ul.style.setProperty('--spine-h',(rows[rows.length-1].t-rows[0].t)+'px');
-    rows.forEach(row=>{if(row.items.length===1)row.items[0].classList.add('org-li-solo')});
+    rows.forEach(row=>{
+      row.items[0].classList.add('org-li-rowfirst');
+      row.items[row.items.length-1].classList.add('org-li-rowlast');
+      if(row.items.length===1)row.items[0].classList.add('org-li-solo');
+    });
   });
 }
 let orgSpineTimer=null;
 window.addEventListener('resize',()=>{clearTimeout(orgSpineTimer);orgSpineTimer=setTimeout(rapikanGarisBagan,180)});
+window.addEventListener('load',()=>rapikanGarisBagan());
+if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>rapikanGarisBagan());
 /* Tipe TABEL: satu baris per jabatan, berkelompok mengikuti cabang
    pohon — kelompok pertama berisi jabatan puncak beserta anak-anaknya,
    lalu satu kelompok per cabang yang mempunyai anak. */
@@ -1097,7 +1110,7 @@ function vSusunan(){
         try{await kembalikanSusunanAwal();S.susunanPanel=null;render()}
         catch(error){console.error(error);alert('Gagal mengembalikan susunan awal: '+(error.message||'periksa koneksi'))}
       }},'Kembalikan Susunan Awal'),
-      atur&&h('p',{class:'sub org-atur-note'},'Mode atur aktif: pakai tombol Nama, Pemegang, Geser, Hapus, dan ＋ Bawahan pada tiap jabatan; tombol + Tambah Jabatan Baru di atas menambah posisi di bawah jabatan mana pun. Di tampilan Bagan, jabatan juga bisa diseret — tahan kartunya atau pegangan ⠿ Seret, lalu geser ke jabatan tujuan untuk memindah induk atau menggeser urutan.')
+      atur&&h('p',{class:'sub org-atur-note'},'Mode atur aktif: pakai tombol Nama, Pemegang, Geser, Hapus, dan ＋ Tambah Dapukan pada tiap jabatan; tombol + Tambah Jabatan Baru di atas menambah posisi di bawah jabatan mana pun. Di tampilan Bagan, jabatan juga bisa diseret — tahan kartunya atau pegangan ⠿ Seret, lalu geser ke jabatan tujuan untuk memindah induk atau menggeser urutan.')
     ));
   }
   if(S.admin&&S.susunanPanel){

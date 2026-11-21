@@ -12,7 +12,6 @@ const V={
   keuangan:vKeuangan,
   susunan:vSusunan,
   pengaturan:vPengaturan,
-  'map-settings':vPetaSettings,
   approvals:vApprovals
 };
 function navTo(view){return event=>{event.preventDefault();go(view)}}
@@ -110,7 +109,7 @@ function render(){
   $('#sw').style.display=S.mainAdmin?'flex':'none';
   updateApprovalBadges();
   const current=ALL.find(x=>x[0]===S.view);
-  if(!V[S.view]||(['map-settings','approvals'].includes(S.view)&&!S.mainAdmin)||(S.view==='pengaturan'&&!S.admin))S.view='landing';
+  if(!V[S.view]||(S.view==='approvals'&&!S.mainAdmin)||(S.view==='pengaturan'&&!S.admin))S.view='landing';
   const content=[];
   const storageErrors=Object.values(S.storageErrors||{});
   if(storageErrors.length)content.push(h('p',{class:'warn storage-warning'},'Database bersama tidak dapat dibaca: '+storageErrors.join(' · ')+' Jalankan pembaruan skema Supabase, lalu muat ulang aplikasi.'));
@@ -121,6 +120,9 @@ function render(){
   hydrateMemberQrCodes();
   hydrateMemberMedia();
   if(typeof rapikanGarisBagan==='function')rapikanGarisBagan();
+  /* Halaman Peta: bangun peta Leaflet sesudah DOM terpasang (dijaga di
+     dalam initPetaMap sendiri supaya kegagalan peta tidak merusak render) */
+  if(typeof initPetaMap==='function')initPetaMap();
   $('#pet').style.display=S.form?'none':'block';
 }
 function sub(name,key){
