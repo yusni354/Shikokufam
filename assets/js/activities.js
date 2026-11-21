@@ -776,7 +776,14 @@ function vRingkasan(){
   };
   const rekapHead=h('thead',{},h('tr',{},
     h('th',{class:'rekap-name-head'},'Nama'),
-    ...rekapEvents.map(event=>h('th',{class:'rekap-ev',title:(event.judul||'Kegiatan komunitas')+' · '+shortDate(event)},h('small',{},shortDate(event)),h('span',{},event.judul||'Kegiatan komunitas'))),
+    /* Kepala kolom kegiatan: khusus admin bisa diklik untuk membuka
+       panel pengaturan kegiatan itu (satu-satunya tempat hapus kegiatan
+       sekarang); anggota biasa tidak mendapat reaksi apa pun. */
+    ...rekapEvents.map(event=>{
+      const props={class:'rekap-ev'+(S.admin?' rekap-ev-admin':''),title:(event.judul||'Kegiatan komunitas')+' · '+shortDate(event)+(S.admin?' — ketuk untuk pengaturan kegiatan':'')};
+      if(S.admin)props.onclick=()=>{S.rekapDialog={id:event.id,judul:event.judul||'Kegiatan komunitas',tanggal:event.tanggal||'',tahap:'atur'};render()};
+      return h('th',props,h('small',{},shortDate(event)),h('span',{},event.judul||'Kegiatan komunitas'));
+    }),
     h('th',{class:'rekap-sum-start',title:'Total Hadir sepanjang tahun'},'Hadir'),
     h('th',{title:'Total Izin sepanjang tahun'},'Izin'),
     h('th',{title:'Total Cuti sepanjang tahun'},'Cuti'),
@@ -846,7 +853,46 @@ function vRingkasan(){
     rekapMembers.length
       ?h('div',{class:'rekap-wrap'},h('table',{class:'rekap-table'},rekapHead,rekapBody))
       :h('p',{class:'warn'},'Belum ada anggota aktif.'));
-  return [...head,summaryCard,rekapCard,h('div',{class:'activity-list'},...events.map(item))];
+  return [...head,summaryCard,rekapCard,h('div',{class:'activity-list'},...events.map(item)),dialogRekapKegiatan()];
+}
+/* ===== Panel pengaturan kegiatan dari kepala kolom tabel rekap =====
+   Dibuka dengan mengklik kepala kolom sebuah kegiatan di tabel rekap
+   (khusus admin). Pola aplikasi: tanpa tombol X — mengetuk bidang di
+   luar kotak atau tombol penutup menutupnya. Tahap pertama menampilkan
+   nama + tanggal kegiatan dan tombol 'Hapus Kegiatan'; menekannya
+   membuka konfirmasi tegas yang menyebut nama kegiatannya. Sesudah
+   dikonfirmasi, dokumen kegiatan (beserta data absensi di dalamnya)
+   dihapus lewat jalur data aplikasi dan tabel digambar ulang. */
+function dialogRekapKegiatan(){
+  const d=S.rekapDialog;
+  if(!d)return null;
+  const tutup=()=>{S.rekapDialog=null;render()};
+  const nama=d.judul||'Kegiatan komunitas';
+  const tgl=d.tanggal?new Date(d.tanggal+'T00:00:00'):null;
+  const tglLabel=tgl&&!Number.isNaN(tgl.getTime())?tgl.toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'}):'Tanggal belum ditentukan';
+  if(d.tahap==='yakin'){
+    return h('div',{class:'confirm-overlay',onclick:tutup},
+      h('div',{class:'card confirm-card',onclick:ev=>ev.stopPropagation()},
+        h('b',{class:'confirm-title'},'Hapus Kegiatan'),
+        h('p',{class:'confirm-text'},'Hapus kegiatan "'+nama+'" ('+tglLabel+')? Kegiatan ini beserta seluruh data absensinya akan terhapus dan tidak bisa dibatalkan.'),
+        h('div',{class:'fl confirm-actions'},
+          h('button',{class:'btn s',onclick:tutup},'Batal'),
+          h('button',{class:'btn',onclick:async()=>{
+            const id=d.id;S.rekapDialog=null;
+            try{
+              await S.db.collection('events').doc(id).delete();
+              S.events=S.events.filter(e=>String(e.id)!==String(id));
+            }catch(error){console.error(error);alert('Gagal menghapus kegiatan: '+(error.message||'periksa koneksi'))}
+            render();
+          }},'Hapus'))));
+  }
+  return h('div',{class:'confirm-overlay',onclick:tutup},
+    h('div',{class:'card confirm-card',onclick:ev=>ev.stopPropagation()},
+      h('b',{class:'confirm-title'},'Pengaturan Kegiatan'),
+      h('p',{class:'confirm-text'},h('b',{},nama),h('br',{}),tglLabel),
+      h('div',{class:'fl confirm-actions'},
+        h('button',{class:'btn s',onclick:tutup},'Tutup'),
+        h('button',{class:'btn',onclick:()=>{S.rekapDialog={...d,tahap:'yakin'};render()}},'Hapus Kegiatan'))));
 }
 /* ===== Pengulangan bulanan pada formulir Buat Kegiatan =====
    Tanggal pada formulir adalah AWAL rangkaian. Untuk pola 'tanggal',
