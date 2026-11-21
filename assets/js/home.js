@@ -47,13 +47,10 @@ function vPengaturan(){
    Gerakannya dibuat terasa hidup, ACAK, dan PELAN mengikuti
    permintaan pengguna: kecepatan putar 0.85, penjadwal memberi JEDA
    DIAM acak (berhenti 2-6 detik setiap sela acak 8-20 detik, lalu
-   lanjut lagi) supaya tidak terasa seperti putaran video, dan
-   SESEKALI (jeda acak ±25-60 detik) maskot JALAN-JALAN pelan
-   (±3-5 detik) ke titik lain di jalur khususnya (.mascot-walk) di
-   sisi kanan kartu sambutan — jalurnya ruang tata letak tersendiri,
-   jadi tidak pernah menutupi teks dan tidak pernah keluar kartu;
-   hadap membalik (scaleX) mengikuti arah jalan.
-   Semua penjadwal berhenti sendiri begitu elemen maskot lepas dari
+   lanjut lagi) supaya tidak terasa seperti putaran video. Maskot
+   DIAM di posisinya di sisi kanan kartu sambutan — perilaku
+   jalan-jalan sudah dihapus atas permintaan pengguna.
+   Penjadwal berhenti sendiri begitu elemen maskot lepas dari
    halaman (pindah menu) dan mulai lagi saat Home dibuka kembali.
    Cadangan jujur: bila peramban tidak bisa memutar WebM VP9
    (canPlayType kosong) yang tampil gambar POSTER DIAM transparan
@@ -75,7 +72,6 @@ function muatDataMaskotVideo(){
 }
 function homeMascot(){
   const stage=h('div',{class:'home-welcome-mascot mascot-video-stage',role:'img','aria-label':'Maskot Shikoku Family'});
-  const walk=h('div',{class:'mascot-walk'},stage);
   muatDataMaskotVideo().then(ok=>{
     if(!stage.isConnected)return;
     if(!ok||!window.MASKOT_POSTER_PNG){
@@ -86,7 +82,7 @@ function homeMascot(){
     }
     pasangMaskotVideo(stage);
   });
-  return walk;
+  return stage;
 }
 function pasangMaskotVideo(stage){
   const posterSrc=window.MASKOT_POSTER_PNG;
@@ -137,61 +133,7 @@ function mulaiHidupMaskotVideo(stage,video){
     },acak(8000,20000));
   };
   jadwalJeda();
-  /* ===== Jalan-jalan di dalam box sambutan =====
-     Panggung (elemen video) berpindah di dalam jalur .mascot-walk
-     saja, sama seperti rig sebelumnya: tujuan acak di sepanjang
-     jalur (kadang kembali ke tempat awal), perjalanan LAMBAT
-     (±3-5 detik) dengan goyangan langkah mungil dan hadap dibalik
-     mengikuti arah jalan. */
-  let berjalan=false,posX=0,posY=0,hadap=1;
-  const jalanSekali=selesai=>{
-    const jalur=stage.parentElement;
-    if(!jalur||berjalan){selesai();return}
-    const maksX=Math.max(0,jalur.clientWidth-stage.offsetWidth);
-    if(maksX<20){selesai();return}
-    let tujuan;
-    if(Math.random()<0.35&&posX>10){tujuan=0}
-    else{
-      tujuan=acak(0,maksX);
-      let coba=0;
-      while(Math.abs(tujuan-posX)<Math.min(30,maksX*0.45)&&coba<6){tujuan=acak(0,maksX);coba++}
-      if(Math.abs(tujuan-posX)<8)tujuan=posX<maksX/2?maksX:0;
-    }
-    const tujuanY=acak(-3,2);
-    const jarak=Math.abs(tujuan-posX);
-    const hadapBaru=tujuan>posX?1:-1;
-    const dur=Math.min(5000,Math.max(3000,jarak*65));
-    const langkah=Math.max(4,Math.min(12,Math.round(jarak/9)));
-    berjalan=true;
-    const kf=[];
-    for(let i=0;i<=langkah;i++){
-      const p=i/langkah;
-      const x=posX+(tujuan-posX)*p;
-      const ujung=(i===0||i===langkah);
-      const bob=ujung?0:(i%2?-1.8:0.4);
-      const miring=ujung?0:(i%2?-1:1);
-      const y=posY+(tujuanY-posY)*p+bob;
-      const sx=i===0?hadap:hadapBaru;
-      kf.push({transform:'translate('+x.toFixed(1)+'px,'+y.toFixed(1)+'px) scaleX('+sx+') rotate('+miring+'deg)',offset:p});
-    }
-    const an=stage.animate(kf,{duration:dur,easing:'linear',fill:'forwards'});
-    let sudahSelesai=false;
-    const tuntaskan=()=>{if(sudahSelesai)return;sudahSelesai=true;berjalan=false;selesai()};
-    const akhiri=()=>{
-      posX=tujuan;posY=tujuanY;hadap=hadapBaru;
-      try{an.commitStyles()}catch(e){}
-      try{an.cancel()}catch(e){}
-      tuntaskan();
-    };
-    an.onfinish=akhiri;
-    an.oncancel=()=>tuntaskan();
-  };
-  /* Penjadwal jalan-jalan: perjalanan pertama ±16-28 detik sesudah
-     Home dibuka, berikutnya jarang dan acak (±25-60 detik). */
-  const jadwalJalan=delay=>{
-    nanti(()=>{jalanSekali(()=>{if(hidup())jadwalJalan(acak(25000,60000))})},delay);
-  };
-  jadwalJalan(acak(16000,28000));
+  /* Maskot diam di posisinya: tidak ada penjadwal jalan-jalan lagi. */
 }
 /* Halaman Home dan Ringkasan */
 function vHome(){

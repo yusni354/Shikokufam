@@ -617,22 +617,16 @@ input,textarea,select{background:#f4f8fa;border-color:#bfcfdb}
    kanal alfa, data URI di assets/js/maskot-video-alpha.js, dimuat
    malas hanya saat Home dibuka — lihat homeMascot() di home.js).
    Tampil langsung di kartu sambutan tanpa bingkai dan tanpa latar
-   kotak: latar videonya benar-benar transparan. Ukuran tampil sama
-   seperti maskot Home sebelumnya: tinggi 124px desktop / 94px HP;
-   rasio 400/626 mengikuti berkas videonya. */
-.home-welcome-mascot{height:124px;width:auto;aspect-ratio:400/626;max-width:38%;flex:none;position:relative;background:transparent;filter:drop-shadow(0 10px 14px rgba(8,25,38,.35))}
-/* Jalur jalan-jalan maskot: kolom tata letak tersendiri di kanan
-   kartu sambutan (desktop lebar, HP lebih pendek). Panggung video
-   diposisikan mutlak di dalamnya dan hanya berpindah di dalam
-   jalur ini — tidak menutupi teks sambutan, tidak keluar kartu. */
-.mascot-walk{position:relative;flex:none;width:176px;height:134px}
-.mascot-walk .home-welcome-mascot{position:absolute;left:0;bottom:3px;max-width:none;will-change:transform}
-@media (max-width:560px){.mascot-walk{width:108px;height:104px}}
+   kotak: latar videonya benar-benar transparan. Ukuran tampil:
+   tinggi 149px desktop / 113px HP (diperbesar 20% atas permintaan
+   pengguna); rasio 400/626 mengikuti berkas videonya. Maskot diam
+   di posisinya di sisi kanan kartu — tidak ada lagi jalan-jalan. */
+.home-welcome-mascot{height:149px;width:auto;aspect-ratio:400/626;max-width:38%;flex:none;position:relative;background:transparent;filter:drop-shadow(0 10px 14px rgba(8,25,38,.35))}
 .mascot-video-stage{background:transparent;overflow:visible}
 .mascot-video-el{width:100%;height:100%;display:block;object-fit:contain;background:transparent;border:0;outline:0;pointer-events:none}
 .mascot-poster-img{width:100%;height:100%;display:block;object-fit:contain;background:transparent;pointer-events:none;user-select:none}
 .home-welcome-cta{margin-top:14px;background:linear-gradient(145deg,#38bda6,#2a8f7d);box-shadow:0 8px 18px rgba(20,60,50,.4),inset 0 1px 0 rgba(255,255,255,.4)}
-@media (max-width:560px){.home-welcome-mascot{height:94px}}
+@media (max-width:560px){.home-welcome-mascot{height:113px}}
 /* Kartu statistik pastel empat warna */
 .stats{background:none;box-shadow:none;padding:0;gap:10px;display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr))}
 .stats>div{border-radius:22px;padding:14px 10px 12px;box-shadow:8px 10px 20px rgba(70,95,115,.18),-4px -4px 12px rgba(255,255,255,.55),inset 0 1px 0 rgba(255,255,255,.7)}
