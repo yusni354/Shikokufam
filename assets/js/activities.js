@@ -149,7 +149,6 @@ function activityCard(event){
       if(!confirm('Hapus kegiatan "'+(event.judul||'ini')+'"?'))return;
       try{await S.db.collection('events').doc(event.id).delete()}catch(error){console.error(error);alert('Gagal menghapus kegiatan: '+(error.message||'periksa koneksi'))}
     }},'Hapus kegiatan'),h('span',{class:'activity-chevron','aria-hidden':'true'},'›'))),
-    event.deskripsi&&h('p',{class:'activity-description'},event.deskripsi),
     h('div',{class:'activity-counts','aria-label':'Total absensi kegiatan'},countPill('c-hadir','Hadir',totals.hadir),countPill('c-izin','Izin',totals.izin),countPill('c-cuti','Cuti',totals.cuti),countPill('c-alpha','Alpha',totals.alpha))
   ];
   if(expanded)content.push(
@@ -336,19 +335,19 @@ function vKegiatan(){
   const date=h('input',{type:'date'});
   const time=h('input',{type:'time'});
   const location=h('input',{placeholder:'Lokasi kegiatan',maxlength:'180'});
-  const description=h('textarea',{placeholder:'Deskripsi atau informasi kegiatan',maxlength:'1000',rows:'3'});
   const events=[...S.events].sort((a,b)=>(b.tanggal||'').localeCompare(a.tanggal||'')||(b.at||0)-(a.at||0));
   const createForm=S.admin&&h('section',{class:'card activity-create'},h('h2',{},'Buat kegiatan'),
-    h('label',{class:'activity-field'},'Nama kegiatan *',title),
-    h('div',{class:'activity-create-grid'},h('label',{class:'activity-field'},'Tanggal *',date),h('label',{class:'activity-field'},'Waktu',time)),
-    h('label',{class:'activity-field'},'Lokasi',location),
-    h('label',{class:'activity-field'},'Deskripsi',description),
+    h('div',{class:'activity-create-grid'},
+      h('label',{class:'activity-field activity-field-wide'},'Nama kegiatan *',title),
+      h('label',{class:'activity-field'},'Tanggal *',date),
+      h('label',{class:'activity-field'},'Waktu',time),
+      h('label',{class:'activity-field activity-field-wide'},'Lokasi',location)),
     h('button',{class:'btn',onclick:async()=>{
       const judul=title.value.trim();
       if(!judul||!date.value){alert('Isi nama dan tanggal kegiatan.');return}
       try{
-        await S.db.collection('events').add({judul,tanggal:date.value,waktu:time.value,lokasi:location.value.trim(),deskripsi:description.value.trim(),peserta_anggota:[],hadir_anggota:[],at:Date.now()});
-        title.value='';date.value='';time.value='';location.value='';description.value='';
+        await S.db.collection('events').add({judul,tanggal:date.value,waktu:time.value,lokasi:location.value.trim(),peserta_anggota:[],hadir_anggota:[],at:Date.now()});
+        title.value='';date.value='';time.value='';location.value='';
       }catch(error){console.error(error);alert('Gagal membuat kegiatan: '+(error.message||'periksa koneksi'))}
     }},'Buat kegiatan'));
   return [

@@ -355,11 +355,15 @@ body.admin-dark .card .e{background:#293946;color:var(--acc)}
 @media (max-width:560px){.duty-card{align-items:flex-start;flex-wrap:wrap}.duty-info{padding-top:2px}.duty-actions{width:100%;padding-left:72px;justify-content:flex-start}.duty-heading{align-items:flex-start}.duty-count{margin-top:14px}}
 #qm{position:fixed;inset:0;background:rgba(23,50,77,.45);display:grid;place-items:center;padding:16px;z-index:12}
 .activity-create,.activity-card{display:block}
-.activity-create h2,.activity-card h2{margin:0 0 8px;font-size:20px}
-.activity-create-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.activity-create h2,.activity-card h2{margin:0 0 10px;font-size:20px}
+.activity-create-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 10px;align-items:start}
+.activity-create-grid .activity-field{margin:0;min-width:0}
+.activity-field-wide{grid-column:1/-1}
 .activity-field{display:block;margin:10px 0;color:var(--mut);font-size:13px;font-weight:700}
 .activity-field input,.activity-field textarea{display:block;color:var(--ink);font-weight:400}
-.activity-create>.btn{margin-top:4px}
+.activity-create-grid .activity-field input,.activity-create-grid .activity-field textarea{margin:4px 0 0;min-width:0}
+.activity-create input,.activity-create textarea{padding:10px 12px;border-radius:14px}
+.activity-create>.btn{margin-top:10px}
 .activity-list{display:grid;gap:12px}
 .activity-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
 .activity-heading .btn{flex:none}
@@ -432,7 +436,8 @@ body.admin-dark .card .e{background:#293946;color:var(--acc)}
 .absensi-chip.st-cuti{background:#2f8fc1;color:#fff}
 .absensi-savebar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:12px}
 @media(max-width:560px){.activity-region-pick-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.activity-region-pick{padding:9px 10px;border-radius:14px}.activity-region-pick-main b{font-size:12px}.activity-region-pick-main small{font-size:10px}.activity-region-pick-arrow{font-size:17px}.absensi-row{gap:8px;padding:8px 8px 8px 10px}.absensi-opt{padding:7px 6px;font-size:10px}.absensi-info b{font-size:13px}}
-@media(max-width:560px){.activity-create-grid{grid-template-columns:1fr;gap:0}.activity-heading{align-items:flex-start}.activity-region-list{grid-template-columns:1fr}.activity-participant{align-items:flex-start;flex-direction:column}.activity-participant-actions{width:100%;flex-wrap:wrap}.activity-add-row,.activity-scanner-row{align-items:stretch}.activity-add-row{flex-direction:column}.activity-region-section .activity-add-row{flex-direction:row}.activity-region-section .activity-add-row .btn{white-space:nowrap}.activity-scanner-row .btn{white-space:nowrap}}
+@media(max-width:560px){.activity-create-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.activity-create-grid .activity-field{font-size:12px}.activity-create input,.activity-create textarea{padding:9px 10px;font-size:14px}.activity-heading{align-items:flex-start}.activity-region-list{grid-template-columns:1fr}.activity-participant{align-items:flex-start;flex-direction:column}.activity-participant-actions{width:100%;flex-wrap:wrap}.activity-add-row,.activity-scanner-row{align-items:stretch}.activity-add-row{flex-direction:column}.activity-region-section .activity-add-row{flex-direction:row}.activity-region-section .activity-add-row .btn{white-space:nowrap}.activity-scanner-row .btn{white-space:nowrap}}
+@media(max-width:340px){.activity-create-grid{grid-template-columns:1fr}.activity-field-wide{grid-column:auto}}
 
 /* ===== Musyawarah: buku catatan rapat (dari file musyawarah.html) =====
    Semua aturan ter-scope di .musy-root supaya tidak mengganggu halaman lain.
