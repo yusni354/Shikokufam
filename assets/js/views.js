@@ -4,6 +4,7 @@ const V={
   dash:vDash,
   members:vMembers,
   kegiatan:vKegiatan,
+  ringkasan:vRingkasan,
   piket:vPiket,
   peta:vPeta,
   forum:vForum,

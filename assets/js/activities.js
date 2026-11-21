@@ -102,6 +102,44 @@ function leaveAbsensi(){
   window.scrollTo(0,0);
 }
 
+/* Total empat status satu kegiatan — dihitung dari peta status
+   activityStatusMap (termasuk pemetaan data lama), persis seperti yang
+   ditampilkan kartu kegiatan. Dipakai kartu kegiatan DAN halaman
+   Ringkasan Kegiatan supaya angkanya selalu sama. */
+function activityTotals(event){
+  const totals={hadir:0,izin:0,cuti:0,alpha:0};
+  Object.values(activityStatusMap(event)).forEach(st=>{if(totals[st]!=null)totals[st]++});
+  return totals;
+}
+/* Pil total + GRAFIK batang tumpuk + legenda persen dengan gaya yang
+   sama persis seperti di kartu kegiatan: tiap segmen berwarna sesuai
+   status dan lebarnya sebanding dengan bagiannya dari totalAnggota;
+   anggota yang belum tercatat tampil sebagai sisa batang kosong.
+   Mengembalikan {pills, chart, legend}. */
+function activityTotalsView(totals,totalAnggota){
+  const countPill=(cls,label,n)=>h('b',{class:cls},label+' '+n);
+  const pills=h('div',{class:'activity-counts','aria-label':'Total absensi kegiatan'},countPill('c-hadir','Hadir',totals.hadir),countPill('c-izin','Izin',totals.izin),countPill('c-cuti','Cuti',totals.cuti),countPill('c-alpha','Alpha',totals.alpha));
+  const chartSeg=(cls,label,n)=>{
+    const pct=totalAnggota?n/totalAnggota*100:0;
+    return h('span',{class:'activity-chart-seg '+cls,style:'width:'+pct+'%',title:label+' '+n+' dari '+totalAnggota+' anggota ('+Math.round(pct)+'%)'},
+      pct>=14?h('small',{},Math.round(pct)+'%'):'');
+  };
+  const recordedTotal=totals.hadir+totals.izin+totals.cuti+totals.alpha;
+  const unrecorded=totalAnggota?Math.max(0,totalAnggota-recordedTotal):0;
+  const chart=h('div',{class:'activity-chart',role:'img','aria-label':'Grafik absensi kegiatan dari '+totalAnggota+' anggota'},
+    chartSeg('s-hadir','Hadir',totals.hadir),
+    chartSeg('s-izin','Izin',totals.izin),
+    chartSeg('s-cuti','Cuti',totals.cuti),
+    chartSeg('s-alpha','Alpha',totals.alpha),
+    unrecorded>0&&h('span',{class:'activity-chart-seg s-sisa',style:'width:'+(unrecorded/totalAnggota*100)+'%',title:'Belum tercatat '+unrecorded+' dari '+totalAnggota+' anggota'})
+  );
+  const legend=totalAnggota?h('div',{class:'activity-chart-legend'},
+    ...[['hadir','Hadir'],['izin','Izin'],['cuti','Cuti'],['alpha','Alpha']].map(([key,label])=>
+      h('span',{class:'lg-'+key},h('i',{'aria-hidden':'true'}),label+' '+Math.round(totals[key]/totalAnggota*100)+'%')),
+    unrecorded>0&&h('span',{class:'lg-sisa'},h('i',{'aria-hidden':'true'}),'Belum tercatat '+Math.round(unrecorded/totalAnggota*100)+'%')
+  ):null;
+  return {pills,chart,legend};
+}
 function activityCard(event){
   const attendees=new Set(activityMemberIds(event,'hadir_anggota'));
   const registeredMembers=S.members.filter(member=>String(member.status||'aktif').toLowerCase()!=='nonaktif');
@@ -117,8 +155,7 @@ function activityCard(event){
      muncul sesudah badan kartu diklik; membuka satu kartu menutup
      kartu lain (S.activityExpanded hanya memuat satu id). */
   const expanded=String(S.activityExpanded)===String(event.id);
-  const totals={hadir:0,izin:0,cuti:0,alpha:0};
-  Object.values(activityStatusMap(event)).forEach(st=>{if(totals[st]!=null)totals[st]++});
+  const totals=activityTotals(event);
   /* Pil total hanya menampilkan JUMLAH tiap status (tanpa teks
      persen). Proporsi tiap status terhadap TOTAL KESELURUHAN ANGGOTA
      aktif (semua wilayah, populasi yang sama dengan daftar absensi)
@@ -129,26 +166,9 @@ function activityCard(event){
      utuh 100%. Bila belum ada anggota sama sekali, batang tampil
      kosong tanpa label. */
   const totalAnggota=registeredMembers.length;
-  const countPill=(cls,label,n)=>h('b',{class:cls},label+' '+n);
-  const chartSeg=(cls,label,n)=>{
-    const pct=totalAnggota?n/totalAnggota*100:0;
-    return h('span',{class:'activity-chart-seg '+cls,style:'width:'+pct+'%',title:label+' '+n+' dari '+totalAnggota+' anggota ('+Math.round(pct)+'%)'},
-      pct>=14?h('small',{},Math.round(pct)+'%'):'');
-  };
-  const recordedTotal=totals.hadir+totals.izin+totals.cuti+totals.alpha;
-  const unrecorded=totalAnggota?Math.max(0,totalAnggota-recordedTotal):0;
-  const chart=h('div',{class:'activity-chart',role:'img','aria-label':'Grafik absensi kegiatan dari '+totalAnggota+' anggota'},
-    chartSeg('s-hadir','Hadir',totals.hadir),
-    chartSeg('s-izin','Izin',totals.izin),
-    chartSeg('s-cuti','Cuti',totals.cuti),
-    chartSeg('s-alpha','Alpha',totals.alpha),
-    unrecorded>0&&h('span',{class:'activity-chart-seg s-sisa',style:'width:'+(unrecorded/totalAnggota*100)+'%',title:'Belum tercatat '+unrecorded+' dari '+totalAnggota+' anggota'})
-  );
-  const chartLegend=totalAnggota?h('div',{class:'activity-chart-legend'},
-    ...[['hadir','Hadir'],['izin','Izin'],['cuti','Cuti'],['alpha','Alpha']].map(([key,label])=>
-      h('span',{class:'lg-'+key},h('i',{'aria-hidden':'true'}),label+' '+Math.round(totals[key]/totalAnggota*100)+'%')),
-    unrecorded>0&&h('span',{class:'lg-sisa'},h('i',{'aria-hidden':'true'}),'Belum tercatat '+Math.round(unrecorded/totalAnggota*100)+'%')
-  ):null;
+  const totalsView=activityTotalsView(totals,totalAnggota);
+  const chart=totalsView.chart;
+  const chartLegend=totalsView.legend;
   /* Tahap 1: pilih wilayah dulu. Daftar anggota BELUM tampil di sini;
      admin mengetuk satu wilayah untuk masuk ke halaman pengabsenannya. */
   const regionPick=(region,color)=>{
@@ -162,12 +182,8 @@ function activityCard(event){
   const regionPicks=wilayahEfektif().map(([region,color])=>regionPick(region,color));
   if(registeredMembers.some(member=>memberRegion(member)==='Belum dipilih'))regionPicks.push(regionPick('Belum dipilih','#718096'));
   const content=[
-    h('div',{class:'activity-heading'},h('div',{},h('h2',{},event.judul||'Kegiatan komunitas'),h('p',{class:'activity-meta'},icon('calendar',15),h('span',{},dateLabel+(event.waktu?' · '+event.waktu:'')))),h('span',{class:'activity-heading-side'},S.admin&&h('button',{class:'btn s btn-eh',onclick:async e=>{
-      e.stopPropagation();
-      if(!confirm('Hapus kegiatan "'+(event.judul||'ini')+'"?'))return;
-      try{await S.db.collection('events').doc(event.id).delete()}catch(error){console.error(error);alert('Gagal menghapus kegiatan: '+(error.message||'periksa koneksi'))}
-    }},'Hapus kegiatan'),h('span',{class:'activity-chevron','aria-hidden':'true'},'›'))),
-    h('div',{class:'activity-counts','aria-label':'Total absensi kegiatan'},countPill('c-hadir','Hadir',totals.hadir),countPill('c-izin','Izin',totals.izin),countPill('c-cuti','Cuti',totals.cuti),countPill('c-alpha','Alpha',totals.alpha)),
+    h('div',{class:'activity-heading'},h('div',{},h('h2',{},event.judul||'Kegiatan komunitas'),h('p',{class:'activity-meta'},icon('calendar',15),h('span',{},dateLabel+(event.waktu?' · '+event.waktu:'')))),h('span',{class:'activity-heading-side'},h('span',{class:'activity-chevron','aria-hidden':'true'},'›'))),
+    totalsView.pills,
     chart,
     chartLegend
   ];
@@ -267,7 +283,7 @@ function activityCard(event){
   }
   const card=h('article',{class:'card activity-card'+(expanded?' open':''),'aria-expanded':expanded?'true':'false',title:expanded?'Ketuk untuk menutup':'Ketuk untuk melihat wilayah'},...content);
   /* Klik pada badan kartu membuka/menutup daftar wilayah; klik pada
-     tombol/field di dalam kartu (hapus, pemilih wilayah, pemindai)
+     tombol/field di dalam kartu (pemilih wilayah, pemindai)
      tidak ikut membuka/menutup. */
   card.addEventListener('click',e=>{
     if(e.target.closest('button,input,video,a,select,textarea,label'))return;
@@ -343,6 +359,66 @@ function vAbsensiFokus(event,region){
       h('button',{class:'btn s',onclick:()=>leaveAbsensi()},'Ganti wilayah')),
     feedback
   );
+}
+/* ===== Halaman Ringkasan Kegiatan: rekap SELURUH kegiatan dalam satu
+   tahun, baca-saja untuk semua pengguna yang masuk & disetujui. Tahun
+   sebuah kegiatan ditentukan dari tanggalnya. Total absensi memakai
+   sumber & pemetaan status yang sama persis dengan kartu kegiatan
+   (activityTotals + activityTotalsView), jadi angka dan grafiknya
+   selalu sama dengan yang tampil di halaman Kegiatan. ===== */
+function activityYear(event){
+  const y=parseInt(String(event.tanggal||'').slice(0,4),10);
+  return Number.isNaN(y)?null:y;
+}
+function vRingkasan(){
+  const currentYear=new Date().getFullYear();
+  /* Pilihan tahun: tahun-tahun yang memiliki kegiatan, ditambah tahun
+     berjalan (bawaan terpilih) supaya tahun yang masih kosong pun bisa
+     dipilih dan menampilkan pesan kosongnya. */
+  const years=[...new Set([currentYear,...S.events.map(activityYear).filter(y=>y!=null)])].sort((a,b)=>b-a);
+  const selected=years.includes(S.ringkasanTahun)?S.ringkasanTahun:currentYear;
+  const yearSelect=h('select',{'aria-label':'Pilih tahun',onchange:e=>{S.ringkasanTahun=Number(e.target.value);render()}},
+    ...years.map(y=>h('option',{value:String(y)},String(y))));
+  yearSelect.value=String(selected);
+  const head=[h('h1',{},'Ringkasan Kegiatan'),guard(),
+    h('label',{class:'activity-field ringkasan-year'},'Tahun',yearSelect)];
+  const events=S.events.filter(event=>activityYear(event)===selected)
+    .sort((a,b)=>(b.tanggal||'').localeCompare(a.tanggal||'')||(b.at||0)-(a.at||0));
+  if(!events.length){
+    return [...head,h('p',{class:'warn'},'Belum ada kegiatan pada tahun '+selected+'.')];
+  }
+  const totalAnggota=S.members.filter(member=>String(member.status||'aktif').toLowerCase()!=='nonaktif').length;
+  const yearTotals={hadir:0,izin:0,cuti:0,alpha:0};
+  events.forEach(event=>{const t=activityTotals(event);Object.keys(yearTotals).forEach(k=>{yearTotals[k]+=t[k]})});
+  /* Penyebut grafik setahun = total anggota aktif × jumlah kegiatan
+     tahun itu (gabungan penyebut grafik tiap kartu kegiatan), sehingga
+     sisa 'Belum tercatat' berarti slot anggota×kegiatan yang belum
+     tercatat statusnya. */
+  const yearView=activityTotalsView(yearTotals,totalAnggota*events.length);
+  const summaryCard=h('section',{class:'card ringkasan-summary'},
+    h('h2',{},'Ringkasan tahun '+selected),
+    h('p',{class:'activity-meta'},icon('calendar',15),h('span',{},events.length+' kegiatan pada tahun ini')),
+    yearView.pills,yearView.chart,yearView.legend);
+  const item=event=>{
+    const view=activityTotalsView(activityTotals(event),totalAnggota);
+    const date=event.tanggal?new Date(event.tanggal+'T00:00:00'):null;
+    const dateLabel=date&&!Number.isNaN(date.getTime())?date.toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'}):'Tanggal belum ditentukan';
+    const card=h('article',{class:'card ringkasan-item',title:'Ketuk untuk membuka kegiatan ini di halaman Kegiatan'},
+      h('h2',{},event.judul||'Kegiatan komunitas'),
+      h('p',{class:'activity-meta'},icon('calendar',15),h('span',{},dateLabel+(event.waktu?' · '+event.waktu:''))),
+      view.pills,view.chart,view.legend);
+    /* Ketuk satu kegiatan: buka kegiatan itu dalam keadaan terbuka di
+       halaman Kegiatan memakai alur yang sudah ada (activityExpanded
+       + go). Keadaan fokus absensi dibersihkan dulu supaya daftar
+       kegiatan yang tampil, bukan halaman fokus wilayah lain. */
+    card.addEventListener('click',()=>{
+      S.absensiEvent=null;S.absensiRegion=null;S.absensiDraft=null;
+      S.activityExpanded=String(event.id);
+      go('kegiatan');
+    });
+    return card;
+  };
+  return [...head,summaryCard,h('div',{class:'activity-list'},...events.map(item))];
 }
 function vKegiatan(){
   /* Tahap 2 aktif: tampilkan hanya halaman pengabsenan wilayah terpilih */
