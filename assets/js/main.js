@@ -42,6 +42,7 @@ render();
         const nextUid = session?.user?.id || null;
         if (S.uid !== nextUid) {
           S.members = []; S.events = []; S.topics = []; S.cleaningDuties = []; S.pins = [];
+          S.keuangan = []; S.kategoriCustom = []; S.financeForm = null; S.financePhoto = null;
           S.tanya = []; S.replies = []; S.messageSignature = ''; S.unreadMessages = 0;
           S.storageErrors = {}; S.memberMediaUrls.clear(); S.memberMediaPending.clear();
           S.memberMediaFailed.clear(); S.legacyMediaPaths.clear(); S.memberMediaError = '';

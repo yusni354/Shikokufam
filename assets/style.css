@@ -5,7 +5,7 @@ button,input,select,textarea{font:inherit}
 button{cursor:pointer}
 header{display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--g);color:#fff;border-radius:0 0 24px 24px;box-shadow:0 8px 22px rgba(47,134,184,.2);position:sticky;top:env(safe-area-inset-top,0px);z-index:5}
 header b{letter-spacing:.45px;font-size:14px}
-#brand-title{cursor:pointer;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+#brand-title{cursor:pointer;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent;touch-action:manipulation;padding:14px 8px;margin:-14px -8px}
 .logo{width:34px;height:34px;border-radius:12px;background:#fff;color:var(--acc);display:grid;place-items:center;font-weight:700;box-shadow:0 3px 8px rgba(0,0,0,.1)}
 .ic{width:38px;height:38px;padding:0;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.28);border-radius:13px;display:grid;place-items:center;color:inherit}
 .app-icon{display:inline-block;flex:none;vertical-align:middle}
@@ -728,3 +728,61 @@ input,textarea,select{background:#f4f8fa;border-color:#bfcfdb}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:#8fa9bc;border-radius:99px;border:2px solid transparent;background-clip:content-box}
 ::-webkit-scrollbar-thumb:hover{background:#6f8ea6;border:2px solid transparent;background-clip:content-box}
+
+/* ===== Pasang Aplikasi (PWA / APK) ===== */
+.install-app-icon{width:96px;height:96px;border-radius:24px;box-shadow:0 10px 24px rgba(50,75,95,.28);object-fit:cover}
+.install-home-icon{width:54px;height:54px;border-radius:16px;flex:none;object-fit:cover;box-shadow:0 4px 12px rgba(50,75,95,.2)}
+.install-home-card{align-items:center}
+.install-main-btn{min-width:210px;padding:13px 22px;font-size:16px}
+.install-main-btn:disabled{opacity:.75;cursor:default}
+.install-steps{scroll-margin-top:90px}
+.install-ol{margin:10px 0 0;padding-left:22px;line-height:1.6;color:#22384c}
+.install-ol li{margin:5px 0}
+
+/* ===== Laporan Keuangan ===== */
+.fin-totals{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.fin-total{padding:16px;background:linear-gradient(115deg,#fffdf8,#eef7f2);border:1px solid var(--line);border-radius:20px;box-shadow:0 4px 14px rgba(47,134,184,.08)}
+.fin-total small{display:block;color:var(--mut);font-size:12px;font-weight:600;margin-bottom:4px}
+.fin-total b{font-size:21px;color:var(--acc)}
+.fin-toolbar{display:flex;align-items:flex-end;gap:10px;margin-bottom:12px}
+.fin-filter-label{flex:1;min-width:0;display:block;font-size:13px;font-weight:600}
+.fin-month-select{margin:4px 0 0}
+.fin-toolbar>.btn{flex:none;margin-bottom:2px}
+.fin-summary{margin-bottom:12px}
+.fin-summary-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0;border-top:1px solid var(--line)}
+.fin-summary-row span{min-width:0;overflow-wrap:anywhere;font-size:14px}
+.fin-summary-row b{flex:none;color:var(--acc)}
+.fin-list{display:grid;gap:10px}
+.fin-row{display:flex;align-items:center;gap:12px;padding:12px;background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:0 4px 14px rgba(47,134,184,.07)}
+.fin-thumb{width:56px;height:56px;flex:none;border-radius:14px;object-fit:cover;cursor:pointer;background:var(--line)}
+.fin-thumb-empty{display:grid;place-items:center;color:var(--mut);cursor:default}
+.fin-info{flex:1;min-width:0}
+.fin-info>b{display:block;font-size:15px;overflow-wrap:anywhere}
+.fin-info small{display:block;color:var(--mut);font-size:12px;margin-top:2px;overflow-wrap:anywhere}
+.fin-note{font-size:13px!important}
+.fin-side{flex:none;text-align:right}
+.fin-amount{color:var(--acc);font-size:16px;white-space:nowrap}
+.fin-actions{display:flex;gap:5px;justify-content:flex-end;margin-top:6px;flex-wrap:wrap}
+.fin-delete{color:#b45353!important}
+.fin-nota-preview{width:96px;height:96px;border-radius:16px;object-fit:cover;display:block;margin:8px 0}
+.fin-lightbox{position:fixed;inset:0;z-index:20;background:rgba(15,30,45,.85);display:grid;place-items:center;padding:20px;cursor:pointer}
+.fin-lightbox img{max-width:100%;max-height:86vh;border-radius:16px;background:#fff;object-fit:contain}
+@media (max-width:430px){.fin-total b{font-size:17px}.fin-row{align-items:flex-start}.fin-actions{justify-content:flex-start}.fin-side{text-align:left}}
+
+/* ===== Tombol Edit & Hapus mini (btn-eh): diperkecil ±70% dari ukuran semula,
+   hanya untuk tombol edit/hapus di semua modul; tombol lain tidak berubah ===== */
+.btn.btn-eh{padding:2px 5px;font-size:10px;line-height:1.2;gap:2px;border-width:1.5px;font-weight:600;min-height:0}
+.btn.btn-eh .app-icon{width:9px;height:9px;margin-right:2px}
+/* ===== Dropdown terkelola (managed-select): panel tambah/hapus pilihan
+   tampil sebaris di bawah dropdown, mengikuti tema kartu aplikasi ===== */
+.managed-select{display:block}
+.managed-panel{margin-top:8px;padding:10px 12px;border:1px solid var(--line);border-radius:14px;background:var(--card)}
+.managed-add-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.managed-select .managed-add-row input{flex:1;min-width:140px;width:auto;margin:0}
+.managed-panel-title{margin:0 0 4px;font-size:13px;color:var(--mut)}
+.managed-del-row{display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid var(--line)}
+.managed-del-name{flex:1;min-width:0;overflow-wrap:anywhere;font-size:14px}
+.managed-used{color:var(--mut);font-size:12px;text-align:right}
+.managed-panel-foot{margin-top:8px;display:flex;justify-content:flex-end}
+.musy-root .musy-tools button.musy-del{min-width:17px;height:17px;font-size:9.5px;padding:0 2px;border-radius:6px}
+.musy-root .musy-ta button.x{padding:1px 6px;font-size:10px}

@@ -171,7 +171,7 @@ function musyList(){
   const listEl=root.querySelector('.musy-list');
   if(MUSY.TR){
     const t=MUSY.meetings.filter(m=>m.del).sort((a,b)=>b.del-a.del);
-    listEl.innerHTML=(t.length&&!RO?'<button data-t="empty" style="padding:3px 8px;font-size:13px;margin-bottom:8px;color:#b3402f">Kosongkan sampah</button>':'')+(t.map(m=>'<div class="musy-pg"><b>'+musyEsc(m.title||'(Tanpa judul)')+'</b><span>'+musyEsc(musyFd(m.date))+' · dihapus '+new Date(m.del).toLocaleDateString('id-ID')+'</span>'+(RO?'':'<div class="musy-ta"><button data-t="res" data-i="'+musyEsc(m.id)+'">↩ Pulihkan</button><button class="x" data-t="del" data-i="'+musyEsc(m.id)+'">Hapus permanen</button></div>')+'</div>').join('')||'<div class="musy-empty">Tempat sampah kosong.</div>');
+    listEl.innerHTML=(t.length&&!RO?'<button data-t="empty" style="padding:1px 5px;font-size:10px;margin-bottom:8px;color:#b3402f">Kosongkan sampah</button>':'')+(t.map(m=>'<div class="musy-pg"><b>'+musyEsc(m.title||'(Tanpa judul)')+'</b><span>'+musyEsc(musyFd(m.date))+' · dihapus '+new Date(m.del).toLocaleDateString('id-ID')+'</span>'+(RO?'':'<div class="musy-ta"><button data-t="res" data-i="'+musyEsc(m.id)+'">↩ Pulihkan</button><button class="x" data-t="del" data-i="'+musyEsc(m.id)+'">Hapus permanen</button></div>')+'</div>').join('')||'<div class="musy-empty">Tempat sampah kosong.</div>');
     return;
   }
   const ms=musyActive().filter(m=>q?(m.title+' '+m.leader+' '+m.scribe+' '+musyFd(m.date)+' '+musyPlain(m.html).toLowerCase()).toLowerCase().includes(q):musyYr(m)===MUSY.Y)

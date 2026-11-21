@@ -11,8 +11,8 @@ function vPiket(){
       h('div',{class:'duty-info'},h('small',{},dateLabel(duty.tanggal)),h('div',{class:'duty-assignments'},...assignmentsFor(duty).map(assignment=>
         h('div',{class:'duty-assignment'},h('b',{},assignment.nama),h('span',{},assignment.tugas))))),
       S.admin&&h('div',{class:'duty-actions'},
-        h('button',{class:'btn s',title:'Edit jadwal',onclick:()=>{S.dutyForm={...duty,assignments:assignmentsFor(duty).map(assignment=>({...assignment}))};render()}},icon('edit',15),h('span',{},'Edit')),
-        h('button',{class:'btn s',title:'Hapus jadwal',onclick:async()=>{
+        h('button',{class:'btn s btn-eh',title:'Edit jadwal',onclick:()=>{S.dutyForm={...duty,assignments:assignmentsFor(duty).map(assignment=>({...assignment}))};render()}},icon('edit',15),h('span',{},'Edit')),
+        h('button',{class:'btn s btn-eh',title:'Hapus jadwal',onclick:async()=>{
           if(!confirm('Hapus jadwal piket tanggal '+dateLabel(duty.tanggal)+'?'))return;
           try{await S.db.collection('cleaning_duties').doc(duty.id).delete()}catch(error){console.error(error);alert('Gagal menghapus jadwal: '+(error.message||'periksa koneksi'))}
         }},'Hapus')));
@@ -35,7 +35,7 @@ function vPiket(){
           h('div',{class:'duty-form-fields'},
             h('label',{class:'lb'},'Nama *',name),
             h('label',{class:'lb'},'Tugas *',task)),
-          form.assignments.length>1&&h('button',{class:'btn s duty-remove',title:'Hapus nama dan tugas ini',onclick:()=>{form.assignments.splice(index,1);drawAssignments()}},icon('close',15)));
+          form.assignments.length>1&&h('button',{class:'btn s duty-remove btn-eh',title:'Hapus nama dan tugas ini',onclick:()=>{form.assignments.splice(index,1);drawAssignments()}},icon('close',15)));
       }));
     };
     drawAssignments();
@@ -65,7 +65,7 @@ function vPiket(){
 function vForum(){
   const t=h('input',{placeholder:'Judul topik'}),b=h('textarea',{placeholder:'Isi diskusi',rows:3});
   const list=S.topics.map(x=>h('div',{class:'card',style:'display:block'},h('b',{},x.judul),h('p',{class:'warn'},x.isi||''),
-    S.admin&&h('button',{class:'btn s',onclick:async()=>{
+    S.admin&&h('button',{class:'btn s btn-eh',onclick:async()=>{
       if(!confirm('Hapus topik ini?'))return;
       try{await S.db.collection('topics').doc(x.id).delete()}catch(error){console.error(error);alert('Gagal menghapus topik: '+(error.message||'periksa koneksi'))}
     }},'Hapus')));

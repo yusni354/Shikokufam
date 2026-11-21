@@ -4,8 +4,20 @@ function replyFromRow(row){return {id:row.id,message_id:row.message_id,by:row.se
 /* Penyimpanan pesan mode lokal (tanpa Supabase): baris berbentuk sama seperti tabel Supabase */
 const LOCAL_MESSAGES_KEY='shikoku-family:messages';
 const LOCAL_REPLIES_KEY='shikoku-family:message-replies';
-function localMessageRows(key){try{return JSON.parse(localStorage.getItem(key)||'[]')}catch(e){return[]}}
-function saveLocalMessageRows(key,rows){try{localStorage.setItem(key,JSON.stringify(rows))}catch(e){throw new Error('Penyimpanan lokal tidak tersedia')}}
+/* Cermin baris pesan di ingatan, untuk lingkungan dengan localStorage
+   terblokir (pratinjau artefak): pesan lokal tetap bekerja selama sesi. */
+const memoryMessageRows={};
+function localMessageRows(key){
+  try{
+    const raw=localStorage.getItem(key);
+    if(raw!==null)return JSON.parse(raw)||[];
+  }catch(e){}
+  return memoryMessageRows[key]||[];
+}
+function saveLocalMessageRows(key,rows){
+  memoryMessageRows[key]=rows;
+  try{localStorage.setItem(key,JSON.stringify(rows))}catch(e){/* penyimpanan terblokir: baris tetap tersimpan di ingatan untuk sesi ini */}
+}
 function newLocalRowId(prefix){return prefix+'-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8)}
 function updateMessageBadges(){
   const value=String(S.unreadMessages||0);

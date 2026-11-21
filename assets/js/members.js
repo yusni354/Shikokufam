@@ -3,7 +3,7 @@ const PERAN=['Anggota','Pengurus'];
 function vMembers(){
   if(S.form)return [memberFormCard()];
   const search=h('input',{type:'search',placeholder:'Cari nama, WhatsApp, kota, wilayah, atau nomor anggota'}),region=h('select',{});
-  const regions=WILAYAH.map(([name])=>name);
+  const regions=wilayahEfektif().map(([name])=>name);
   if(S.members.some(member=>memberRegion(member)==='Belum dipilih'))regions.push('Belum dipilih');
   region.replaceChildren(h('option',{value:''},'Semua wilayah'),...regions.map(value=>h('option',{value},value)));
   search.value=S.memberQuery||'';region.value=S.memberRegion||'';
@@ -24,8 +24,8 @@ function vMembers(){
           h('small',{},member.wa?memberValue('wa',member.wa):member.email||'Kontak belum diisi')),
         h('div',{class:'member-card-actions'},
           h('button',{class:'btn s',onclick:()=>openMember(member,'members')},'Lihat kartu ID'),
-          S.admin&&h('button',{class:'btn s',onclick:()=>{S.form={...member};S.detail=null;render()}},icon('edit',15),h('span',{},'Edit')),
-          S.admin&&h('button',{class:'btn s member-delete',onclick:async()=>{
+          S.admin&&h('button',{class:'btn s btn-eh',onclick:()=>{S.form={...member};S.detail=null;render()}},icon('edit',15),h('span',{},'Edit')),
+          S.admin&&h('button',{class:'btn s member-delete btn-eh',onclick:async()=>{
             if(!confirm('Hapus data anggota '+(member.nama||'ini')+'?'))return;
             try{await S.db.collection('members').doc(member.id).delete()}catch(error){console.error(error);alert('Gagal menghapus data anggota: '+(error.message||'periksa koneksi'))}
           }},'Hapus')))
@@ -94,7 +94,7 @@ function detailCard(){
   const qrValue=memberQrValue(member);
   return h('section',{class:'member-profile-page',style:'--region-color:'+regionColor(area)},
     h('div',{class:'member-profile-toolbar'},h('button',{class:'btn s',onclick:()=>{S.detail=null;const origin=S.detailOrigin;S.detailOrigin=null;S.view=origin==='landing'?'landing':'members';render()}},'← Kembali'),
-      S.admin&&h('button',{class:'btn s',onclick:()=>{S.form={...member};S.detail=null;S.detailOrigin=null;render()}},icon('edit',15),h('span',{},'Edit data'))),
+      S.admin&&h('button',{class:'btn s btn-eh',onclick:()=>{S.form={...member};S.detail=null;S.detailOrigin=null;render()}},icon('edit',15),h('span',{},'Edit data'))),
     h('article',{class:'member-id-card'},
       h('div',{class:'member-id-banner'},h('span',{},'SHIKOKU FAMILY'),h('span',{class:'member-region-tag'},area)),
       h('div',{class:'member-id-main'},
@@ -103,7 +103,7 @@ function detailCard(){
       h('div',{class:'member-id-barcode'},h('b',{class:'member-barcode-label'},'QR CODE ABSENSI'),qrValue?h('img',{class:'member-qr-code','data-member-qr':qrValue,alt:'QR code untuk ID anggota'}):h('p',{class:'member-barcode-help'},'ID anggota belum tersedia.'),h('small',{class:'member-barcode-help','data-member-qr-status':'true'},qrValue?'Membuat QR code...':'QR code akan tersedia setelah ID anggota tersimpan.'))),
     ...sections.filter(([,rows])=>rows.some(([,value])=>value)).map(([title,rows])=>h('section',{class:'member-detail-section'},h('h3',{},title.toUpperCase()),h('div',{class:'member-detail-grid'},...rows.filter(([,value])=>value).map(([label,value])=>h('div',{class:'member-detail-item'},h('small',{},label.toUpperCase()),h('span',{},memberValue(label==='Nomor HP / WhatsApp'?'wa':label==='Nomor HP pengurus daerah'?'hp_pengurus':label==='Nomor HP orang tua'?'hp_ortu':label.toLowerCase(),value))))))),
     (member.surat||[]).length>0&&h('section',{class:'member-detail-section'},h('h3',{},'Foto Surat Sambung'),...(member.surat||[]).map((id,index)=>h('a',{class:'member-file-link',...memberMediaAttributes(id,'href'),target:'_blank',rel:'noopener'},icon('attachment',16),h('span',{},'Buka lampiran '+(index+1))))),
-    S.admin&&h('div',{class:'member-detail-actions'},h('button',{class:'btn',onclick:()=>{S.form={...member};S.detail=null;S.detailOrigin=null;render()}},icon('edit',16),h('span',{},'Edit data anggota')))
+    S.admin&&h('div',{class:'member-detail-actions'},h('button',{class:'btn btn-eh',onclick:()=>{S.form={...member};S.detail=null;S.detailOrigin=null;render()}},icon('edit',16),h('span',{},'Edit data anggota')))
   );
 }
 
@@ -238,7 +238,13 @@ function parseMemberPaste(text){
   return {data,recognized};
 }
 const KEEP_CASE=['foto','email','instagram','tiktok'];
+/* Penghitung pemakaian pilihan pada data anggota (untuk cegah hapus) */
+const hitungPemakaianAnggota=field=>value=>S.members.filter(m=>String(m[field]||'').trim().toLowerCase()===String(value||'').trim().toLowerCase()).length;
 function fld(l,k,o){o=o||{};const f=S.form;let e;
+  if(o.opts&&o.managed){
+    const ms=managedSelect({key:o.managed.key,bawaan:o.opts,value:String(f[k]||''),placeholder:o.ph||'Pilih',countUsage:o.managed.countUsage,onChange:v=>{f[k]=v?v.toUpperCase():''}});
+    return h('label',{class:'lb'},l,ms);
+  }
   if(o.opts)e=h('select',{},h('option',{value:''},o.ph||'Pilih'),...o.opts.map(x=>h('option',{value:x},x)));
   else if(o.area)e=h('textarea',{rows:3,placeholder:o.ph||''});
   else e=h('input',{placeholder:o.ph||'',type:o.type||'text'});
@@ -336,7 +342,7 @@ async function saveForm(){
     return;
   }
   const allowedPref=PREF.find(pref=>pref.toLowerCase()===String(f.pref).trim().toLowerCase());
-  const allowedRegion=WILAYAH.some(([name])=>name.toLowerCase()===String(f.wilayah).trim().toLowerCase());
+  const allowedRegion=wilayahEfektif().some(([name])=>name.toLowerCase()===String(f.wilayah).trim().toLowerCase());
   if(!allowedPref||!allowedRegion){
     alert('Data anggota dibatasi untuk prefektur Shikoku dan Okayama. Periksa kembali prefektur dan wilayah.');
     return;
@@ -355,7 +361,7 @@ function memberFormCard(){
   const topCard=()=>{
     const text=S.admin?h('textarea',{rows:1,placeholder:'Tempel teks data anggota'}):null;if(text)text.value='';
     return box(h('div',{class:'member-top-card'},
-      fld('Wilayah anggota *','wilayah',{opts:WILAYAH.map(([name])=>name),ph:'Pilih wilayah'}),
+      fld('Wilayah anggota *','wilayah',{opts:WILAYAH.map(([name])=>name),ph:'Pilih wilayah',managed:{key:'wilayah',countUsage:value=>S.members.filter(m=>memberRegion(m)===value).length}}),
       S.admin&&h('div',{class:'member-top-auto'},
         h('span',{class:'member-top-label'},'Isi Otomatis'),
         text,
@@ -367,7 +373,7 @@ function memberFormCard(){
     h('div',{class:'fl'},pick('Ambil foto','image/jpeg,image/png,image/webp',1,file=>up(file,'foto')),pick('Pilih foto','image/jpeg,image/png,image/webp',0,file=>up(file,'foto'))),
     dropZone('Ganti foto setengah badan','image/jpeg,image/png,image/webp','foto',0))
   const documentBox=()=>box(h('b',{},'Foto Surat Sambung'),
-    ...(f.surat||[]).map((id,index)=>h('div',{class:'member-file-row'},h('a',{...memberMediaAttributes(id,'href'),target:'_blank'},icon('attachment',16),h('span',{},'Lampiran '+(index+1))),h('button',{class:'btn s',onclick:()=>{f.surat=f.surat.filter(value=>value!==id);render()}},'Hapus'))),
+    ...(f.surat||[]).map((id,index)=>h('div',{class:'member-file-row'},h('a',{...memberMediaAttributes(id,'href'),target:'_blank'},icon('attachment',16),h('span',{},'Lampiran '+(index+1))),h('button',{class:'btn s btn-eh',onclick:()=>{f.surat=f.surat.filter(value=>value!==id);render()}},'Hapus'))),
     h('div',{class:'fl'},pick('Ambil / foto dokumen','image/*,application/pdf',1,file=>up(file,'surat',1)),pick('Pilih dokumen','image/*,application/pdf',0,file=>up(file,'surat',1))),
     dropZone('Tambah foto atau PDF surat sambung','image/*,application/pdf','surat',1));
   return h('div',{class:'member-editor'},
@@ -375,13 +381,13 @@ function memberFormCard(){
       h('div',{},h('p',{class:'member-eyebrow'},'DATA KOMUNITAS'),h('h1',{},f.id?'Edit data anggota':'Anggota baru'))),
     topCard(),
     box(h('div',{class:'member-section-heading'},h('b',{},'Profil anggota')),
-      fieldGrid(fld('Nama lengkap *','nama'),fld('Nomor HP / WhatsApp','wa',{type:'tel'}),fld('Nomor anggota','kode'),fld('Jenis kelamin','kelamin',{opts:['Laki-laki','Perempuan']}),fld('Tanggal lahir','lahir',{type:'date'}),fld('Peran','peran',{opts:PERAN}),fld('Status pernikahan','nikah',{opts:['Belum menikah','Menikah','Cerai']}),fld('MT','mt'),fld('Bulan kedatangan','bln',{opts:BLN}),fld('Tahun kedatangan','thn',{opts:years}),fld('Mulai tinggal di Jepang','mulai_jp',{ph:'Contoh: 22-09-2026'}),fld('Email','email',{type:'email'}),fld('Instagram','instagram',{ph:'@username'}),fld('Facebook','facebook'))),
+      fieldGrid(fld('Nama lengkap *','nama'),fld('Nomor HP / WhatsApp','wa',{type:'tel'}),fld('Nomor anggota','kode'),fld('Jenis kelamin','kelamin',{opts:['Laki-laki','Perempuan'],ph:'Pilih jenis kelamin',managed:{key:'kelamin',countUsage:hitungPemakaianAnggota('kelamin')}}),fld('Tanggal lahir','lahir',{type:'date'}),fld('Peran','peran',{opts:PERAN}),fld('Status pernikahan','nikah',{opts:['Belum menikah','Menikah','Cerai'],ph:'Pilih status pernikahan',managed:{key:'nikah',countUsage:hitungPemakaianAnggota('nikah')}}),fld('MT','mt'),fld('Bulan kedatangan','bln',{opts:BLN}),fld('Tahun kedatangan','thn',{opts:years}),fld('Mulai tinggal di Jepang','mulai_jp',{ph:'Contoh: 22-09-2026'}),fld('Email','email',{type:'email'}),fld('Instagram','instagram',{ph:'@username'}),fld('Facebook','facebook'))),
     box(h('div',{class:'member-section-heading'},h('b',{},'Kontak & keluarga')),
       fieldGrid(fld('Nama pengurus daerah','pengurus'),fld('Nomor HP pengurus daerah','hp_pengurus',{type:'tel'}),fld('Nama orang tua','ortu'),fld('Nomor HP orang tua','hp_ortu',{type:'tel'}))),
     box(h('div',{class:'member-section-heading'},h('b',{},'Asal di Indonesia')),
-      fieldGrid(fld('Kelompok','kelompok'),fld('Desa','desa'),fld('Daerah','daerah'),fld('Alamat Indonesia','alamat_id',{area:1}))),
+      fieldGrid(fld('Kelompok','kelompok',{opts:[],ph:'Pilih kelompok',managed:{key:'kelompok',countUsage:hitungPemakaianAnggota('kelompok')}}),fld('Desa','desa'),fld('Daerah','daerah'),fld('Alamat Indonesia','alamat_id',{area:1}))),
     box(h('div',{class:'member-section-heading'},h('b',{},'Alamat & pekerjaan di Jepang')),
-      fieldGrid(fld('Kode pos','kodepos',{inputmode:'numeric'}),fld('Alamat di Jepang','alamat_jp',{area:1}),fld('Stasiun terdekat','stasiun'),fld('Status visa','tinggal',{opts:TGL,ph:'Pilih status visa'}),fld('Bidang pekerjaan','bidang'),fld('Nama perusahaan','perusahaan'))),
+      fieldGrid(fld('Kode pos','kodepos',{inputmode:'numeric'}),fld('Alamat di Jepang','alamat_jp',{area:1}),fld('Stasiun terdekat','stasiun'),fld('Status visa','tinggal',{opts:TGL,ph:'Pilih status visa',managed:{key:'tinggal',countUsage:hitungPemakaianAnggota('tinggal')}}),fld('Bidang pekerjaan','bidang',{opts:BIDANG_PEKERJAAN_AWAL,ph:'Pilih bidang pekerjaan',managed:{key:'bidang',countUsage:hitungPemakaianAnggota('bidang')}}),fld('Nama perusahaan','perusahaan'))),
     photoBox(),documentBox(),
     box(h('div',{class:'member-section-heading'},h('b',{},'Catatan tambahan')),fld('Catatan','catatan',{area:1})),
     h('div',{class:'member-editor-actions'},h('button',{class:'btn s',onclick:()=>{S.form=null;render()}},'Batal'),h('button',{class:'btn',onclick:saveForm},f.id?'Simpan perubahan':'Simpan anggota'))

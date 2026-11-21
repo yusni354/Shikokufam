@@ -28,7 +28,7 @@ function activityCard(event){
   const participants=activityMemberIds(event,'peserta_anggota'),attendees=new Set(activityMemberIds(event,'hadir_anggota'));
   const registeredMembers=S.members.filter(member=>String(member.status||'aktif').toLowerCase()!=='nonaktif');
   const memberById=new Map(S.members.map(member=>[String(member.id),member]));
-  const participantsByRegion=new Map(WILAYAH.map(([region])=>[region,[]]));
+  const participantsByRegion=new Map(wilayahEfektif().map(([region])=>[region,[]]));
   const unassignedParticipants=[];
   participants.forEach(id=>{
     const member=memberById.get(id),region=member&&memberRegion(member);
@@ -43,7 +43,7 @@ function activityCard(event){
         h('button',{class:'btn s',onclick:async()=>{
           try{await updateActivityMember(event.id,id,present?'absent':'present')}catch(error){console.error(error);alert('Gagal memperbarui kehadiran: '+(error.message||'periksa koneksi'))}
         }},present?'Batal hadir':'Tandai hadir'),
-        h('button',{class:'btn s',onclick:async()=>{
+        h('button',{class:'btn s btn-eh',onclick:async()=>{
           if(!confirm('Keluarkan '+(member?.nama||'anggota ini')+' dari kegiatan?'))return;
           try{await updateActivityMember(event.id,id,'remove')}catch(error){console.error(error);alert('Gagal menghapus peserta: '+(error.message||'periksa koneksi'))}
         }},'Hapus')));
@@ -71,10 +71,10 @@ function activityCard(event){
     }
     return h('section',{class:'activity-region-section'},...contents);
   };
-  const regionSections=WILAYAH.map(([region])=>regionSection(region,participantsByRegion.get(region)));
+  const regionSections=wilayahEfektif().map(([region])=>regionSection(region,participantsByRegion.get(region)));
   if(unassignedParticipants.length)regionSections.push(regionSection('Wilayah belum ditentukan',unassignedParticipants));
   const content=[
-    h('div',{class:'activity-heading'},h('div',{},h('h2',{},event.judul||'Kegiatan komunitas'),h('p',{class:'activity-meta'},icon('calendar',15),h('span',{},dateLabel+(event.waktu?' · '+event.waktu:''))),event.lokasi&&h('p',{class:'activity-meta'},icon('pin',15),h('span',{},event.lokasi))),S.admin&&h('button',{class:'btn s',onclick:async()=>{
+    h('div',{class:'activity-heading'},h('div',{},h('h2',{},event.judul||'Kegiatan komunitas'),h('p',{class:'activity-meta'},icon('calendar',15),h('span',{},dateLabel+(event.waktu?' · '+event.waktu:''))),event.lokasi&&h('p',{class:'activity-meta'},icon('pin',15),h('span',{},event.lokasi))),S.admin&&h('button',{class:'btn s btn-eh',onclick:async()=>{
       if(!confirm('Hapus kegiatan "'+(event.judul||'ini')+'"?'))return;
       try{await S.db.collection('events').doc(event.id).delete()}catch(error){console.error(error);alert('Gagal menghapus kegiatan: '+(error.message||'periksa koneksi'))}
     }},'Hapus kegiatan')),

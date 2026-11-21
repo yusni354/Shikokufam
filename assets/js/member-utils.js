@@ -1,7 +1,7 @@
 /* Pembantu data anggota: wilayah, tautan WhatsApp/sosial, nilai kontak */
-function regionColor(value){return WILAYAH.find(([name])=>name===value)?.[1]||'#718096'}
+function regionColor(value){return wilayahEfektif().find(([name])=>name===value)?.[1]||'#718096'}
 function memberRegion(member){
-  const known=value=>WILAYAH.find(([name])=>name.toLowerCase()===String(value||'').trim().toLowerCase())?.[0];
+  const known=value=>wilayahEfektif().find(([name])=>name.toLowerCase()===String(value||'').trim().toLowerCase())?.[0];
   const legacy=legacyRegionTarget(member);
   if(legacy)return legacy;
   return known(member.wilayah)||inferJapanLocation(member.alamat_jp,member.kota,member.kec_jp,member.kodepos,member.pref,member.wilayah)?.wilayah||'Belum dipilih';

@@ -9,6 +9,8 @@ const V={
   forum:vForum,
   pesan:vPesan,
   musyawarah:musyawarahView,
+  keuangan:vKeuangan,
+  pasang:(...args)=>vPasang(...args),
   susunan:vSusunan,
   pengaturan:vPengaturan,
   'map-settings':vPetaSettings,
@@ -47,7 +49,7 @@ function render(){
   if(!S.uid){
     $('#dr').replaceChildren();
     $('#app').replaceChildren(h('div',{class:'landing'},h('section',{class:'hero'},
-      h('p',{style:'font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-bottom:10px'},'SHIKOKU FAMILY'),
+      h('p',{style:'font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-bottom:10px',onclick:()=>handleBrandTap()},'SHIKOKU FAMILY'),
       h('h1',{},'Selamat datang!'),
       accountForm()
     )));
@@ -133,6 +135,8 @@ function startDataSubscriptions(){
   add(()=>sub('cleaning_duties','cleaningDuties'));
   add(()=>sub('pin','pins'));
   add(()=>sub('musyawarah','musyawarah'));
+  add(()=>sub('keuangan','keuangan'));
+  add(()=>subscribePilihan());
   if(!S.supabase)add(()=>sub('pengaturan','pengaturan'));
   add(()=>subscribeSambutan());
 }

@@ -40,7 +40,7 @@ function vHome(){
   const upcomingDuties=[...S.cleaningDuties].filter(duty=>duty.tanggal&&duty.tanggal>=todayKey).sort((a,b)=>a.tanggal.localeCompare(b.tanggal)).slice(0,2);
   const recentEvents=[...S.events].sort((a,b)=>(b.at||0)-(a.at||0)).slice(0,2);
   const memberGroups=wilayah();
-  const regionCards=WILAYAH.map(([name,color])=>{
+  const regionCards=wilayahEfektif().map(([name,color])=>{
     const members=[...(memberGroups[name]||[])].sort((a,b)=>(a.nama||'').localeCompare(b.nama||'','id'));
     return h('section',{class:'home-region-card',style:'--region-color:'+color,onclick:()=>{S.memberRegion=name;S.memberQuery='';S.memberStatus='';go('members')}},
       h('div',{class:'home-region-heading'},h('b',{},name),h('span',{},members.length+' anggota'))
@@ -72,6 +72,7 @@ function vHome(){
     h('div',{class:'home-section-heading'},h('h2',{},'Kegiatan komunitas'),h('button',{class:'btn s',onclick:()=>go('kegiatan')},'Lihat kegiatan')),
     recentEvents.length?h('div',{class:'home-events'},...recentEvents.map(event=>h('div',{class:'home-event'},icon('calendar',19),h('div',{},h('b',{},event.judul||'Kegiatan komunitas'),h('small',{},eventParticipantCount(event)+' peserta · '+eventAttendanceCount(event)+' hadir'))))):h('div',{class:'home-empty'},icon('calendar',23),h('p',{},'Belum ada kegiatan komunitas.')),
     homeAttendanceChart(),
+    (typeof isStandaloneApp==='function'&&!isStandaloneApp())?h('button',{class:'card install-home-card',onclick:()=>go('pasang')},h('img',{class:'install-home-icon',src:'assets/icons/icon-192.png',alt:''}),h('span',{style:'flex:1'},h('b',{},'Pasang aplikasi di HP'),h('small',{},'Tambahkan ke layar utama — dibuka seperti aplikasi biasa, Android & iPhone')),'›'):null,
     h('button',{class:'home-admin-link',onclick:askForm},icon('messages',17),' Butuh bantuan? Hubungi Admin')
   ];
 }

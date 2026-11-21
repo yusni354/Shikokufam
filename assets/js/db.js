@@ -2,8 +2,22 @@
 function createLocalDb(){
   const listeners={};
   const key=name=>'shikoku-family:'+name;
-  const read=name=>{try{return JSON.parse(localStorage.getItem(key(name))||'[]')}catch(e){return []}};
-  const write=(name,rows)=>{try{localStorage.setItem(key(name),JSON.stringify(rows))}catch(e){throw new Error('Penyimpanan lokal tidak tersedia')}};
+  /* Cermin data di ingatan: bila localStorage terblokir (mis. pratinjau
+     artefak dalam iframe sandbox), data lokal tetap hidup selama sesi
+     berjalan alih-alih gagal ditulis. Di peramban biasa localStorage
+     tetap menjadi sumber utama seperti sebelumnya. */
+  const memory={};
+  const read=name=>{
+    try{
+      const raw=localStorage.getItem(key(name));
+      if(raw!==null)return JSON.parse(raw)||[];
+    }catch(e){}
+    return (memory[name]||[]).map(row=>({...row}));
+  };
+  const write=(name,rows)=>{
+    memory[name]=rows.map(row=>({...row}));
+    try{localStorage.setItem(key(name),JSON.stringify(rows))}catch(e){/* penyimpanan terblokir: data tetap tersimpan di ingatan untuk sesi ini */}
+  };
   const notify=name=>(listeners[name]||[]).forEach(fn=>fn({docs:read(name).map(data=>({id:data.id,data:()=>({...data})}))}));
   const collection=name=>({
     onSnapshot(fn){(listeners[name]||(listeners[name]=[])).push(fn);notify(name);return ()=>{const list=listeners[name]||[],index=list.indexOf(fn);if(index>=0)list.splice(index,1)}},
@@ -16,7 +30,7 @@ function createLocalDb(){
   });
   return {collection};
 }
-const APP_DATA_COLLECTIONS=new Set(['members','events','topics','cleaning_duties','pin','musyawarah','pengaturan']);
+const APP_DATA_COLLECTIONS=new Set(['members','events','topics','cleaning_duties','pin','musyawarah','pengaturan','keuangan']);
 function createSupabaseDb(client){
   const collection=name=>{
     if(!APP_DATA_COLLECTIONS.has(name))throw new Error('Koleksi aplikasi tidak dikenal: '+name);
