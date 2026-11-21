@@ -456,9 +456,12 @@ body.admin-dark .card .e{background:#293946;color:var(--acc)}
 .rekap-table thead th.rekap-ev{max-width:72px;font-weight:600}
 .rekap-table thead th.rekap-ev small{display:block;font-size:10px;font-weight:400;opacity:.85}
 .rekap-table thead th.rekap-ev span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.rekap-table thead th.rekap-ev:hover{max-width:280px}
-.rekap-table thead th.rekap-ev:hover span{overflow:visible;text-overflow:clip}
 .rekap-table thead th.rekap-ev-admin{cursor:pointer}
+/* Label melayang nama lengkap kegiatan saat kursor di atas kepala
+   kolom rekap: berposisi fixed (ditempel ke body lewat JS), latar
+   slate gelap teks putih mengikuti kepala tabel, tidak menangkap
+   ketukan dan tidak memengaruhi lebar kolom/tata letak tabel. */
+.rekap-tip{position:fixed;z-index:1200;max-width:min(280px,86vw);padding:6px 11px;border-radius:9px;background:#2c4a5e;color:#fff;font-size:12.5px;font-weight:600;line-height:1.35;text-align:center;box-shadow:0 8px 22px rgba(23,34,43,.35);pointer-events:none}
 .rekap-table thead th.rekap-ev-admin:hover{background:#35566e}
 .rekap-table th:first-child,.rekap-table td:first-child{position:sticky;left:0;text-align:left}
 .rekap-table thead th:first-child{z-index:3;background:#2c4a5e}

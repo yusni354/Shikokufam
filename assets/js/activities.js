@@ -693,6 +693,34 @@ function activityMonth(event){
   return Number.isNaN(m)||m<1||m>12?null:m;
 }
 const NAMA_BULAN=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+/* Label melayang nama kegiatan pada kepala kolom tabel rekap: saat
+   kursor berada di atas kepala kolom, nama kegiatan selengkapnya
+   tampil pada label yang melayang di atas kepala kolom itu. Label
+   berposisi fixed dan ditempel ke <body>, jadi lebar kolom dan tata
+   letak tabel TIDAK berubah sama sekali dan label tidak terpotong
+   wadah gulir tabel. Isinya cukup nama kegiatannya saja (tanpa
+   tanggal). Kursor pergi, halaman digulir, atau ukuran jendela
+   berubah → label hilang dan kepala kolom kembali singkatan. */
+let rekapTipEl=null;
+function sembunyiRekapTip(){
+  if(rekapTipEl){rekapTipEl.remove();rekapTipEl=null}
+}
+function tampilRekapTip(th,nama){
+  sembunyiRekapTip();
+  const tip=h('div',{class:'rekap-tip',role:'tooltip'},nama);
+  document.body.appendChild(tip);
+  rekapTipEl=tip;
+  const r=th.getBoundingClientRect();
+  const lebar=tip.offsetWidth,tinggi=tip.offsetHeight;
+  let kiri=r.left+r.width/2-lebar/2;
+  kiri=Math.max(6,Math.min(kiri,window.innerWidth-lebar-6));
+  let atas=r.top-tinggi-6;
+  if(atas<6)atas=r.bottom+6;
+  tip.style.left=kiri+'px';
+  tip.style.top=atas+'px';
+}
+document.addEventListener('scroll',sembunyiRekapTip,true);
+window.addEventListener('resize',sembunyiRekapTip);
 function vRingkasan(){
   const currentYear=new Date().getFullYear();
   const ruang=ringkasanRuangAktif();
@@ -805,20 +833,22 @@ function vRingkasan(){
     h('th',{class:'rekap-name-head'},'Nama'),
     /* Kepala kolom kegiatan: tanggal + SINGKATAN nama kegiatan saja
        supaya kolom sempit dan seragam, tidak melebar mengikuti panjang
-       nama. Saat kursor berada di atasnya (hover desktop) singkatan
-       berganti menjadi nama asli selengkapnya dan kembali lagi saat
-       kursor pergi; atribut title memuat nama penuh sebagai cadangan.
-       Khusus admin bisa diklik untuk membuka panel pengaturan kegiatan
-       itu (satu-satunya tempat hapus kegiatan sekarang); anggota biasa
-       tidak mendapat reaksi klik apa pun. */
+       nama. Saat kursor berada di atasnya (hover desktop) nama asli
+       selengkapnya tampil sebagai LABEL MELAYANG di atas kepala kolom
+       (lihat tampilRekapTip) — cukup nama kegiatannya saja; lebar
+       kolom tidak berubah dan singkatan di kepala kolom tetap.
+       Kursor pergi → label hilang. Khusus admin bisa diklik untuk
+       membuka panel pengaturan kegiatan itu (satu-satunya tempat
+       hapus kegiatan sekarang); anggota biasa tidak mendapat reaksi
+       klik apa pun. */
     ...rekapEvents.map(event=>{
       const namaPenuh=event.judul||'Kegiatan komunitas';
       const singkatan=singkatanKegiatan(namaPenuh);
       const label=h('span',{class:'rekap-ev-label'},singkatan);
-      const props={class:'rekap-ev'+(S.admin?' rekap-ev-admin':''),title:namaPenuh+' · '+shortDate(event)+(S.admin?' — ketuk untuk pengaturan kegiatan':''),
-        onmouseenter:()=>{label.textContent=namaPenuh},
-        onmouseleave:()=>{label.textContent=singkatan}};
-      if(S.admin)props.onclick=()=>{S.rekapDialog={id:event.id,judul:namaPenuh,tanggal:event.tanggal||'',tahap:'atur'};render()};
+      const props={class:'rekap-ev'+(S.admin?' rekap-ev-admin':''),
+        onmouseenter:ev=>tampilRekapTip(ev.currentTarget,namaPenuh),
+        onmouseleave:sembunyiRekapTip};
+      if(S.admin)props.onclick=()=>{sembunyiRekapTip();S.rekapDialog={id:event.id,judul:namaPenuh,tanggal:event.tanggal||'',tahap:'atur'};render()};
       return h('th',props,h('small',{},shortDate(event)),label);
     }),
     h('th',{class:'rekap-sum-start',title:'Total Hadir pada bulan terpilih'},'Hadir'),
