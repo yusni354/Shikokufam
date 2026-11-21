@@ -826,8 +826,8 @@ function vRingkasan(){
      tercatat statusnya. */
   const yearView=activityTotalsView(yearTotals,totalAnggota*events.length);
   /* Kartu ringkasan TAHUNAN: isinya tetap setahun penuh (tidak mengikuti
-     bulan terpilih) dan kini diletakkan di BAGIAN BAWAH ruangan ini,
-     sesudah tabel rekap. */
+     bulan terpilih) dan diletakkan di BAGIAN BAWAH ruangan ini,
+     sesudah tabel rekap dan kartu ringkasan bulanan. */
   const summaryCard=h('section',{class:'card ringkasan-summary ringkasan-summary-bawah'},
     h('h2',{},'Ringkasan tahun '+selected),
     h('p',{class:'activity-meta'},icon('calendar',15),h('span',{},events.length+' kegiatan pada tahun ini')),
@@ -963,9 +963,25 @@ function vRingkasan(){
     rekapMembers.length
       ?h('div',{class:'rekap-wrap'},h('table',{class:'rekap-table'},rekapHead,rekapBody))
       :h('p',{class:'warn'},'Belum ada anggota aktif.'));
+  /* Kartu ringkasan BULANAN: bentuknya sama persis dengan kartu
+     ringkasan tahunan (judul, baris jumlah kegiatan, pil total empat
+     status, grafik batang bertumpuk + legenda persen termasuk 'Belum
+     tercatat', keterangan total anggota), tetapi dihitung dari BULAN
+     TERPILIH saja — totalnya memakai activityTotals yang sama seperti
+     kartu kegiatan & kartu tahunan, dan penyebut grafiknya total
+     anggota aktif × jumlah kegiatan pada bulan itu. Mengganti
+     bulan/tahun menggambar ulang kartu ini mengikuti pilihannya. */
+  const monthTotals={hadir:0,izin:0,cuti:0,alpha:0};
+  rekapEvents.forEach(event=>{const t=activityTotals(event);Object.keys(monthTotals).forEach(k=>{monthTotals[k]+=t[k]})});
+  const monthView=activityTotalsView(monthTotals,totalAnggota*rekapEvents.length);
+  const monthlyCard=h('section',{class:'card ringkasan-summary ringkasan-summary-bulanan'},
+    h('h2',{},'Ringkasan '+namaBulanTerpilih+' '+selected),
+    h('p',{class:'activity-meta'},icon('calendar',15),h('span',{},rekapEvents.length+' kegiatan pada bulan ini')),
+    monthView.pills,monthView.chart,monthView.legend,
+    totalAnggota>0&&h('p',{class:'activity-total-note'},'dari total '+totalAnggota+' anggota'));
   /* Susunan akhir: saringan Tahun+Bulan → tabel rekap bulan terpilih →
-     kartu ringkasan tahunan di paling bawah. */
-  return [...head,rekapCard,summaryCard,dialogRekapKegiatan()];
+     kartu ringkasan bulanan → kartu ringkasan tahunan di paling bawah. */
+  return [...head,rekapCard,monthlyCard,summaryCard,dialogRekapKegiatan()];
 }
 /* ===== Panel pengaturan kegiatan dari kepala kolom tabel rekap =====
    Dibuka dengan mengklik kepala kolom sebuah kegiatan di tabel rekap

@@ -435,6 +435,7 @@ body.admin-dark .card .e{background:#293946;color:var(--acc)}
 .ringkasan-filters .ringkasan-year,.ringkasan-filters .ringkasan-month{flex:1 1 140px;max-width:220px;margin:0}
 .ringkasan-month select{margin:4px 0 0}
 .ringkasan-summary{margin-bottom:12px}
+.ringkasan-summary-bulanan{margin:12px 0 0}
 .ringkasan-summary-bawah{margin:12px 0 0}
 .rekap-head-info{margin:0 0 10px}
 .rekap-title{margin:0 0 3px;font-size:16px}
