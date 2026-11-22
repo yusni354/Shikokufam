@@ -407,30 +407,58 @@ function activityCard(event){
      dihentikan di sini). Anggota biasa tidak melihat tombol ini. */
   if(S.admin)content.push(h('div',{class:'activity-card-foot'},
     h('button',{class:'activity-gear-btn',type:'button','aria-label':'Pengaturan kegiatan '+(event.judul||''),title:'Pengaturan kegiatan',
-      onclick:e=>{e.stopPropagation();S.kegiatanDialog={id:event.id,tahap:'atur'};render()}},icon('settings',16))));
-  /* Animasi pegas ala ikon Mac: kartu yang baru saja dibuka/ditutup
-     lewat klik mendapat kelas 'spring-in' SATU kali (penanda
-     S.activitySpringId dipakai lalu dibersihkan di sini) supaya
-     melebar/menyusutnya terasa memantul lembut, bukan kaku seketika. */
-  const springIn=S.activitySpringId!=null&&String(S.activitySpringId)===String(event.id);
-  if(springIn)S.activitySpringId=null;
-  const card=h('article',{class:'card activity-card'+(expanded?' open':'')+(springIn?' spring-in':''),style:'--activity-color:'+warnaAksen,'aria-expanded':expanded?'true':'false',title:expanded?'Ketuk untuk menutup':'Ketuk untuk melihat wilayah'},...content);
+      onclick:e=>{e.stopPropagation();S.kegiatanDialog={id:event.id,tahap:'atur'};render()}},icon('gear',16))));
+  /* Genie effect (ala minimize jendela macOS): kartu yang baru saja
+     dibuka/ditutup lewat klik ditandai data-genie oleh penanda
+     S.activityGenie; sesudah render, handler klik di bawah memberi
+     kelas arah (genie-in-open / genie-in-close) + transform-origin
+     di titik klik supaya kartu mengembang/tersedot dari titik itu. */
+  const genieIn=S.activityGenie&&String(S.activityGenie.id)===String(event.id);
+  const cardProps={class:'card activity-card'+(expanded?' open':'')+(genieIn?' genie-in':''),style:'--activity-color:'+warnaAksen,'aria-expanded':expanded?'true':'false',title:expanded?'Ketuk untuk menutup':'Ketuk untuk melihat wilayah'};
+  if(genieIn)cardProps['data-genie']='1';
+  const card=h('article',cardProps,...content);
   /* Klik pada badan kartu membuka/menutup daftar wilayah; klik pada
      tombol/field di dalam kartu (pemilih wilayah, pemindai)
-     tidak ikut membuka/menutup. Sebelum keadaan berganti, kartu yang
-     ditekan menyusut sebentar seperti ikon Mac yang ditekan
-     (.activity-press ±150 ms), lalu render menggambar keadaan baru
-     dengan animasi pegas masuk. prefers-reduced-motion: langsung
-     berganti tanpa animasi dan tanpa jeda. */
+     tidak ikut membuka/menutup. Urutan genie: (1) kartu yang diklik
+     TERSEDOT melengkung menuju titik klik (.genie-out ±170 ms —
+     menyempit tak seragam + skew/perspective ringan, transform-origin
+     di titik klik), (2) render menggambar keadaan baru, (3) kartu baru
+     mengembang melepas dari titik klik yang sama (membuka:
+     genie-in-open; menutup: genie-in-close, gerakan berkebalikan).
+     Hanya transform/opacity yang bergerak — tata letak grid utuh.
+     prefers-reduced-motion: langsung berganti tanpa animasi. */
   card.addEventListener('click',e=>{
     if(e.target.closest('button,input,video,a,select,textarea,label'))return;
     const target=expanded?null:String(event.id);
     const kurangiGerak=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     if(kurangiGerak){S.activityExpanded=target;render();return}
-    if(card.dataset.springing)return;
-    card.dataset.springing='1';
-    card.classList.add('activity-press');
-    setTimeout(()=>{S.activityExpanded=target;S.activitySpringId=String(event.id);render()},150);
+    if(card.dataset.genieBusy)return;
+    card.dataset.genieBusy='1';
+    const rect=card.getBoundingClientRect();
+    const fx=Math.min(1,Math.max(0,(e.clientX-rect.left)/Math.max(rect.width,1)));
+    const fy=Math.min(1,Math.max(0,(e.clientY-rect.top)/Math.max(rect.height,1)));
+    card.style.transformOrigin=(fx*100)+'% '+(fy*100)+'%';
+    card.style.setProperty('--gskew',((0.5-fx)*10).toFixed(2)+'deg');
+    card.classList.add('genie-out');
+    const genie={id:String(event.id),dir:expanded?'close':'open',x:e.clientX,y:e.clientY,w:rect.width};
+    setTimeout(()=>{
+      S.activityExpanded=target;
+      S.activityGenie=genie;
+      render();
+      S.activityGenie=null;
+      const el=document.querySelector('.activity-card[data-genie="1"]');
+      if(!el)return;
+      const r=el.getBoundingClientRect();
+      /* Titik klik yang sama, kini relatif terhadap kartu baru */
+      el.style.transformOrigin=(genie.x-r.left)+'px '+(genie.y-r.top)+'px';
+      const fxBaru=r.width?(genie.x-r.left)/r.width:0.5;
+      el.style.setProperty('--gskew',((0.5-fxBaru)*10).toFixed(2)+'deg');
+      if(genie.dir==='open'&&r.width)el.style.setProperty('--gsx',Math.min(1,Math.max(0.15,genie.w/r.width)).toFixed(3));
+      const bersih=()=>{el.classList.remove('genie-in','genie-in-open','genie-in-close');el.removeAttribute('data-genie')};
+      el.addEventListener('animationend',bersih,{once:true});
+      setTimeout(bersih,900);
+      el.classList.add(genie.dir==='open'?'genie-in-open':'genie-in-close');
+    },170);
   });
   return card;
 }
