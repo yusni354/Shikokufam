@@ -405,10 +405,9 @@ body.admin-dark .card .e{background:#293946;color:var(--acc)}
 .activity-repeat-week{display:grid;grid-template-columns:1fr;gap:6px;align-items:start}
 .activity-create .activity-feedback{margin:8px 0 0}
 /* Daftar kartu kegiatan: grid menyamping — 2 kolom di HP, 4 kolom di
-   desktop (≥1024px), 1 kolom di layar sangat sempit (≤340px). Kartu
-   yang sedang terbuka (akordeon) melebar selebar baris grid supaya
-   pemilih wilayah & pemindai QR di dalamnya tetap lega; kartu lain
-   tetap pada susunannya. */
+   desktop (≥1024px), 1 kolom di layar sangat sempit (≤340px). Semua
+   kartu selalu ringkas; mengklik kartu membuka halaman detail
+   kegiatan satu halaman penuh (bukan akordeon di dalam grid). */
 .activity-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;align-items:start}
 .activity-list>.activity-card{margin-bottom:0;min-width:0;padding:13px}
 .activity-list .activity-card h2{font-size:17px;margin-bottom:6px;overflow-wrap:anywhere}
@@ -416,7 +415,6 @@ body.admin-dark .card .e{background:#293946;color:var(--acc)}
 .activity-list .activity-counts{gap:6px;margin-top:10px}
 .activity-list .activity-counts b{padding:6px 8px;font-size:12px}
 .activity-list .activity-chart-legend{gap:3px 10px}
-.activity-card.open{grid-column:1/-1}
 @media(min-width:1024px){.activity-list{grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}}
 @media(max-width:340px){.activity-list{grid-template-columns:1fr}}
 .activity-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
@@ -555,8 +553,7 @@ body.admin-dark .card .e{background:#293946;color:var(--acc)}
 .laporan-bar-fill{display:block;height:100%;border-radius:999px;background:var(--acc)}
 .lap-pct{margin-left:8px;font-weight:700;white-space:nowrap}
 .activity-heading-side{display:flex;align-items:flex-start;gap:8px;flex:none}
-.activity-chevron{flex:none;font-size:24px;line-height:1;color:var(--mut);transition:transform .18s ease;transform:rotate(90deg)}
-.activity-card.open .activity-chevron{transform:rotate(-90deg)}
+.activity-chevron{flex:none;font-size:24px;line-height:1;color:var(--mut)}
 .activity-card h3{margin:16px 0 8px;font-size:16px}
 .activity-region-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .activity-region-section{min-width:0;padding:12px;border:1px solid var(--line);border-radius:16px;background:var(--card)}
@@ -608,33 +605,24 @@ body.qr-full-lock{overflow:hidden}
 .qr-full-status{margin:0;max-width:520px;min-height:1.3em;text-align:center;color:#fff;font-size:15px;font-weight:600;line-height:1.45;background:rgba(6,17,24,.74);padding:10px 16px;border-radius:14px;overflow-wrap:anywhere}
 .qr-full-close{display:inline-flex;align-items:center;gap:8px;background:#fff;color:#10222e;border:0;border-radius:999px;font-family:inherit;font-weight:700;font-size:16px;padding:13px 28px;box-shadow:0 8px 22px rgba(0,0,0,.35);cursor:pointer}
 .qr-full-close:active{transform:scale(.97)}
-/* ===== Genie effect kartu kegiatan (ala minimize jendela macOS) =====
-   Seperti jin tersedot masuk lampu: transform-origin selalu di titik
-   klik pengguna pada kartu (diatur JS per klik). Total gerak ±810–830
-   ms, dibagi dua fase yang mengalir tanpa patah:
-   .genie-out (250 ms): kartu yang diklik menyempit tak seragam
-   (scaleX jauh lebih kecil dari scaleY yang justru meregang) sambil
-   miring (skew mengikuti posisi klik lewat --gskew) dan sedikit
-   rotateX berperspektif — warp-nya bergerak progresif lewat enam
-   tahapan rapat sehingga lengkung sedotannya terasa hidup dan halus,
-   makin cepat menjelang titik klik (easing akselerasi lembut).
-   .genie-in-open (580 ms): kartu lebar hasil render mulai dari
-   keadaan tersedot (scaleX = rasio lebar kolom/lebar penuh, --gsx)
-   lalu mengembang melepas: warp terurai bertahap mengikuti lengkung
-   yang sama, ditutup ayunan elastis sangat halus sebelum menetap.
-   .genie-in-close (560 ms): gerakan berkebalikan — kartu kolom
-   mulai meregang lebar dari titik klik lalu menyusut menetap ke
-   ukuran kolomnya dengan tahapan dan tempo yang seirama.
-   Hanya transform/opacity yang bergerak; tata letak grid tidak
-   berubah. */
-.activity-card.genie-out{animation:genieOut .25s cubic-bezier(.5,.02,.72,.38) both;will-change:transform}
-@keyframes genieOut{0%{transform:perspective(700px) rotateX(0deg) scale(1,1) skewX(0deg);opacity:1}18%{transform:perspective(700px) rotateX(.6deg) scale(.965,1.012) skewX(calc(var(--gskew,0deg)*.18));opacity:1}38%{transform:perspective(700px) rotateX(1.4deg) scale(.9,1.045) skewX(calc(var(--gskew,0deg)*.42));opacity:.99}58%{transform:perspective(700px) rotateX(2.2deg) scale(.79,1.085) skewX(calc(var(--gskew,0deg)*.66));opacity:.96}78%{transform:perspective(700px) rotateX(2.9deg) scale(.62,1.12) skewX(calc(var(--gskew,0deg)*.86)) translateY(3px);opacity:.82}100%{transform:perspective(700px) rotateX(3.4deg) scale(.42,1.16) skewX(var(--gskew,0deg)) translateY(6px);opacity:.45}}
-.activity-card.genie-in{will-change:transform}
-.activity-card.genie-in-open{animation:genieInOpen .58s cubic-bezier(.22,1.04,.36,1) both}
-@keyframes genieInOpen{0%{transform:perspective(800px) rotateX(3.4deg) scale(var(--gsx,.34),1.16) skewX(var(--gskew,0deg));opacity:.45}16%{transform:perspective(800px) rotateX(2.6deg) scale(calc(var(--gsx,.34) + (1 - var(--gsx,.34))*.38),1.115) skewX(calc(var(--gskew,0deg)*.74));opacity:.62}32%{transform:perspective(800px) rotateX(1.7deg) scale(calc(var(--gsx,.34) + (1 - var(--gsx,.34))*.62),1.07) skewX(calc(var(--gskew,0deg)*.5));opacity:.8}48%{transform:perspective(800px) rotateX(.8deg) scale(calc(var(--gsx,.34) + (1 - var(--gsx,.34))*.83),1.032) skewX(calc(var(--gskew,0deg)*.28));opacity:.93}64%{transform:perspective(800px) rotateX(0deg) scale(calc(var(--gsx,.34) + (1 - var(--gsx,.34))*.96),1.01) skewX(calc(var(--gskew,0deg)*-.1));opacity:1}78%{transform:scale(1.011,.994) skewX(0deg);opacity:1}89%{transform:scale(.997,1.003) skewX(0deg)}100%{transform:scale(1,1) skewX(0deg);opacity:1}}
-.activity-card.genie-in-close{animation:genieInClose .56s cubic-bezier(.24,1.03,.36,1) both}
-@keyframes genieInClose{0%{transform:perspective(800px) rotateX(-2.4deg) scale(1.55,.9) skewX(var(--gskew,0deg));opacity:.5}18%{transform:perspective(800px) rotateX(-1.7deg) scale(1.36,.935) skewX(calc(var(--gskew,0deg)*.72));opacity:.66}36%{transform:perspective(800px) rotateX(-1deg) scale(1.2,.965) skewX(calc(var(--gskew,0deg)*.48));opacity:.82}54%{transform:perspective(800px) rotateX(-.4deg) scale(1.08,.99) skewX(calc(var(--gskew,0deg)*.24));opacity:.94}70%{transform:perspective(800px) rotateX(0deg) scale(1.02,1.004) skewX(calc(var(--gskew,0deg)*-.08));opacity:1}84%{transform:scale(.992,1.006) skewX(0deg)}100%{transform:scale(1,1) skewX(0deg);opacity:1}}
-@media(prefers-reduced-motion:reduce){.activity-card.genie-out,.activity-card.genie-in-open,.activity-card.genie-in-close{animation:none}.qr-full-frame::after{animation:none}.qr-full-result.ok.play,.qr-full-result.fail.play{animation-duration:.5s}}
+/* ===== Transisi halaman detail kegiatan =====
+   Gerakan yang tenang dan profesional, selaras tema clay aplikasi:
+   - Kartu yang diketuk memberi respons sentuh sangat halus
+     (mengecil 1% + sedikit memudar, 180 ms, tanpa pantulan).
+   - Halaman detail masuk dengan pudar + naik halus 300 ms
+     (kelas .enter, hanya saat detail dibuka / daftar ditampilkan
+     lagi sesudah kembali dari detail) — tanpa lengkungan, tanpa
+     regangan, tanpa efek berlebihan. */
+.activity-card{transition:transform .18s ease,opacity .18s ease}
+.activity-card:active{transform:scale(.99);opacity:.97}
+.activity-detail.enter,.kegiatan-bulan-blok.enter{animation:activityPageIn .3s cubic-bezier(.22,.61,.36,1) both}
+@keyframes activityPageIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.activity-detail-back{margin-bottom:12px}
+.activity-detail-card{display:block;cursor:default}
+.activity-detail-card:active{transform:none;opacity:1}
+.activity-detail-card h2{margin:0 0 6px;font-size:22px;color:var(--activity-color,#10222e)}
+.activity-detail-card h3{margin:18px 0 8px;font-size:16px}
+@media(prefers-reduced-motion:reduce){.activity-detail.enter,.kegiatan-bulan-blok.enter{animation:none}.activity-card{transition:none}.activity-card:active{transform:none;opacity:1}.qr-full-frame::after{animation:none}.qr-full-result.ok.play,.qr-full-result.fail.play{animation-duration:.5s}}
 .activity-feedback{min-height:1.3em;color:var(--mut);font-size:14px}
 .activity-empty{color:var(--mut);margin:8px 0}
 /* Absensi dua tahap: tahap 1 pemilih wilayah, tahap 2 halaman fokus satu wilayah */

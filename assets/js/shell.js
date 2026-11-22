@@ -23,7 +23,7 @@ function bawaanArsipKegiatan(){const kini=new Date();S.kegiatanTahun=kini.getFul
    dalam gambar ulang: berpindah bulan/tahun/ruangan selama masih di
    halaman tidak di-reset; keluar lalu kembali → bulan berjalan lagi. */
 function bawaanArsipRingkasan(){const kini=new Date();S.ringkasanTahun=kini.getFullYear();S.ringkasanBulan=kini.getMonth()+1}
-function go(v){if(v==='kegiatan')bawaanArsipKegiatan();if(v==='ringkasan')bawaanArsipRingkasan();S.view=v;simpanViewTerakhir(v);S.adminMenuOpen=false;S.form=S.detail=S.dutyForm=null;S.financeForm=null;S.financePhoto=null;S.idPhoto=null;S.detailOrigin=null;if(v==='pesan'&&S.admin)S.openConversation=null;document.body.classList.remove('open');syncAdminTheme();render();if(v==='pesan'&&!S.admin)markMessagesRead()}
+function go(v){if(v==='kegiatan'){bawaanArsipKegiatan();/* Masuk halaman Kegiatan dari menu selalu menuju DAFTAR: detail kegiatan adalah sub-tampilan yang hanya dibuka dari kartu dan ditutup lewat tombol Kembali di dalamnya, jadi keadaan detail & absensi dibersihkan di sini (bukan saat kembali dari detail). */S.activityDetail=null;S.absensiEvent=null;S.absensiRegion=null;S.absensiDraft=null;try{sessionStorage.removeItem('shikoku-family:kegiatan-detail')}catch(e){/* storage terblokir: abaikan */}}if(v==='ringkasan')bawaanArsipRingkasan();S.view=v;simpanViewTerakhir(v);S.adminMenuOpen=false;S.form=S.detail=S.dutyForm=null;S.financeForm=null;S.financePhoto=null;S.idPhoto=null;S.detailOrigin=null;if(v==='pesan'&&S.admin)S.openConversation=null;document.body.classList.remove('open');syncAdminTheme();render();if(v==='pesan'&&!S.admin)markMessagesRead()}
 $('#mn').onclick=()=>document.body.classList.add('open');
 $('#mn').replaceChildren(icon('menu',21));
 $('#st').replaceChildren(icon('settings',19));
@@ -64,9 +64,24 @@ function pulihkanViewTerakhir(){
   if(v==='approvals'&&!S.admin)return;
   if(v==='pengaturan'&&!S.admin)return;
   S.view=v;
-  /* Memulihkan halaman Kegiatan sesudah muat ulang = membuka halaman
-     itu, jadi bawaan arsip bulan berjalan berlaku juga di sini. */
-  if(v==='kegiatan')bawaanArsipKegiatan();
+  /* Memulihkan halaman Kegiatan sesudah muat ulang: bila halaman
+     terakhir adalah DETAIL kegiatan (tersimpan di sessionStorage oleh
+     activities.js), pulihkan detail itu beserta arsip bulan/tahun saat
+     detail dibuka — bukan bawaan bulan berjalan. Bila kegiatannya
+     sudah terhapus, vKegiatan membawanya kembali ke daftar. Tanpa
+     detail tersimpan, bawaan arsip bulan berjalan berlaku seperti
+     biasa. */
+  if(v==='kegiatan'){
+    let detailTersimpan=null;
+    try{detailTersimpan=JSON.parse(sessionStorage.getItem('shikoku-family:kegiatan-detail')||'null')}catch(e){detailTersimpan=null}
+    if(detailTersimpan&&detailTersimpan.id){
+      S.activityDetail=String(detailTersimpan.id);
+      S._activityDetailAnimate=true;
+      if(detailTersimpan.tahun)S.kegiatanTahun=detailTersimpan.tahun;
+      if(detailTersimpan.bulan)S.kegiatanBulan=detailTersimpan.bulan;
+      if(!detailTersimpan.tahun||!detailTersimpan.bulan)bawaanArsipKegiatan();
+    }else bawaanArsipKegiatan();
+  }
   /* Halaman Ringkasan & Laporan yang dipulihkan sesudah muat ulang
      diperlakukan sama: bawaan arsipnya bulan berjalan lagi. */
   if(v==='ringkasan')bawaanArsipRingkasan();

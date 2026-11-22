@@ -98,6 +98,9 @@ function leaveAbsensi(){
   S.absensiEvent=null;
   S.absensiRegion=null;
   S.absensiDraft=null;
+  /* Kembali dari halaman fokus absensi menuju halaman DETAIL kegiatan
+     yang sama (S.activityDetail tidak diubah di sini). */
+  if(S.activityDetail)S._activityDetailAnimate=true;
   render();
   window.scrollTo(0,0);
 }
@@ -179,21 +182,52 @@ function resetManagedSelect(wrap){
     if(sel){sel.value='';if(typeof sel.onchange==='function')sel.onchange()}
   }catch(e){/* abaikan: formulir akan digambar ulang oleh data baru */}
 }
+/* ===== Detail kegiatan SATU HALAMAN PENUH =====
+   Mengklik kartu kegiatan TIDAK lagi membuka akordeon di dalam grid:
+   kartu membuka halaman detail tersendiri (sub-tampilan halaman
+   Kegiatan) berisi isi yang dulu tampil pada kartu yang melebar —
+   judul + tanggal/waktu + lokasi, pil & grafik persentase kehadiran,
+   pemilih wilayah 'Absensi per wilayah', dan Pemindaian QR (admin).
+   Keadaan detail disimpan di S.activityDetail (id kegiatan) dan
+   ditulis ke sessionStorage bersama arsip bulan/tahun saat detail
+   dibuka, supaya sesudah muat ulang pengguna kembali ke detail yang
+   sama (ditangani pulihkanViewTerakhir di shell.js); bila kegiatan
+   itu sudah terhapus, vKegiatan membawanya kembali ke daftar. */
+const KEGIATAN_DETAIL_KEY='shikoku-family:kegiatan-detail';
+function simpanDetailKegiatan(){
+  try{
+    if(S.activityDetail)sessionStorage.setItem(KEGIATAN_DETAIL_KEY,JSON.stringify({id:String(S.activityDetail),tahun:S.kegiatanTahun,bulan:S.kegiatanBulan}));
+    else sessionStorage.removeItem(KEGIATAN_DETAIL_KEY);
+  }catch(e){/* storage terblokir: abaikan */}
+}
+function openActivityDetail(id){
+  S.activityDetail=String(id);
+  S._activityDetailAnimate=true;
+  simpanDetailKegiatan();
+  render();
+  window.scrollTo(0,0);
+}
+/* Kembali dari detail ke daftar Kegiatan: arsip bulan/tahun TIDAK
+   diatur ulang (bawaan bulan berjalan hanya berlaku saat masuk
+   halaman Kegiatan dari menu lewat go()), jadi daftar tampil persis
+   seperti sebelum masuk detail. */
+function leaveActivityDetail(){
+  S.activityDetail=null;
+  simpanDetailKegiatan();
+  S._kegiatanListAnimate=true;
+  render();
+  window.scrollTo(0,0);
+}
+/* Kartu kegiatan RINGKAS di grid: hanya nama, tanggal & lokasi, dan
+   TOTAL absensi gabungan semua wilayah (Hadir/Izin/Cuti/Alpha dari
+   peta status tersimpan, dengan pemetaan data lama yang sama seperti
+   di tempat lain), plus tombol gigi pengaturan khusus admin di kaki
+   kartu. Mengklik badan kartu membuka halaman detail kegiatan;
+   klik pada tombol di dalam kartu tidak ikut membuka detail. */
 function activityCard(event){
-  const attendees=new Set(activityMemberIds(event,'hadir_anggota'));
   const registeredMembers=S.members.filter(member=>String(member.status||'aktif').toLowerCase()!=='nonaktif');
   const date=event.tanggal?new Date(event.tanggal+'T00:00:00'):null;
   const dateLabel=date&&!Number.isNaN(date.getTime())?date.toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'}):'Tanggal belum ditentukan';
-  const legacyCount=Array.isArray(event.hadir_anggota)?0:(event.hadir||[]).length;
-  const feedback=S.activityFeedback&&String(S.activityFeedback.eventId)===String(event.id)?S.activityFeedback.message:'';
-  const status=h('p',{class:'activity-feedback','aria-live':'polite'},feedback);
-  /* Kartu ringkas (akordeon): keadaan bawaan hanya menampilkan nama,
-     keterangan, tanggal & lokasi, dan TOTAL absensi gabungan semua wilayah
-     (Hadir/Izin/Cuti/Alpha dari peta status tersimpan, dengan pemetaan
-     data lama yang sama seperti di tempat lain). Pemilih wilayah baru
-     muncul sesudah badan kartu diklik; membuka satu kartu menutup
-     kartu lain (S.activityExpanded hanya memuat satu id). */
-  const expanded=String(S.activityExpanded)===String(event.id);
   const warnaAksen=warnaKegiatan(event.judul||'Kegiatan komunitas');
   const totals=activityTotals(event);
   /* Pil total hanya menampilkan JUMLAH tiap status (tanpa teks
@@ -207,8 +241,54 @@ function activityCard(event){
      kosong tanpa label. */
   const totalAnggota=registeredMembers.length;
   const totalsView=activityTotalsView(totals,totalAnggota);
-  const chart=totalsView.chart;
-  const chartLegend=totalsView.legend;
+  const content=[
+    /* Lokasi tampil BERSEBELAHAN dengan tanggal & waktu pada baris
+       meta kepala kartu (mis. '29 Nov 2026 · 09:00 · Aula Takamatsu'). */
+    h('div',{class:'activity-heading'},h('div',{},h('h2',{},event.judul||'Kegiatan komunitas'),h('p',{class:'activity-meta'},icon('calendar',15),h('span',{},dateLabel+(event.waktu?' · '+event.waktu:'')+(event.lokasi?' · '+event.lokasi:'')))),h('span',{class:'activity-heading-side'},h('span',{class:'activity-chevron','aria-hidden':'true'},'\u203a'))),
+    totalsView.pills,
+    totalsView.chart,
+    totalsView.legend,
+    /* Keterangan penyebut grafik: jumlah total anggota aktif yang
+       menjadi dasar perhitungan batang & legenda di atas. */
+    totalAnggota>0&&h('p',{class:'activity-total-note'},'dari total '+totalAnggota+' anggota')
+  ];
+  /* Tombol PENGATURAN kecil (ikon roda gigi) khusus admin di ujung
+     bawah kartu. Mengetuknya membuka panel pengaturan kegiatan
+     (Edit / Hapus) lewat S.kegiatanDialog; ketukannya tidak membuka
+     halaman detail (rambatannya dihentikan di sini). Anggota biasa
+     tidak melihat tombol ini. */
+  if(S.admin)content.push(h('div',{class:'activity-card-foot'},
+    h('button',{class:'activity-gear-btn',type:'button','aria-label':'Pengaturan kegiatan '+(event.judul||''),title:'Pengaturan kegiatan',
+      onclick:e=>{e.stopPropagation();S.kegiatanDialog={id:event.id,tahap:'atur'};render()}},icon('gear',16))));
+  const card=h('article',{class:'card activity-card',style:'--activity-color:'+warnaAksen,title:'Ketuk untuk membuka detail kegiatan'},...content);
+  card.addEventListener('click',e=>{
+    if(e.target.closest('button,input,video,a,select,textarea,label'))return;
+    openActivityDetail(event.id);
+  });
+  return card;
+}
+/* ===== Halaman detail kegiatan (satu halaman penuh) =====
+   Isi yang sama seperti badan kartu terbuka dulu: judul kegiatan,
+   tanggal/waktu, lokasi, pil & grafik persentase kehadiran,
+   'Absensi per wilayah' dengan pemilih wilayahnya (ketuk wilayah ->
+   halaman fokus absensi; 'Kembali' dari sana kembali ke halaman
+   detail ini), Pemindaian QR dengan tombol 'Absensi QR' (admin),
+   dan tombol gigi pengaturan (admin). Tombol 'Kembali' di bagian
+   atas membawa ke daftar Kegiatan dengan arsip yang sama. Transisi
+   masuknya tenang: pudar + naik halus (kelas 'enter', diatur CSS),
+   hanya pada saat halaman detail dibuka — gambar ulang dari data
+   latar tidak mengulang animasinya. */
+function vActivityDetail(event){
+  const registeredMembers=S.members.filter(member=>String(member.status||'aktif').toLowerCase()!=='nonaktif');
+  const date=event.tanggal?new Date(event.tanggal+'T00:00:00'):null;
+  const dateLabel=date&&!Number.isNaN(date.getTime())?date.toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'}):'Tanggal belum ditentukan';
+  const legacyCount=Array.isArray(event.hadir_anggota)?0:(event.hadir||[]).length;
+  const feedback=S.activityFeedback&&String(S.activityFeedback.eventId)===String(event.id)?S.activityFeedback.message:'';
+  const status=h('p',{class:'activity-feedback','aria-live':'polite'},feedback);
+  const warnaAksen=warnaKegiatan(event.judul||'Kegiatan komunitas');
+  const totals=activityTotals(event);
+  const totalAnggota=registeredMembers.length;
+  const totalsView=activityTotalsView(totals,totalAnggota);
   /* Tahap 1: pilih wilayah dulu. Daftar anggota BELUM tampil di sini;
      admin mengetuk satu wilayah untuk masuk ke halaman pengabsenannya. */
   const regionPick=(region,color)=>{
@@ -222,26 +302,17 @@ function activityCard(event){
   const regionPicks=wilayahEfektif().map(([region,color])=>regionPick(region,color));
   if(registeredMembers.some(member=>memberRegion(member)==='Belum dipilih'))regionPicks.push(regionPick('Belum dipilih','#718096'));
   const content=[
-    /* Lokasi tampil BERSEBELAHAN dengan tanggal & waktu pada baris
-       meta kepala kartu (mis. '29 Nov 2026 · 09:00 · Aula Takamatsu'),
-       jadi terlihat pada keadaan kartu tertutup maupun terbuka —
-       tidak ada lagi baris lokasi tersendiri di badan kartu. */
-    h('div',{class:'activity-heading'},h('div',{},h('h2',{},event.judul||'Kegiatan komunitas'),h('p',{class:'activity-meta'},icon('calendar',15),h('span',{},dateLabel+(event.waktu?' · '+event.waktu:'')+(event.lokasi?' · '+event.lokasi:'')))),h('span',{class:'activity-heading-side'},h('span',{class:'activity-chevron','aria-hidden':'true'},'›'))),
+    h('h2',{},event.judul||'Kegiatan komunitas'),
+    h('p',{class:'activity-meta'},icon('calendar',15),h('span',{},dateLabel+(event.waktu?' · '+event.waktu:''))),
+    event.lokasi&&h('p',{class:'activity-meta'},icon('pin',15),h('span',{},event.lokasi)),
     totalsView.pills,
-    chart,
-    chartLegend,
-    /* Keterangan penyebut grafik: jumlah total anggota aktif yang menjadi
-       dasar perhitungan batang & legenda di atas, supaya proporsinya
-       terbaca utuh ("dari total N anggota"). Angka yang sama persis
-       dengan penyebut grafik (totalAnggota). Tidak tampil bila belum
-       ada anggota sama sekali. */
-    totalAnggota>0&&h('p',{class:'activity-total-note'},'dari total '+totalAnggota+' anggota')
-  ];
-  if(expanded)content.push(
+    totalsView.chart,
+    totalsView.legend,
+    totalAnggota>0&&h('p',{class:'activity-total-note'},'dari total '+totalAnggota+' anggota'),
     legacyCount>0&&h('p',{class:'warn'},legacyCount+' catatan absensi lama belum terhubung dengan data anggota.'),
     h('h3',{},'Absensi per wilayah'),
     h('div',{class:'activity-region-pick-grid'},...regionPicks)
-  );
+  ];
   if(S.admin){
     const scanButton=h('button',{class:'btn s',type:'button'},icon('scan',16),h('span',{},'Absensi QR'));
     /* Inti pencatatan dari kode QR: dipakai pemindai kamera layar
@@ -274,8 +345,9 @@ function activityCard(event){
        supaya tidak tercatat dobel karena terbaca berkali-kali. Kamera
        hanya berhenti lewat tombol 'Tutup QR'. Lapisan pemindai tinggal
        di <body> (di luar #app) dan render() dijaga supaya tidak
-       menghentikannya, jadi angka kartu di belakang ikut segar dari
-       data terbaru dan kartu tetap terbuka sesudah kamera ditutup. */
+       menghentikannya, jadi angka di halaman detail di belakang ikut
+       segar dari data terbaru dan halaman detail tetap terbuka
+       sesudah kamera ditutup. */
     const openQrScanner=()=>{
       if(S.qrScannerOpen)return;
       const video=h('video',{class:'qr-full-video',autoplay:'',muted:'',playsinline:'true'});
@@ -377,77 +449,21 @@ function activityCard(event){
       })();
     };
     scanButton.onclick=()=>openQrScanner();
-    if(expanded)content.push(
-      h('div',{class:'activity-scanner',onclick:e=>e.stopPropagation()},
+    content.push(
+      h('div',{class:'activity-scanner'},
         h('h3',{},'Pemindaian QR'),
         h('div',{class:'activity-scanner-row'},scanButton),
         status)
     );
   }
-  /* Tombol PENGATURAN kecil (ikon roda gigi) khusus admin di ujung
-     bawah kartu — di bawah grafik batang + legenda persen dan
-     keterangan total anggota. Mengetuknya membuka panel pengaturan
-     kegiatan (Edit Kegiatan / Hapus Kegiatan) lewat S.kegiatanDialog;
-     ketukannya tidak membuka/menutup akordeon kartu (tombol di dalam
-     kartu memang diabaikan handler klik kartu, dan rambatannya juga
-     dihentikan di sini). Anggota biasa tidak melihat tombol ini. */
   if(S.admin)content.push(h('div',{class:'activity-card-foot'},
     h('button',{class:'activity-gear-btn',type:'button','aria-label':'Pengaturan kegiatan '+(event.judul||''),title:'Pengaturan kegiatan',
       onclick:e=>{e.stopPropagation();S.kegiatanDialog={id:event.id,tahap:'atur'};render()}},icon('gear',16))));
-  /* Genie effect (ala minimize jendela macOS): kartu yang baru saja
-     dibuka/ditutup lewat klik ditandai data-genie oleh penanda
-     S.activityGenie; sesudah render, handler klik di bawah memberi
-     kelas arah (genie-in-open / genie-in-close) + transform-origin
-     di titik klik supaya kartu mengembang/tersedot dari titik itu. */
-  const genieIn=S.activityGenie&&String(S.activityGenie.id)===String(event.id);
-  const cardProps={class:'card activity-card'+(expanded?' open':'')+(genieIn?' genie-in':''),style:'--activity-color:'+warnaAksen,'aria-expanded':expanded?'true':'false',title:expanded?'Ketuk untuk menutup':'Ketuk untuk melihat wilayah'};
-  if(genieIn)cardProps['data-genie']='1';
-  const card=h('article',cardProps,...content);
-  /* Klik pada badan kartu membuka/menutup daftar wilayah; klik pada
-     tombol/field di dalam kartu (pemilih wilayah, pemindai)
-     tidak ikut membuka/menutup. Urutan genie: (1) kartu yang diklik
-     TERSEDOT melengkung menuju titik klik (.genie-out 250 ms —
-     menyempit tak seragam + skew/perspective progresif bertahap,
-     transform-origin di titik klik), (2) render menggambar keadaan
-     baru, (3) kartu baru mengembang melepas dari titik klik yang sama
-     (membuka: genie-in-open 580 ms; menutup: genie-in-close 560 ms,
-     gerakan berkebalikan). Total ±810–830 ms.
-     Hanya transform/opacity yang bergerak — tata letak grid utuh.
-     prefers-reduced-motion: langsung berganti tanpa animasi. */
-  card.addEventListener('click',e=>{
-    if(e.target.closest('button,input,video,a,select,textarea,label'))return;
-    const target=expanded?null:String(event.id);
-    const kurangiGerak=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if(kurangiGerak){S.activityExpanded=target;render();return}
-    if(card.dataset.genieBusy)return;
-    card.dataset.genieBusy='1';
-    const rect=card.getBoundingClientRect();
-    const fx=Math.min(1,Math.max(0,(e.clientX-rect.left)/Math.max(rect.width,1)));
-    const fy=Math.min(1,Math.max(0,(e.clientY-rect.top)/Math.max(rect.height,1)));
-    card.style.transformOrigin=(fx*100)+'% '+(fy*100)+'%';
-    card.style.setProperty('--gskew',((0.5-fx)*10).toFixed(2)+'deg');
-    card.classList.add('genie-out');
-    const genie={id:String(event.id),dir:expanded?'close':'open',x:e.clientX,y:e.clientY,w:rect.width};
-    setTimeout(()=>{
-      S.activityExpanded=target;
-      S.activityGenie=genie;
-      render();
-      S.activityGenie=null;
-      const el=document.querySelector('.activity-card[data-genie="1"]');
-      if(!el)return;
-      const r=el.getBoundingClientRect();
-      /* Titik klik yang sama, kini relatif terhadap kartu baru */
-      el.style.transformOrigin=(genie.x-r.left)+'px '+(genie.y-r.top)+'px';
-      const fxBaru=r.width?(genie.x-r.left)/r.width:0.5;
-      el.style.setProperty('--gskew',((0.5-fxBaru)*10).toFixed(2)+'deg');
-      if(genie.dir==='open'&&r.width)el.style.setProperty('--gsx',Math.min(1,Math.max(0.15,genie.w/r.width)).toFixed(3));
-      const bersih=()=>{el.classList.remove('genie-in','genie-in-open','genie-in-close');el.removeAttribute('data-genie')};
-      el.addEventListener('animationend',bersih,{once:true});
-      setTimeout(bersih,1250);
-      el.classList.add(genie.dir==='open'?'genie-in-open':'genie-in-close');
-    },250);
-  });
-  return card;
+  const animate=S._activityDetailAnimate;
+  S._activityDetailAnimate=false;
+  return h('div',{class:'activity-detail'+(animate?' enter':'')},
+    h('button',{class:'btn s activity-detail-back',onclick:()=>leaveActivityDetail()},icon('back',16),h('span',{},'Kembali')),
+    h('section',{class:'card activity-card activity-detail-card',style:'--activity-color:'+warnaAksen},...content));
 }
 /* Tahap 2: halaman fokus mengabsen anggota SATU wilayah untuk satu
    kegiatan. Seluruh anggota wilayah tampil; di kanan tiap baris ada
@@ -1181,7 +1197,7 @@ function dialogKegiatanKartu(){
           h('button',{class:'btn s',onclick:tutup},'Batal'),
           h('button',{class:'btn',onclick:async()=>{
             const id=d.id;S.kegiatanDialog=null;
-            if(String(S.activityExpanded)===String(id))S.activityExpanded=null;
+            if(String(S.activityDetail)===String(id)){S.activityDetail=null;simpanDetailKegiatan()}
             try{
               await S.db.collection('events').doc(id).delete();
               S.events=S.events.filter(e=>String(e.id)!==String(id));
@@ -1297,6 +1313,16 @@ function vKegiatan(){
     if(focused)return [h('h1',{},'Absensi Kegiatan'),guard(),vAbsensiFokus(focused,S.absensiRegion)];
     S.absensiEvent=null;S.absensiRegion=null;S.absensiDraft=null;
   }
+  /* Halaman detail kegiatan (sub-tampilan Kegiatan): bila
+     S.activityDetail terisi, tampilkan SATU HALAMAN PENUH detail
+     kegiatan itu. Bila kegiatannya sudah terhapus (tidak ditemukan
+     padahal data kegiatan sudah termuat), bersihkan keadaan detail
+     dan lanjutkan ke daftar seperti biasa. */
+  if(S.activityDetail){
+    const detailEvent=S.events.find(item=>String(item.id)===String(S.activityDetail));
+    if(detailEvent)return [h('h1',{},'Detail Kegiatan'),guard(),vActivityDetail(detailEvent),dialogKegiatanKartu()];
+    if(S.events.length){S.activityDetail=null;simpanDetailKegiatan()}
+  }
   /* Nama kegiatan & Lokasi: dropdown TERKELOLA (sistem pilihan.js) —
      pilihan bawaan dari nama/lokasi yang pernah dipakai kegiatan
      tersimpan, dengan '＋ Tambah pilihan baru…' dan '－ Hapus pilihan…'
@@ -1387,9 +1413,10 @@ function vKegiatan(){
   let kegiatanDaftar;
   if(!semuaEvents.length)kegiatanDaftar=h('p',{class:'warn'},'Belum ada kegiatan.');
   else if(!events.length)kegiatanDaftar=h('p',{class:'warn'},bulanTerpilih!=null?'Belum ada kegiatan pada bulan '+NAMA_BULAN[bulanTerpilih-1]+' '+tahunTerpilih+'. Pilih bulan atau tahun lain yang memiliki kegiatan.':'Belum ada kegiatan pada tahun '+tahunTerpilih+'. Pilih tahun lain yang memiliki kegiatan.');
-  else kegiatanDaftar=h('div',{class:'kegiatan-bulan-blok'},
+  else kegiatanDaftar=h('div',{class:'kegiatan-bulan-blok'+(S._kegiatanListAnimate?' enter':'')},
     h('p',{class:'kegiatan-bulan-judul'},'Kegiatan '+NAMA_BULAN[bulanTerpilih-1]+' '+tahunTerpilih+' · '+events.length+' kegiatan'),
     h('div',{class:'activity-list'},...events.map(activityCard)));
+  S._kegiatanListAnimate=false;
   /* Formulir TEPAT 2 baris: baris 1 dua kolom Nama | Lokasi, baris 2
      TIGA kolom Tanggal | Waktu | Pengulangan. Pemilih tambahan
      pengulangan tinggal di dalam kolom ketiga, tepat di bawah field
