@@ -41,7 +41,46 @@ function migrateMemberRegions(){
   });
 }
 function wilayah(){const m={};S.members.forEach(x=>{const w=memberRegion(x);(m[w]=m[w]||[]).push(x)});return m}
-function openMember(member,origin){S.detail=member;S.detailOrigin=origin;S.view='members';render()}
+/* ===== Asal halaman detail/kartu anggota (tombol 'Kembali') =====
+   Setiap kali detail anggota DIBUKA, halaman yang sedang tampil tepat
+   sebelumnya dicatat di S.detailReturnView (dicerminkan juga ke
+   S.detailOrigin lama). Tombol 'Kembali' pada detail memakai catatan
+   itu untuk mengembalikan pengguna ke halaman tersebut — Home,
+   Kegiatan, Ringkasan, Peta, Kepengurusan, daftar anggota, halaman
+   mana pun — BUKAN selalu ke daftar anggota. Pemulihan dilakukan
+   dengan mengganti S.view secara langsung (bukan lewat go()), jadi
+   keadaan halaman asal TIDAK diatur ulang: arsip bulan/tahun
+   Kegiatan, halaman detail kegiatan / fokus absensi yang sedang
+   terbuka, saringan & pilihan pin Peta, ruangan & arsip Ringkasan,
+   serta kata cari / saringan wilayah daftar anggota semua tetap
+   seperti saat ditinggalkan, persis pola pemulihan tampilan yang
+   sudah dipakai aplikasi. Bila detail dibuka dari detail anggota
+   lain, catatan asal TIDAK ditimpa — yang berlaku tetap halaman
+   terakhir di luar detail anggota. Bila tidak ada catatan asal sama
+   sekali (mis. detail terpasang langsung tanpa lewat openMember,
+   seperti keadaan sesudah muat ulang), cadangannya daftar anggota. */
+function viewDetailDikenal(v){return !!v&&typeof V!=='undefined'&&!!V[v]}
+function openMember(member,origin){
+  if(!member)return;
+  if(!S.detail){
+    /* Halaman yang sedang tampil saat ini adalah asal yang dicatat;
+       argumen origin dari pemanggil hanya cadangan bila view saat
+       ini tidak dikenal. */
+    const asal=viewDetailDikenal(S.view)?S.view:(viewDetailDikenal(origin)?origin:'members');
+    S.detailOrigin=asal;
+    S.detailReturnView=asal;
+  }
+  S.detail=member;
+  S.view='members';
+  render();
+}
+function kembaliDariDetailAnggota(){
+  const tujuan=viewDetailDikenal(S.detailReturnView)?S.detailReturnView:(viewDetailDikenal(S.detailOrigin)?S.detailOrigin:'members');
+  S.detail=null;S.idPhoto=null;S.detailOrigin=null;S.detailReturnView=null;
+  S.view=tujuan;
+  if(typeof simpanViewTerakhir==='function')simpanViewTerakhir(tujuan);
+  render();
+}
 function whatsappUrl(value){
   const raw=String(value||'').trim();
   let number=raw.replace(/\D/g,'');

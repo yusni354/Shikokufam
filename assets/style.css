@@ -506,8 +506,17 @@ body.admin-dark .card .e{background:#293946;color:var(--acc)}
 .rekap-table tbody td{background:var(--card)}
 .rekap-table tbody tr:nth-child(even) td{background:#f2f6f3}
 .rekap-table tbody tr:last-child td{border-bottom:0}
-.rekap-name{min-width:138px;max-width:200px;white-space:normal!important}
-.rekap-name b{display:block;font-size:12.5px;overflow-wrap:anywhere}
+/* Kolom nama rekap (kolom lengket di kiri): lebarnya dibuat LEBIH
+   PROPORSIONAL — 170px juga di HP — supaya nama anggota tampil wajar.
+   Nama membungkus HANYA di batas kata (tidak pernah patah di tengah
+   kata/huruf) dan tampil MAKSIMAL 2 BARIS; nama yang masih lebih
+   panjang sesudah 2 baris dipotong rapi dengan elipsis di baris
+   kedua. Warna lembut sel nama berasal dari style sebaris di JS dan
+   tidak berubah; kolom kegiatan & kolom ringkasan kanan tidak
+   diubah, wadah tetap bisa digeser mendatar seperti sebelumnya. */
+.rekap-name{width:170px;min-width:170px;max-width:210px;white-space:normal!important}
+.rekap-table thead th.rekap-name-head{width:170px;min-width:170px;max-width:210px}
+.rekap-name b{display:-webkit-box;font-size:12.5px;line-height:1.35;overflow:hidden;overflow-wrap:normal;word-break:normal;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2}
 .rekap-divider{cursor:pointer}
 .rekap-table td.rekap-divider-cell{position:static;text-align:left;padding:0;border-bottom:1px solid var(--line)}
 .rekap-divider:hover td.rekap-divider-cell{filter:brightness(.97)}
@@ -1411,6 +1420,6 @@ body.auth-locked .landing{padding-top:0}
 /* Pengecualian: tabel rekap & tabel laporan tetap seperti semula
    (kolom status satu huruf, wadah gulir mendatar miliknya sendiri). */
 .card .rekap-table th,.card .rekap-table td{white-space:nowrap;overflow-wrap:normal;word-break:normal}
-.card .rekap-table .rekap-name,.card .rekap-table .rekap-name b{white-space:normal;overflow-wrap:anywhere;word-break:break-word}
+.card .rekap-table .rekap-name,.card .rekap-table .rekap-name b{white-space:normal;overflow-wrap:normal;word-break:normal}
 .card .rekap-divider-label{white-space:nowrap;overflow-wrap:normal;word-break:normal}
 .card .laporan-table th{white-space:nowrap;overflow-wrap:normal;word-break:normal}

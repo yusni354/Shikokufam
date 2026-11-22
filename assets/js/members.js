@@ -30,7 +30,7 @@ function vMembers(){
           location&&h('small',{},location.toUpperCase()),
           h('small',{},member.wa?memberValue('wa',member.wa):member.email||'Kontak belum diisi')),
         h('div',{class:'member-card-actions'},
-          S.admin&&h('button',{class:'btn s btn-eh',onclick:()=>{S.form={...member};S.detail=null;S.formPinAlamatHasil='';render()}},icon('edit',15),h('span',{},'Edit')),
+          S.admin&&h('button',{class:'btn s btn-eh',onclick:()=>{S.form={...member};S.detail=null;S.detailOrigin=null;S.detailReturnView=null;S.formPinAlamatHasil='';render()}},icon('edit',15),h('span',{},'Edit')),
           S.admin&&h('button',{class:'btn s member-delete btn-eh',onclick:async()=>{
             if(!confirm('Hapus data anggota '+(member.nama||'ini')+'?'))return;
             try{await S.db.collection('members').doc(member.id).delete()}catch(error){console.error(error);alert('Gagal menghapus data anggota: '+(error.message||'periksa koneksi'))}
@@ -42,7 +42,7 @@ function vMembers(){
   draw();
   return [
     h('div',{class:'member-page-heading'},h('div',{},h('p',{class:'member-eyebrow'},'KOMUNITAS SHIKOKU FAMILY'),h('h1',{},'Daftar Anggota')),
-      S.admin&&h('button',{class:'btn',onclick:()=>{S.form={};S.detail=null;S.formPinAlamatHasil='';render()}},'+ Tambah Anggota')),
+      S.admin&&h('button',{class:'btn',onclick:()=>{S.form={};S.detail=null;S.detailOrigin=null;S.detailReturnView=null;S.formPinAlamatHasil='';render()}},'+ Tambah Anggota')),
     guard(),
     S.detail&&detailCard(),
     h('div',{class:'member-toolbar'},search,h('div',{class:'member-filters'},region)),
@@ -107,8 +107,8 @@ function detailCard(){
   ];
   const qrValue=memberQrValue(member);
   return h('section',{class:'member-profile-page',style:'--region-color:'+regionColor(area)},
-    h('div',{class:'member-profile-toolbar'},h('button',{class:'btn s',onclick:()=>{S.detail=null;S.idPhoto=null;const origin=S.detailOrigin;S.detailOrigin=null;S.view=origin==='landing'?'landing':'members';render()}},'← Kembali'),
-      S.admin&&h('button',{class:'btn s btn-eh',onclick:()=>{S.form={...member};S.detail=null;S.idPhoto=null;S.detailOrigin=null;S.formPinAlamatHasil='';render()}},icon('edit',15),h('span',{},'Edit data'))),
+    h('div',{class:'member-profile-toolbar'},h('button',{class:'btn s',onclick:()=>kembaliDariDetailAnggota()},'← Kembali'),
+      S.admin&&h('button',{class:'btn s btn-eh',onclick:()=>{S.form={...member};S.detail=null;S.idPhoto=null;S.detailOrigin=null;S.detailReturnView=null;S.view='members';S.formPinAlamatHasil='';render()}},icon('edit',15),h('span',{},'Edit data'))),
     h('article',{class:'member-id-card'},
       h('div',{class:'member-id-banner'},h('span',{},'SHIKOKU FAMILY'),h('span',{class:'member-region-tag'},area)),
       h('div',{class:'member-id-main'},
@@ -117,7 +117,7 @@ function detailCard(){
       h('div',{class:'member-id-barcode'},h('b',{class:'member-barcode-label'},'QR CODE ABSENSI'),qrValue?h('img',{class:'member-qr-code','data-member-qr':qrValue,alt:'QR code untuk ID anggota'}):h('p',{class:'member-barcode-help'},'ID anggota belum tersedia.'),h('small',{class:'member-barcode-help','data-member-qr-status':'true'},qrValue?'Membuat QR code...':'QR code akan tersedia setelah ID anggota tersimpan.'))),
     ...sections.filter(([,rows])=>rows.some(([,value])=>value)).map(([title,rows])=>h('section',{class:'member-detail-section'},h('h3',{},title.toUpperCase()),h('div',{class:'member-detail-grid'},...rows.filter(([,value])=>value).map(([label,value])=>h('div',{class:'member-detail-item'},h('small',{},label.toUpperCase()),h('span',{},label==='Posisi pin di peta'?value:memberValue(label==='Nomor HP / WhatsApp'?'wa':label==='Nomor HP pengurus daerah'?'hp_pengurus':label==='Nomor HP orang tua'?'hp_ortu':label.toLowerCase(),value))))))),
     (member.surat||[]).length>0&&h('section',{class:'member-detail-section'},h('h3',{},'Foto Surat Sambung'),...(member.surat||[]).map((id,index)=>h('a',{class:'member-file-link',...memberMediaAttributes(id,'href'),target:'_blank',rel:'noopener'},icon('attachment',16),h('span',{},'Buka lampiran '+(index+1))))),
-    S.admin&&h('div',{class:'member-detail-actions'},h('button',{class:'btn btn-eh',onclick:()=>{S.form={...member};S.detail=null;S.idPhoto=null;S.detailOrigin=null;S.formPinAlamatHasil='';render()}},icon('edit',16),h('span',{},'Edit data anggota'))),
+    S.admin&&h('div',{class:'member-detail-actions'},h('button',{class:'btn btn-eh',onclick:()=>{S.form={...member};S.detail=null;S.idPhoto=null;S.detailOrigin=null;S.detailReturnView=null;S.view='members';S.formPinAlamatHasil='';render()}},icon('edit',16),h('span',{},'Edit data anggota'))),
     /* Penampil foto besar kartu ID: klik foto di kartu membuka lapisan ini;
        mengetuk bidang di luar foto menutupnya (tanpa tombol X, mengikuti
        pola penampil foto nota di Laporan Keuangan). */
@@ -1133,7 +1133,7 @@ function orgRow(nodes,node,urut){
     const avatar=member.foto
       ?h('img',{class:'org-photo',...memberMediaAttributes(member.foto,'src'),alt:'Foto '+(member.nama||'pengurus')})
       :h('span',{class:'org-photo org-avatar-ph'},(member.nama||'?').trim().slice(0,1).toUpperCase());
-    personEl=h('button',{class:'org-person',title:'Lihat kartu ID '+(member.nama||''),onclick:()=>openMember(member,'members')},
+    personEl=h('button',{class:'org-person',title:'Lihat kartu ID '+(member.nama||''),onclick:()=>openMember(member,'susunan')},
       avatar,
       h('span',{class:'org-person-text'},
         h('b',{class:'org-jabatan'},node.nama),

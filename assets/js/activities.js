@@ -1078,7 +1078,7 @@ function vRingkasan(){
       });
       const pct=rekapEvents.length?Math.round(totals.hadir/rekapEvents.length*100):0;
       return h('tr',{class:terlipat?'rekap-tersembunyi':''},
-        h('td',{class:'rekap-name',style:'background:'+warnaLembut(warna,.85)},h('b',{},member.nama||'Tanpa nama')),
+        h('td',{class:'rekap-name',title:member.nama||'Tanpa nama',style:'background:'+warnaLembut(warna,.85)},h('b',{},member.nama||'Tanpa nama')),
         ...cells,
         h('td',{class:'rekap-num rekap-sum-start'},String(totals.hadir)),
         h('td',{class:'rekap-num'},String(totals.izin)),
