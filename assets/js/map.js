@@ -781,17 +781,37 @@ function petaInisial(nama){const p=String(nama||'?').trim().split(/\s+/);return 
 /* Keadaan peta yang sedang hidup (satu instance Leaflet dalam satu waktu).
    gen bertambah setiap peta dibangun ulang — antrean geocoding sesi lama
    berhenti sendiri. style = pilihan tampilan peta sesi ini. */
-const PM={map:null,layer:null,markers:{},entries:[],tileLayer:null,tileOk:0,tileErr:0,tileTimer:null,basemapIdx:0,fallback:false,fallbackLayer:null,gen:0,style:'jalan',chain:null,spiderLayer:null,spider:null,spiderTimer:null,clusters:[],clusterOf:{}};
-try{const tersimpan=sessionStorage.getItem('sf_peta_style');if(tersimpan&&(tersimpan==='jalan'||tersimpan==='satelit'||tersimpan==='terang'))PM.style=tersimpan}catch(e){}
-/* Pilihan tampilan peta dasar — semua gratis tanpa API key. CARTO SENGAJA
-   tidak dipakai: sejak 2026 servernya mengembalikan ubin placeholder
-   bertuliskan "API KEY REQUIRED" dengan status HTTP sukses, jadi ubin
-   watermark itu lolos deteksi tileerror/timeout dan peta tampil coretan. */
+/* Pilihan tampilan peta dasar — TUJUH gaya, semua gratis TANPA kunci
+   API, dan setiap alamat ubinnya diverifikasi benar-benar merespons
+   (uji muat ubin nyata di sekitar Takamatsu pada beberapa tingkat
+   zoom). CARTO SENGAJA tidak dipakai: sejak 2026 servernya
+   mengembalikan ubin placeholder bertuliskan "API KEY REQUIRED"
+   dengan status HTTP sukses, jadi ubin watermark itu lolos deteksi
+   tileerror/timeout dan peta tampil coretan.
+   url+opts = lapisan dasar gaya itu (dipakai juga oleh peta kecil
+   formulir pin); overlays = lapisan transparan tambahan di atasnya
+   (label satelit / jalur kereta). Catatan jujur: lapisan referensi
+   Esri untuk wilayah Jepang hanya berisi sampai zoom ±12, jadi pada
+   'Satelit + Label' lapisannya dipasang maxNativeZoom 12 — label
+   tetap tampil saat peta diperbesar, digambar dari ubin zoom 12. */
 const PETA_STYLES={
-  jalan:{label:'Jalan',name:'Esri World Street Map',url:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',opts:{maxZoom:19,attribution:'Tiles &copy; Esri'}},
-  satelit:{label:'Satelit',name:'Esri World Imagery',url:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',opts:{maxZoom:19,attribution:'Tiles &copy; Esri — Source: Esri, Maxar, Earthstar Geographics'}},
-  terang:{label:'Terang',name:'OpenStreetMap',url:'https://tile.openstreetmap.org/{z}/{x}/{y}.png',opts:{maxZoom:19,attribution:'&copy; OpenStreetMap contributors'}}
+  jalan:{label:'Jalan',desc:'Peta jalan umum',name:'Esri World Street Map',url:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',opts:{maxZoom:19,attribution:'Tiles &copy; Esri'},overlays:[]},
+  terang:{label:'Terang',desc:'OpenStreetMap — stasiun, toko & fasilitas lengkap',name:'OpenStreetMap',url:'https://tile.openstreetmap.org/{z}/{x}/{y}.png',opts:{maxZoom:19,attribution:'&copy; OpenStreetMap contributors'},overlays:[]},
+  jepang:{label:'Jepang Detail',desc:'GSI Jepang — kereta, stasiun & nama tempat paling rinci',name:'Peta GSI Jepang',url:'https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png',opts:{maxZoom:19,maxNativeZoom:18,attribution:'&copy; GSI — Geospatial Information Authority of Japan'},overlays:[]},
+  satelit:{label:'Satelit',desc:'Citra satelit / foto udara',name:'Esri World Imagery',url:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',opts:{maxZoom:19,attribution:'Tiles &copy; Esri — Source: Esri, Maxar, Earthstar Geographics'},overlays:[]},
+  satelitlabel:{label:'Satelit + Label',desc:'Satelit dengan nama tempat, jalan & jalur kereta',name:'Esri World Imagery + Label',url:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',opts:{maxZoom:19,attribution:'Tiles &copy; Esri — Source: Esri, Maxar, Earthstar Geographics'},overlays:[
+    {url:'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}',opts:{maxZoom:19,maxNativeZoom:12,attribution:'Tiles &copy; Esri'}},
+    {url:'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',opts:{maxZoom:19,maxNativeZoom:12,attribution:'Tiles &copy; Esri'}}
+  ]},
+  topo:{label:'Topografi',desc:'Kontur, jalur kereta & stasiun',name:'OpenTopoMap',url:'https://a.tile.opentopomap.org/{z}/{x}/{y}.png',opts:{maxZoom:19,maxNativeZoom:17,attribution:'&copy; OpenStreetMap contributors, SRTM | style: &copy; OpenTopoMap (CC-BY-SA)'},overlays:[]},
+  kereta:{label:'Kereta',desc:'Jalur kereta & stasiun menonjol di atas peta pucat',name:'GSI Pale + OpenRailwayMap',url:'https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png',opts:{maxZoom:19,maxNativeZoom:18,attribution:'&copy; GSI — Geospatial Information Authority of Japan'},overlays:[
+    {url:'https://tiles.openrailwaymap.org/standard/{z}/{x}/{y}.png',opts:{maxZoom:19,attribution:'&copy; OpenStreetMap contributors | &copy; OpenRailwayMap'}}
+  ]}
 };
+/* Urutan tampil di menu dropdown: dari yang umum ke yang khusus. */
+const PETA_STYLE_ORDER=['jalan','terang','jepang','satelit','satelitlabel','topo','kereta'];
+const PM={map:null,layer:null,markers:{},entries:[],tileLayer:null,tileLayers:[],tileOk:0,tileErr:0,tileTimer:null,basemapIdx:0,fallback:false,fallbackLayer:null,gen:0,style:'jalan',chain:null,spiderLayer:null,spider:null,spiderTimer:null,clusters:[],clusterOf:{},menuDocBound:false};
+try{const tersimpan=sessionStorage.getItem('sf_peta_style');if(tersimpan&&PETA_STYLES[tersimpan])PM.style=tersimpan}catch(e){}
 /* Rantai untuk gaya terpilih: gaya itu dulu; bila gagal, kembali ke Jalan
    (Esri Street); bila itu pun gagal, peta dasar cadangan lokal (SVG). */
 function petaChain(){
@@ -799,13 +819,38 @@ function petaChain(){
   if(urutan[0]!=='jalan')urutan.push('jalan');
   return urutan.map(k=>Object.assign({key:k},PETA_STYLES[k]));
 }
+/* Buang semua lapisan ubin gaya yang sedang tampil (dasar + overlay). */
+function petaClearTiles(){
+  if(PM.tileLayers&&PM.map)PM.tileLayers.forEach(l=>{try{PM.map.removeLayer(l)}catch(e){}});
+  PM.tileLayers=[];PM.tileLayer=null;
+}
+/* Samakan tampilan pemilih dropdown dengan gaya yang aktif: label pada
+   tombol pemilih dan tanda centang pada butir menu. */
+function petaSyncStyleUI(){
+  const cur=document.getElementById('peta-style-current');
+  if(cur)cur.textContent=(PETA_STYLES[PM.style]||PETA_STYLES.jalan).label;
+  document.querySelectorAll('.peta-style-item').forEach(b=>{
+    const on=b.getAttribute('data-style')===PM.style;
+    b.classList.toggle('on',on);
+    b.setAttribute('aria-checked',on?'true':'false');
+  });
+}
+/* Tutup menu dropdown gaya peta (dipakai saat gaya dipilih, saat bidang
+   di luar menu diketuk, atau tombol Escape ditekan — tanpa tombol X). */
+function petaTutupMenuStyle(){
+  const menu=document.getElementById('peta-style-menu');
+  if(menu)menu.hidden=true;
+  const tgl=document.getElementById('peta-style-toggle');
+  if(tgl)tgl.setAttribute('aria-expanded','false');
+}
 /* Ganti tampilan peta: hanya lapisan dasar yang diganti — pin, pilihan
    anggota, dan posisi peta tidak berubah. Pilihan diingat selama sesi. */
 function petaSetStyle(key){
   if(!PETA_STYLES[key])return;
   PM.style=key;
   try{sessionStorage.setItem('sf_peta_style',key)}catch(e){}
-  document.querySelectorAll('.peta-style-btn').forEach(b=>b.classList.toggle('on',b.getAttribute('data-style')===key));
+  petaSyncStyleUI();
+  petaTutupMenuStyle();
   if(!PM.map||typeof L==='undefined')return;
   if(PM.fallback){
     PM.fallback=false;
@@ -820,7 +865,7 @@ function petaSetAttrib(txt){const el=document.getElementById('peta-attrib');if(e
 function petaActivateFallback(){
   if(PM.fallback)return;PM.fallback=true;
   if(PM.tileTimer){clearTimeout(PM.tileTimer);PM.tileTimer=null}
-  if(PM.tileLayer&&PM.map){try{PM.map.removeLayer(PM.tileLayer)}catch(e){}PM.tileLayer=null}
+  petaClearTiles();
   if(PM.map&&!PM.fallbackLayer&&typeof L!=='undefined'){
     PM.fallbackLayer=L.imageOverlay('assets/japan-basemap.svg',[[31,129],[45.5,145.5]],{opacity:1,interactive:false}).addTo(PM.map);
     if(PM.layer)PM.layer.eachLayer(l=>{if(l.bringToFront)l.bringToFront()});
@@ -841,15 +886,26 @@ function petaTryBasemap(idx){
   if(!PM.map||typeof L==='undefined')return;
   PM.basemapIdx=idx;PM.tileOk=0;PM.tileErr=0;
   if(PM.tileTimer){clearTimeout(PM.tileTimer);PM.tileTimer=null}
-  if(PM.tileLayer){try{PM.map.removeLayer(PM.tileLayer)}catch(e){}PM.tileLayer=null}
+  petaClearTiles();
   const chain=PM.chain||petaChain();PM.chain=chain;
   if(idx>=chain.length){petaActivateFallback();return}
   const bp=chain[idx];
   petaSetAttrib('Memuat peta dasar: '+bp.name+' …');
-  PM.tileLayer=L.tileLayer(bp.url,bp.opts);
-  PM.tileLayer.on('tileload',()=>{PM.tileOk++;if(PM.tileOk===1){if(PM.tileTimer){clearTimeout(PM.tileTimer);PM.tileTimer=null}petaSetAttrib(idx>0?('Tampilan pilihan tidak terjangkau — memakai '+bp.name+' • Leaflet'):('Peta dasar: '+bp.name+' • Leaflet'))}});
-  PM.tileLayer.on('tileerror',()=>{PM.tileErr++;petaCheckTiles()});
-  PM.tileLayer.addTo(PM.map);
+  /* Lapisan dasar gaya ini: keberhasilan/kegagalan rantai cadangan
+     dinilai dari lapisan ini saja. */
+  const utama=L.tileLayer(bp.url,bp.opts);
+  utama.on('tileload',()=>{PM.tileOk++;if(PM.tileOk===1){if(PM.tileTimer){clearTimeout(PM.tileTimer);PM.tileTimer=null}petaSetAttrib(idx>0?('Tampilan pilihan tidak terjangkau — memakai '+bp.name+' • Leaflet'):('Peta dasar: '+bp.name+' • Leaflet'))}});
+  utama.on('tileerror',()=>{PM.tileErr++;petaCheckTiles()});
+  utama.addTo(PM.map);
+  PM.tileLayer=utama;PM.tileLayers=[utama];
+  /* Lapisan overlay transparan gaya ini (label satelit / jalur
+     kereta) menumpuk di atas lapisan dasar; kesalahannya tidak
+     menggagalkan gaya — dasar yang tampil tetap utuh. */
+  (bp.overlays||[]).forEach(ov=>{
+    const l=L.tileLayer(ov.url,ov.opts);
+    l.addTo(PM.map);
+    PM.tileLayers.push(l);
+  });
   PM.tileTimer=setTimeout(()=>{if(PM.tileOk===0)petaNextBasemap()},6000);
 }
 function petaFiltered(){
@@ -1211,9 +1267,10 @@ function petaSelect(en,opts){
    nama mengisi seluruh ruang utama sampai mendekati header, dan
    SEMUA kontrol (tombol Semua wilayah / Ke Shikoku / Perbaiki Posisi
    Pin, chip saringan wilayah, dan pil statistik) tergabung dalam
-   SATU bilah ramping di BAGIAN BAWAH halaman — rapat dalam satu
-   baris, chip bisa digeser menyamping di dalam barisnya bila lebar
-   tidak cukup. Di HP berlaku aturan tersendiri: halaman BOLEH
+   SATU bilah ramping di BAGIAN BAWAH halaman — tepat DUA baris
+   berhuruf kecil: baris pertama tombol + pil statistik sejajar,
+   baris kedua chip wilayah satu baris yang bisa digeser menyamping
+   di dalam barisnya selebar apa pun daftar wilayahnya. Di HP berlaku aturan tersendiri: halaman BOLEH
    digulir alami, peta bertinggi tetap di atas, daftar nama mengalir
    di bawahnya, dan bilah kontrol menempati bagian bawah alur.
    Daftar hanya menampilkan NAMA + titik warna wilayah (tanpa
@@ -1222,7 +1279,6 @@ function vPeta(){
   const {entries,belum}=petaEntries();
   PM.belumList=belum;
   const stat=(id,val,label)=>h('span',{class:'peta-pill'},h('b',{id},String(val)),h('span',{},label));
-  const styleBtn=(key,label)=>h('button',{type:'button',class:'peta-style-btn'+(PM.style===key?' on':''),'data-style':key,'aria-label':'Tampilan peta '+label},label);
   const fixAktif=!!(S.admin&&S.petaFixMode);
   const topBar=h('div',{class:'peta-top'},
     h('h1',{class:'peta-title'},'Peta & Wilayah'));
@@ -1235,21 +1291,31 @@ function vPeta(){
     stat('peta-stat-total',(S.members||[]).length,'Total'),
     stat('peta-stat-pin',entries.length,'Di peta'),
     stat('peta-stat-wilayah',new Set((S.members||[]).map(m=>memberRegion(m))).size,'Wilayah'));
-  /* Bilah kontrol bawah: tombol, chip wilayah (lentur & bisa digeser
-     menyamping), lalu pil statistik — satu baris padat di bawah
-     peta/daftar, menggantikan tumpukan kontrol yang dulu di atas. */
-  const bottomBar=h('div',{class:'peta-bottombar'},controls,chipsRow,pills);
+  /* Bilah kontrol bawah: tepat DUA baris berhuruf kecil — baris
+     pertama tombol aksi + pil statistik sejajar rapat, baris kedua
+     chip wilayah dalam satu baris yang bisa digeser menyamping.
+     Menggantikan tumpukan kontrol yang dulu di atas peta. */
+  const bottomBar=h('div',{class:'peta-bottombar'},
+    h('div',{class:'peta-bottom-row1'},controls,pills),
+    chipsRow);
   /* Kartu peta = petanya sendiri: permukaan Leaflet memenuhi seluruh
      kartu dari tepi ke tepi (tanpa baris judul/keterangan di atas dan
-     tanpa baris kaki di bawah). Pilihan tampilan peta & pil jumlah pin
+     tanpa baris kaki di bawah). Pemilih gaya peta (satu tombol yang
+     membuka menu DROPDOWN berisi tujuh gaya) & pil jumlah pin
      MELAYANG di sudut kanan atas peta; pemberitahuan sesaat (mode
      Perbaiki, progres geocoding, peta cadangan) melayang di sudut
      kiri bawah peta — tidak ada baris teks yang menyisakan celah.
      Atribusi tetap tampil menyatu di dalam peta (kontrol Leaflet). */
+  const styleItem=key=>{const st=PETA_STYLES[key];return h('button',{type:'button',class:'peta-style-item'+(PM.style===key?' on':''),'data-style':key,role:'menuitemradio','aria-checked':PM.style===key?'true':'false'},
+    h('span',{class:'peta-style-item-main'},h('b',{},st.label),h('small',{},st.desc)),
+    h('span',{class:'peta-style-check','aria-hidden':'true'},icon('check',14)))};
   const mapCard=h('section',{class:'peta-map-card'},
     h('div',{id:'peta-map',role:'application','aria-label':'Peta anggota Shikoku Family'}),
     h('div',{class:'peta-map-overlay'},
-      h('div',{class:'peta-style-switch',role:'group','aria-label':'Pilihan tampilan peta'},styleBtn('jalan','Jalan'),styleBtn('satelit','Satelit'),styleBtn('terang','Terang')),
+      h('div',{class:'peta-style-picker'},
+        h('button',{type:'button',class:'peta-style-toggle',id:'peta-style-toggle','aria-haspopup':'true','aria-expanded':'false','aria-controls':'peta-style-menu','aria-label':'Pilih gaya peta'},
+          icon('map',15),h('span',{id:'peta-style-current'},(PETA_STYLES[PM.style]||PETA_STYLES.jalan).label),icon('chevD',15)),
+        h('div',{class:'peta-style-menu',id:'peta-style-menu',role:'menu','aria-label':'Pilihan gaya peta',hidden:'hidden'},...PETA_STYLE_ORDER.map(styleItem))),
       h('span',{class:'peta-count-badge',id:'peta-count'},entries.length+' pin tampil')),
     h('div',{class:'peta-map-notes'},
       fixAktif?h('div',{class:'peta-fix-banner'},h('b',{},'Perbaiki Posisi Pin'),h('span',{},'Geser pin anggota ke posisi yang benar lalu lepaskan — posisi baru langsung tersimpan sebagai pin manual. Ketuk "Selesai Memperbaiki" bila sudah.')):null,
@@ -1275,12 +1341,29 @@ function initPetaMap(){
   if(!el)return;
   try{
     if(PM.tileTimer){clearTimeout(PM.tileTimer);PM.tileTimer=null}
-    if(PM.map){try{PM.map.remove()}catch(e){}PM.map=null;PM.layer=null;PM.markers={};PM.tileLayer=null;PM.fallbackLayer=null;PM.fallback=false;PM.spiderLayer=null;PM.spider=null;PM.clusters=[];PM.clusterOf={}}
+    if(PM.map){try{PM.map.remove()}catch(e){}PM.map=null;PM.layer=null;PM.markers={};PM.tileLayer=null;PM.tileLayers=[];PM.fallbackLayer=null;PM.fallback=false;PM.spiderLayer=null;PM.spider=null;PM.clusters=[];PM.clusterOf={}}
     PM.gen=(PM.gen||0)+1;
     const hasilAwal=petaEntries();
     PM.entries=hasilAwal.entries;
     PM.belumList=hasilAwal.belum;
-    document.querySelectorAll('.peta-style-btn').forEach(b=>{b.classList.toggle('on',b.getAttribute('data-style')===PM.style);b.onclick=()=>petaSetStyle(b.getAttribute('data-style'))});
+    /* Pemilih gaya peta: satu tombol membuka menu dropdown berisi
+       tujuh gaya; memilih butir langsung mengganti gaya dan menutup
+       menu. Mengetuk bidang di luar menu (atau Escape) menutupnya —
+       tanpa tombol X, sesuai pola aplikasi. Penangan dokumen dipasang
+       sekali saja untuk seluruh sesi. */
+    petaSyncStyleUI();
+    const styleToggle=document.getElementById('peta-style-toggle');
+    const styleMenu=document.getElementById('peta-style-menu');
+    if(styleToggle&&styleMenu){
+      styleToggle.onclick=ev=>{ev.stopPropagation();const buka=!!styleMenu.hidden;styleMenu.hidden=!buka;styleToggle.setAttribute('aria-expanded',buka?'true':'false')};
+      styleMenu.onclick=ev=>ev.stopPropagation();
+      styleMenu.querySelectorAll('.peta-style-item').forEach(b=>{b.onclick=ev=>{ev.stopPropagation();petaSetStyle(b.getAttribute('data-style'))}});
+    }
+    if(!PM.menuDocBound){
+      PM.menuDocBound=true;
+      document.addEventListener('click',()=>petaTutupMenuStyle());
+      document.addEventListener('keydown',ev=>{if(ev.key==='Escape')petaTutupMenuStyle()});
+    }
     const search=document.getElementById('peta-search');
     if(search){search.value=S.petaSearch||'';search.oninput=()=>{S.petaSearch=search.value.trim();petaRenderMarkers();petaRenderList();petaRenderStats()}}
     const reset=document.getElementById('peta-reset');

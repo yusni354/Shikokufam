@@ -1317,17 +1317,32 @@ body.auth-locked .landing{padding-top:0}
    pemberitahuan sesaat melayang di sudut kiri bawah — tidak ada
    baris judul/kaki yang mengambil ruang kartu. */
 .peta-map-overlay{position:absolute;top:10px;right:10px;z-index:600;display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
-.peta-map-overlay .peta-style-switch{background:rgba(255,255,255,.95);border-color:rgba(255,255,255,.9);box-shadow:0 3px 12px rgba(30,50,70,.28)}
+/* Pemilih gaya peta: satu tombol pil melayang yang membuka menu
+   dropdown berisi tujuh gaya (Jalan, Terang, Jepang Detail, Satelit,
+   Satelit + Label, Topografi, Kereta). Menu melayang di bawah tombol,
+   rata kanan; gaya aktif bertanda centang. Menutup lewat ketukan di
+   luar menu / memilih gaya / Escape — tanpa tombol X. */
+.peta-style-picker{position:relative}
+.peta-style-toggle{display:flex;align-items:center;gap:7px;background:rgba(255,255,255,.95);border:1px solid rgba(255,255,255,.9);box-shadow:0 3px 12px rgba(30,50,70,.28);border-radius:999px;padding:7px 12px;font-family:inherit;font-size:12.5px;font-weight:700;color:#16283a;cursor:pointer;line-height:1.2;white-space:nowrap}
+.peta-style-toggle:hover{background:#fff}
+.peta-style-toggle svg{flex:none;color:#2b7a8c}
+.peta-style-menu{position:absolute;top:calc(100% + 6px);right:0;z-index:700;width:272px;max-width:calc(100vw - 24px);background:#fff;border:1px solid #d7e3ec;border-radius:16px;box-shadow:0 14px 34px rgba(30,50,70,.3);padding:6px;display:flex;flex-direction:column;gap:2px}
+.peta-style-menu[hidden]{display:none}
+.peta-style-item{display:flex;align-items:center;gap:8px;width:100%;text-align:left;background:transparent;border:0;border-radius:11px;padding:8px 10px;cursor:pointer;font-family:inherit;color:#111827}
+.peta-style-item:hover{background:#eef4f7}
+.peta-style-item.on{background:#e7f0f5}
+.peta-style-item-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.peta-style-item-main b{font-size:13.5px;line-height:1.25;color:#16283a}
+.peta-style-item-main small{font-size:11.5px;line-height:1.35;color:#3d5568}
+.peta-style-check{flex:none;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;background:transparent}
+.peta-style-item.on .peta-style-check{background:#2b7a8c}
+.peta-style-check svg{opacity:0}
+.peta-style-item.on .peta-style-check svg{opacity:1}
 .peta-map-overlay .peta-count-badge{box-shadow:0 3px 12px rgba(30,50,70,.28)}
 .peta-map-notes{position:absolute;left:10px;bottom:10px;z-index:600;display:flex;flex-direction:column;gap:6px;max-width:min(540px,calc(100% - 20px));pointer-events:none}
 .peta-map-notes .peta-fix-banner,.peta-map-notes .peta-fix-notice,.peta-map-notes .peta-geo-status,.peta-map-notes .peta-notice{border:1px solid rgba(255,255,255,.75);border-radius:12px;box-shadow:0 3px 12px rgba(30,50,70,.22)}
 .peta-count-badge{display:inline-flex;align-items:center;background:linear-gradient(145deg,#3d9db0,#2b7a8c);color:#fff;font-size:12.5px;font-weight:700;padding:5px 11px;border-radius:999px;white-space:nowrap}
-.peta-style-switch{display:flex;gap:3px;background:#e4edf3;border:1px solid #cfdde7;border-radius:999px;padding:3px}
-.peta-style-btn{border:0;background:transparent;font-family:inherit;font-size:12.5px;font-weight:700;color:#3d5568;padding:5px 12px;border-radius:999px;cursor:pointer;line-height:1.2;white-space:nowrap;transition:background .15s ease,color .15s ease}
-.peta-style-btn:hover{color:#16283a;background:rgba(53,75,100,.08)}
-.peta-style-btn.on:hover{color:#fff;background:#354b64}
-.peta-style-btn.on{background:#354b64;color:#fff;box-shadow:0 2px 6px rgba(50,75,95,.25)}
-@media (max-width:640px){.peta-style-btn{padding:5px 10px;font-size:12px}.peta-map-overlay{top:8px;right:8px;gap:6px}}
+@media (max-width:640px){.peta-style-toggle{padding:6px 10px;font-size:12px}.peta-style-menu{width:248px}.peta-map-overlay{top:8px;right:8px;gap:6px}}
 .peta-geo-status{padding:7px 15px;background:#eef6f8;border-top:1px solid #dcebf0;font-size:12px;color:#2b7a8c;font-weight:600}
 #peta-map{height:480px;width:100%;background:#dbe5ee;z-index:1}
 @media (max-width:640px){#peta-map{height:400px}}
@@ -1546,18 +1561,28 @@ body.peta-view main{width:100%;max-width:1180px;padding:10px 12px 12px;display:f
 .peta-list-panel .peta-search{flex:none;margin-top:9px;padding:1px 5px 1px 12px}
 .peta-list-panel .peta-search input{min-height:32px;font-size:14px}
 .peta-controls .btn.s{padding:6px 11px;font-size:13px;background:var(--card)}
-/* Bilah kontrol BAWAH halaman peta: tombol aksi, chip wilayah, dan
-   pil statistik tergabung rapat dalam SATU baris ramping di bawah
-   peta/daftar (dulu bertumpuk di atas peta dan memakan banyak baris).
-   Chip wilayah lentur mengisi ruang tengah dan bisa digeser
-   menyamping di dalam barisnya bila lebar tidak cukup; tombol dan
-   pil tetap terlihat penuh. Di layar sempit bilah boleh membungkus
-   ke baris kedua — tidak lebih dari itu. */
-.peta-bottombar{display:flex;align-items:center;gap:8px;flex:none;flex-wrap:wrap;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:6px 8px;box-shadow:0 4px 16px rgba(47,134,184,.09)}
-.peta-bottombar .peta-controls{flex:none;flex-wrap:nowrap}
-.peta-fit .peta-bottombar .peta-chips{flex:1 1 auto;min-width:0;padding:1px 1px 2px}
-.peta-bottombar .peta-pills{flex:none;margin-left:0}
-@media (max-width:640px){.peta-bottombar{gap:6px;padding:5px 6px;border-radius:14px}.peta-bottombar .peta-controls .btn.s{padding:5px 9px;font-size:12.5px}}
+/* Bilah kontrol BAWAH halaman peta: tepat DUA baris berhuruf KECIL
+   (lebih kecil dari nama daftar anggota ±12,5–13px, bilah ini ±11px)
+   supaya total tingginya ramping dan sisa ruang menjadi tinggi peta.
+   Baris pertama: tombol aksi + pil statistik sejajar rapat. Baris
+   kedua: chip wilayah SATU baris selebar bilah yang bisa digeser
+   menyamping di dalam barisnya — tidak pernah membungkus ke baris
+   ketiga selebar apa pun daftar wilayahnya. Baris pertama pun tidak
+   membungkus: bila layar sangat sempit ia bergeser menyamping di
+   dalam barisnya sendiri. Berlaku sama di desktop dan HP. */
+.peta-bottombar{display:flex;flex-direction:column;gap:4px;flex:none;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:5px 7px;box-shadow:0 4px 16px rgba(47,134,184,.09)}
+.peta-bottom-row1{display:flex;align-items:center;gap:6px;flex-wrap:nowrap;width:100%;min-width:0;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.peta-bottom-row1::-webkit-scrollbar{display:none}
+.peta-bottombar .peta-controls{flex:none;flex-wrap:nowrap;gap:5px}
+.peta-bottombar .peta-controls .btn.s{padding:4px 9px;font-size:11px}
+.peta-bottombar .peta-pills{flex:none;margin-left:auto;flex-wrap:nowrap;gap:5px}
+.peta-bottombar .peta-pill{padding:3px 9px;font-size:11px;gap:4px}
+.peta-bottombar .peta-pill b{font-size:12.5px}
+.peta-fit .peta-bottombar .peta-chips{flex:none;width:100%;min-width:0;padding:0 1px 1px}
+.peta-fit .peta-bottombar .peta-chip{min-height:26px;padding:3px 8px 3px 7px;font-size:11px;gap:5px}
+.peta-fit .peta-bottombar .peta-chip .peta-dot{width:9px;height:9px}
+.peta-fit .peta-bottombar .peta-chip .peta-count{font-size:10px;padding:1px 5px}
+@media (max-width:640px){.peta-bottombar{gap:3px;padding:4px 5px;border-radius:13px}.peta-bottombar .peta-controls .btn.s{padding:4px 7px;font-size:10.5px}.peta-bottombar .peta-pill{padding:2px 7px;font-size:10.5px}.peta-bottombar .peta-pill b{font-size:11.5px}.peta-fit .peta-bottombar .peta-chip{min-height:24px;font-size:10.5px}}
 /* Chip wilayah: SATU baris yang bisa digeser menyamping di dalam
    barisnya sendiri (halaman tetap tidak bergulir) */
 .peta-fit .peta-chips{display:flex;flex-wrap:nowrap;gap:6px;overflow-x:auto;overflow-y:hidden;padding:2px 1px 4px;flex:none;scrollbar-width:thin;-webkit-overflow-scrolling:touch}
@@ -1611,9 +1636,9 @@ body.peta-view main{width:100%;max-width:1180px;padding:10px 12px 12px;display:f
    Lebar layar dimanfaatkan penuh: wadah utama diperlebar, peta
    menjadi elemen dominan yang lega, panel daftar nama di kanan
    lebih proporsional (tiga kolom nama); di atas hanya judul, dan
-   bilah kontrol bawah (tombol, chip wilayah, pil statistik)
-   tertata sejajar satu baris dengan jarak yang konsisten mengikuti
-   tema clay aplikasi.
+   bilah kontrol bawah tertata tepat dua baris berhuruf kecil
+   (baris tombol + pil statistik, lalu baris chip wilayah) dengan
+   jarak yang konsisten mengikuti tema clay aplikasi.
    Kartu detail anggota TIDAK tampil di desktop (dijaga juga oleh
    petaLayarDesktop di map.js): tidak ada elemen melayang yang
    menutupi peta. Di bawah 1024px tata letak tetap seperti
