@@ -868,6 +868,15 @@ function activityMonth(event){
   const m=parseInt(String(event.tanggal||'').slice(5,7),10);
   return Number.isNaN(m)||m<1||m>12?null:m;
 }
+/* Pengurut resmi daftar kartu kegiatan: dari AWAL bulan ke AKHIR
+   bulan — tanggal paling awal dulu (di atas), tanggal paling akhir
+   terakhir (di bawah); tanggal yang sama diurutkan menurut jam,
+   lalu waktu pembuatan. Satu-satunya pengurut yang boleh dipakai
+   daftar kartu halaman Kegiatan, supaya urutannya tidak pernah
+   terbalik lagi menjadi terbaru-dulu. */
+function urutKegiatanAwalKeAkhir(a,b){
+  return (a.tanggal||'').localeCompare(b.tanggal||'')||(a.waktu||'').localeCompare(b.waktu||'')||(a.at||0)-(b.at||0);
+}
 const NAMA_BULAN=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
 /* Label melayang nama kegiatan pada kepala kolom tabel rekap: saat
    kursor berada di atas kepala kolom, nama kegiatan selengkapnya
@@ -1516,13 +1525,14 @@ function vKegiatan(){
   const bulanTerpilih=bulanTersedia.includes(S.kegiatanBulan)?S.kegiatanBulan:(tahunTerpilih===tahunBerjalan?bulanBerjalan:(bulanTersedia.length?bulanTersedia[bulanTersedia.length-1]:null));
   if(bulanTerpilih!=null)S.kegiatanBulan=bulanTerpilih;
   /* Daftar kartu bulan terpilih diurutkan dari AWAL bulan sampai
-     AKHIR bulan: tanggal paling awal dulu, lalu jam untuk tanggal
-     yang sama, lalu waktu pembuatan sebagai penentu terakhir.
-     Urutan ini hanya untuk tampilan daftar kartu halaman Kegiatan;
-     semuaEvents di atas tetap dipakai apa adanya untuk menentukan
-     tahun/bulan yang tersedia. */
+     AKHIR bulan memakai urutKegiatanAwalKeAkhir: tanggal paling
+     awal dulu (di atas), lalu jam untuk tanggal yang sama, lalu
+     waktu pembuatan sebagai penentu terakhir — tanggal akhir bulan
+     selalu paling bawah. Urutan ini hanya untuk tampilan daftar
+     kartu halaman Kegiatan; semuaEvents di atas tetap dipakai apa
+     adanya untuk menentukan tahun/bulan yang tersedia. */
   const events=(bulanTerpilih!=null?eventsTahun.filter(ev=>activityMonth(ev)===bulanTerpilih):[])
-    .sort((a,b)=>(a.tanggal||'').localeCompare(b.tanggal||'')||(a.waktu||'').localeCompare(b.waktu||'')||(a.at||0)-(b.at||0));
+    .sort(urutKegiatanAwalKeAkhir);
   let kegiatanFilters=null;
   if(semuaEvents.length){
     const yearSelect=h('select',{'aria-label':'Pilih tahun kegiatan',onchange:e=>{S.kegiatanTahun=Number(e.target.value);S.kegiatanBulan=null;render()}},
