@@ -3,7 +3,7 @@
    Catatan penempatan: berkas ini ada di assets/. Di situs produksi,
    salin berkas ini ke folder utama situs (di samping index.html)
    dengan nama sw.js supaya cakupannya meliputi seluruh aplikasi. */
-const CACHE = 'shikoku-family-v9';
+const CACHE = 'shikoku-family-v10';
 const CORE = [
   './',
   '../',

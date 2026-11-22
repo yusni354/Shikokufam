@@ -1513,12 +1513,15 @@ body.auth-locked .landing{padding-top:0}
    Saat view Peta aktif, render() memberi body kelas 'peta-view'.
    Di layar ≥900px body menjadi kolom lentur setinggi layar (header
    diam di atas, main mengisi sisa tinggi dan TIDAK bisa digulir);
-   .peta-fit menyusun judul ringkas, kontrol, chip wilayah, lalu
-   .peta-split: peta sebagai ruang utama lentur + panel daftar nama
-   di kolom kanan, dan hanya daftar nama (dan chip bila sempit) yang
-   boleh digulir DI DALAM areanya sendiri. Di HP berlaku aturan
-   tersendiri (lihat blok max-width:899px): halaman digulir alami,
-   peta bertinggi tetap di atas, daftar nama mengalir di bawahnya. */
+   .peta-fit menyusun judul ringkas saja di atas, lalu .peta-split:
+   peta sebagai ruang utama lentur + panel daftar nama di kolom
+   kanan, dan terakhir SATU bilah kontrol ramping di bagian bawah
+   (tombol, chip wilayah, pil statistik). Hanya daftar nama (dan
+   chip di dalam barisnya) yang boleh digulir DI DALAM areanya
+   sendiri. Di HP berlaku aturan tersendiri (lihat blok
+   max-width:899px): halaman digulir alami, peta bertinggi tetap di
+   atas, daftar nama mengalir di bawahnya, bilah kontrol di bawah
+   alur halaman. */
 body.peta-view{display:flex;flex-direction:column}
 body.peta-view main{width:100%;max-width:1180px;padding:10px 12px 12px;display:flex;flex-direction:column}
 /* Kunci SATU JENDELA tanpa gulir halaman hanya berlaku di layar
@@ -1543,6 +1546,18 @@ body.peta-view main{width:100%;max-width:1180px;padding:10px 12px 12px;display:f
 .peta-list-panel .peta-search{flex:none;margin-top:9px;padding:1px 5px 1px 12px}
 .peta-list-panel .peta-search input{min-height:32px;font-size:14px}
 .peta-controls .btn.s{padding:6px 11px;font-size:13px;background:var(--card)}
+/* Bilah kontrol BAWAH halaman peta: tombol aksi, chip wilayah, dan
+   pil statistik tergabung rapat dalam SATU baris ramping di bawah
+   peta/daftar (dulu bertumpuk di atas peta dan memakan banyak baris).
+   Chip wilayah lentur mengisi ruang tengah dan bisa digeser
+   menyamping di dalam barisnya bila lebar tidak cukup; tombol dan
+   pil tetap terlihat penuh. Di layar sempit bilah boleh membungkus
+   ke baris kedua — tidak lebih dari itu. */
+.peta-bottombar{display:flex;align-items:center;gap:8px;flex:none;flex-wrap:wrap;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:6px 8px;box-shadow:0 4px 16px rgba(47,134,184,.09)}
+.peta-bottombar .peta-controls{flex:none;flex-wrap:nowrap}
+.peta-fit .peta-bottombar .peta-chips{flex:1 1 auto;min-width:0;padding:1px 1px 2px}
+.peta-bottombar .peta-pills{flex:none;margin-left:0}
+@media (max-width:640px){.peta-bottombar{gap:6px;padding:5px 6px;border-radius:14px}.peta-bottombar .peta-controls .btn.s{padding:5px 9px;font-size:12.5px}}
 /* Chip wilayah: SATU baris yang bisa digeser menyamping di dalam
    barisnya sendiri (halaman tetap tidak bergulir) */
 .peta-fit .peta-chips{display:flex;flex-wrap:nowrap;gap:6px;overflow-x:auto;overflow-y:hidden;padding:2px 1px 4px;flex:none;scrollbar-width:thin;-webkit-overflow-scrolling:touch}
@@ -1595,9 +1610,10 @@ body.peta-view main{width:100%;max-width:1180px;padding:10px 12px 12px;display:f
 /* ===== Peta di DESKTOP (≥1024px): tata letak lebar profesional =====
    Lebar layar dimanfaatkan penuh: wadah utama diperlebar, peta
    menjadi elemen dominan yang lega, panel daftar nama di kanan
-   lebih proporsional (tiga kolom nama), dan bilah atas — judul,
-   pil statistik, pencarian, tombol, chip wilayah — tertata sejajar
-   dengan jarak yang konsisten mengikuti tema clay aplikasi.
+   lebih proporsional (tiga kolom nama); di atas hanya judul, dan
+   bilah kontrol bawah (tombol, chip wilayah, pil statistik)
+   tertata sejajar satu baris dengan jarak yang konsisten mengikuti
+   tema clay aplikasi.
    Kartu detail anggota TIDAK tampil di desktop (dijaga juga oleh
    petaLayarDesktop di map.js): tidak ada elemen melayang yang
    menutupi peta. Di bawah 1024px tata letak tetap seperti

@@ -1204,14 +1204,18 @@ function petaSelect(en,opts){
     try{const on=document.querySelector('.peta-name-item.on');if(on)on.scrollIntoView({block:'nearest'})}catch(e){}
   }
 }
-/* Halaman Peta: di DESKTOP seluruh isi (judul ringkas, kontrol,
-   chip wilayah, peta, dan daftar nama) muat dalam satu tinggi layar
+/* Halaman Peta: di DESKTOP seluruh isi muat dalam satu tinggi layar
    TANPA halaman bisa digulir ke bawah — body diberi kelas 'peta-view'
    oleh render() (views.js) dan CSS mengunci tingginya di layar
-   ≥900px; peta mengambil ruang utama yang lentur dan daftar nama di
-   kolom kanan hanya bisa digulir di dalam areanya sendiri. Di HP
-   berlaku aturan tersendiri: halaman BOLEH digulir alami, peta
-   bertinggi tetap di atas, dan daftar nama mengalir di bawahnya.
+   ≥900px. Susunannya: judul ringkas saja di atas, lalu peta + daftar
+   nama mengisi seluruh ruang utama sampai mendekati header, dan
+   SEMUA kontrol (tombol Semua wilayah / Ke Shikoku / Perbaiki Posisi
+   Pin, chip saringan wilayah, dan pil statistik) tergabung dalam
+   SATU bilah ramping di BAGIAN BAWAH halaman — rapat dalam satu
+   baris, chip bisa digeser menyamping di dalam barisnya bila lebar
+   tidak cukup. Di HP berlaku aturan tersendiri: halaman BOLEH
+   digulir alami, peta bertinggi tetap di atas, daftar nama mengalir
+   di bawahnya, dan bilah kontrol menempati bagian bawah alur.
    Daftar hanya menampilkan NAMA + titik warna wilayah (tanpa
    alamat) supaya muat banyak. */
 function vPeta(){
@@ -1221,16 +1225,20 @@ function vPeta(){
   const styleBtn=(key,label)=>h('button',{type:'button',class:'peta-style-btn'+(PM.style===key?' on':''),'data-style':key,'aria-label':'Tampilan peta '+label},label);
   const fixAktif=!!(S.admin&&S.petaFixMode);
   const topBar=h('div',{class:'peta-top'},
-    h('h1',{class:'peta-title'},'Peta & Wilayah'),
-    h('div',{class:'peta-pills'},
-      stat('peta-stat-total',(S.members||[]).length,'Total'),
-      stat('peta-stat-pin',entries.length,'Di peta'),
-      stat('peta-stat-wilayah',new Set((S.members||[]).map(m=>memberRegion(m))).size,'Wilayah')));
+    h('h1',{class:'peta-title'},'Peta & Wilayah'));
   const controls=h('div',{class:'peta-controls'},
     h('button',{type:'button',class:'btn s',id:'peta-reset'},'Semua wilayah'),
     h('button',{type:'button',class:'btn s',id:'peta-shikoku'},'Ke Shikoku'),
     S.admin?h('button',{type:'button',class:'btn s'+(fixAktif?' peta-fix-on':''),id:'peta-fix-toggle'},fixAktif?'Selesai Memperbaiki':'Perbaiki Posisi Pin'):null);
   const chipsRow=h('div',{class:'peta-chips',id:'peta-chips','aria-label':'Saringan warna wilayah'});
+  const pills=h('div',{class:'peta-pills'},
+    stat('peta-stat-total',(S.members||[]).length,'Total'),
+    stat('peta-stat-pin',entries.length,'Di peta'),
+    stat('peta-stat-wilayah',new Set((S.members||[]).map(m=>memberRegion(m))).size,'Wilayah'));
+  /* Bilah kontrol bawah: tombol, chip wilayah (lentur & bisa digeser
+     menyamping), lalu pil statistik — satu baris padat di bawah
+     peta/daftar, menggantikan tumpukan kontrol yang dulu di atas. */
+  const bottomBar=h('div',{class:'peta-bottombar'},controls,chipsRow,pills);
   /* Kartu peta = petanya sendiri: permukaan Leaflet memenuhi seluruh
      kartu dari tepi ke tepi (tanpa baris judul/keterangan di atas dan
      tanpa baris kaki di bawah). Pilihan tampilan peta & pil jumlah pin
@@ -1256,7 +1264,7 @@ function vPeta(){
     h('div',{class:'peta-empty',id:'peta-empty',style:'display:none'},'Tidak ada anggota yang cocok. Coba kata pencarian lain atau tampilkan semua wilayah.'));
   const detail=h('section',{id:'peta-detail',class:'peta-detail',style:'display:none'});
   const split=h('div',{class:'peta-split'},mapCard,listPanel,detail);
-  return [h('div',{class:'peta-fit'},topBar,controls,chipsRow,split)];
+  return [h('div',{class:'peta-fit'},topBar,split,bottomBar)];
 }
 /* Dipanggil render() sesudah halaman Peta terpasang di DOM: bangun (ulang)
    peta Leaflet dari data terbaru dan pasang semua pengendali halaman.
