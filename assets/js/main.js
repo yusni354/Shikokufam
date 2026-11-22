@@ -156,7 +156,7 @@ render();
     }
     await applySession(initialSession || null);
     // Daftar pendaftar baru diperiksa berkala; pesan memakai realtime (tanpa polling)
-    setInterval(() => { if (S.mainAdmin) loadPendingUsers().then(() => renderDariData()); }, 60000);
+    setInterval(() => { if (S.admin) loadPendingUsers().then(() => renderDariData()); }, 60000);
   } catch (error) {
     console.error('Supabase gagal diinisialisasi, memakai penyimpanan lokal:', error);
     S.supabase = null;

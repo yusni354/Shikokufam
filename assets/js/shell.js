@@ -24,7 +24,7 @@ $('#ov').onclick=()=>{
   if(S.adminMenuOpen){S.adminMenuOpen=false;render()}else syncAdminTheme();
 };
 $('#st').onclick=()=>{
-  if(!S.mainAdmin)return;
+  if(!S.admin)return;
   S.adminMenuOpen=!S.adminMenuOpen;
   document.body.classList.toggle('open',S.adminMenuOpen);
   $('#st').setAttribute('aria-expanded',String(S.adminMenuOpen));
@@ -52,7 +52,7 @@ function pulihkanViewTerakhir(){
   const v=bacaViewTerakhir();
   if(!v||v===S.view)return;
   if(typeof V==='undefined'||!V[v])return;
-  if(v==='approvals'&&!S.mainAdmin)return;
+  if(v==='approvals'&&!S.admin)return;
   if(v==='pengaturan'&&!S.admin)return;
   S.view=v;
   /* Memulihkan halaman Kegiatan sesudah muat ulang = membuka halaman

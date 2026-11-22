@@ -2,7 +2,7 @@
 function alamatJp(m,det){return [det?m.alamat_jp:'',m.kec_jp,m.kota,m.pref||m.wilayah,m.kodepos,'Japan'].filter(Boolean).join(', ')}
 async function loadPendingUsers(){
   if(!S.supabase){
-    if(!S.mainAdmin){S.pendingUsers=[];S.approvedUsers=[]}
+    if(!S.admin){S.pendingUsers=[];S.approvedUsers=[]}
     else{
       const ringkas=user=>({id:user.id,name:user.name,email:user.email,created_at:user.created_at,approval_status:user.approval_status,approved_at:user.approved_at||null,approved_by:user.approved_by||'',role:user.role,is_main_admin:user.is_main_admin===true,avatar_url:user.avatar_url||''});
       S.pendingUsers=localUsers().filter(user=>user.approval_status==='pending').map(ringkas);
@@ -12,7 +12,7 @@ async function loadPendingUsers(){
     if(typeof updateApprovalBadges==='function')updateApprovalBadges();
     return;
   }
-  if(!S.mainAdmin){S.pendingUsers=[];S.approvedUsers=[];if(typeof updateApprovalBadges==='function')updateApprovalBadges();return}
+  if(!S.admin){S.pendingUsers=[];S.approvedUsers=[];if(typeof updateApprovalBadges==='function')updateApprovalBadges();return}
   const {data,error}=await S.supabase.from('profiles').select('id,name,email,created_at,approval_status').eq('approval_status','pending').order('created_at',{ascending:true});
   if(error){console.error(error);S.pendingUsers=[]}else S.pendingUsers=data||[];
   /* Catatan akun yang sudah disetujui untuk tab 'Sudah Disetujui'.
@@ -22,29 +22,63 @@ async function loadPendingUsers(){
   if(disetujui.error){console.error(disetujui.error);S.approvedUsers=[]}else S.approvedUsers=disetujui.data||[];
   if(typeof updateApprovalBadges==='function')updateApprovalBadges();
 }
-async function setApproval(id,status){
-  if(!S.mainAdmin)return;
+/* Peran hasil persetujuan -> kolom role & is_main_admin yang sudah ada.
+   'utama' = admin + is_main_admin, 'admin' = admin biasa, 'member' =
+   anggota. Peran bawaan persetujuan adalah anggota ('member'). */
+function peranDariPilihan(peran){
+  if(peran==='utama')return {role:'admin',is_main_admin:true};
+  if(peran==='admin')return {role:'admin',is_main_admin:false};
+  return {role:'member',is_main_admin:false};
+}
+async function setApproval(id,status,peran){
+  if(!S.admin)return;
+  /* Peran 'Admin Utama' hanya boleh diberikan admin utama yang masuk. */
+  if(status==='approved'&&peran==='utama'&&!S.mainAdmin)peran='member';
   /* Setiap persetujuan baru mencatat waktu persetujuan (approved_at) dan
      nama admin penyetuju dari sesi (approved_by) ke data akun. */
   const oleh=S.name||S.email||'';
+  const kolomPeran=status==='approved'?peranDariPilihan(peran):null;
   if(!S.supabase){
     const users=localUsers(),user=users.find(item=>item.id===id);
     if(!user){alert('Pendaftar tidak ditemukan.');return}
     user.approval_status=status;
     user.approved_at=status==='approved'?new Date().toISOString():null;
     user.approved_by=status==='approved'?(oleh||null):null;
+    if(kolomPeran){
+      if(kolomPeran.is_main_admin){
+        /* Admin utama lama (bisa jadi sesi yang sedang masuk) turun
+           menjadi admin biasa, sama seperti alur Jadikan Admin Utama. */
+        users.forEach(item=>{if(item.is_main_admin&&item.id!==id){item.is_main_admin=false;item.role='admin'}});
+      }
+      user.role=kolomPeran.role;user.is_main_admin=kolomPeran.is_main_admin;
+    }
     try{saveLocalUsers(users)}catch(e){alert('Gagal memperbarui persetujuan: '+e.message);return}
+    if(kolomPeran&&kolomPeran.is_main_admin&&S.mainAdmin){S.mainAdmin=false;S.admin=true}
     await loadPendingUsers();render();
     return;
   }
   const dasar={approval_status:status,approved_at:status==='approved'?new Date().toISOString():null};
-  let {error}=await S.supabase.from('profiles').update({...dasar,approved_by:status==='approved'?(oleh||null):null}).eq('id',id);
+  const lengkap={...dasar,approved_by:status==='approved'?(oleh||null):null,...(kolomPeran||{})};
+  let {error}=await S.supabase.from('profiles').update(lengkap).eq('id',id);
   if(error&&/approved_by/.test(error.message||'')){
     /* Kolom approved_by belum ada di database lama: ulangi tanpa kolom itu
        supaya persetujuan tidak gagal hanya karena catatan nama penyetuju. */
-    ({error}=await S.supabase.from('profiles').update(dasar).eq('id',id));
+    const tanpaBy={...lengkap};delete tanpaBy.approved_by;
+    ({error}=await S.supabase.from('profiles').update(tanpaBy).eq('id',id));
   }
   if(error){alert('Gagal memperbarui persetujuan: '+error.message);return}
+  if(kolomPeran&&kolomPeran.is_main_admin){
+    /* Akun baru sudah menjadi admin utama: turunkan admin utama lama
+       menjadi admin biasa (peran admin dipertahankan), persis alur
+       Jadikan Admin Utama yang sudah ada. */
+    const lama=S.approvedUsers.filter(user=>user.is_main_admin&&user.id!==id);
+    if(S.uid&&S.uid!==id&&!lama.some(user=>user.id===S.uid))lama.push({id:S.uid});
+    for(const user of lama){
+      const turun=await S.supabase.from('profiles').update({is_main_admin:false}).eq('id',user.id);
+      if(turun.error){alert('Gagal menurunkan admin utama lama: '+turun.error.message);return}
+    }
+    if(S.mainAdmin){S.mainAdmin=false;S.admin=true}
+  }
   await loadPendingUsers();render();
 }
 /* Hapus akun dari data aplikasi (khusus admin utama): catatan akun
@@ -142,20 +176,60 @@ async function jadikanAdminUtama(target){
   S.mainAdmin=false;S.admin=true;
   await loadPendingUsers();render();
 }
-/* Dialog konfirmasi tegas untuk aksi akun (hapus / jadikan admin utama):
-   pola aplikasi — tanpa tombol X; mengetuk bidang di luar kotak atau
-   tombol Batal menutupnya, isi kotak tidak ikut menutup. */
+/* Dialog untuk aksi akun: pilihan peran saat menyetujui, konfirmasi
+   persetujuan sebagai admin utama, konfirmasi hapus / jadikan admin
+   utama. Pola aplikasi — tanpa tombol X; mengetuk bidang di luar kotak
+   atau tombol Batal menutupnya, isi kotak tidak ikut menutup. */
 function dialogKonfirmasiAkun(){
   const d=S.approvalDialog;
   if(!d||!d.user)return null;
   const tutup=()=>{S.approvalDialog=null;render()};
   const nama=d.user.name||'Nama belum diisi';
+  if(d.jenis==='peran'){
+    /* Pilihan peran untuk pendaftar yang disetujui. Bawaan yang disorot
+       adalah 'Anggota' (kasus terbanyak). Pilihan 'Admin Utama' hanya
+       tampil bagi admin utama yang sedang masuk; admin biasa hanya
+       melihat 'Admin Biasa' dan 'Anggota'. */
+    const terpilih=d.peran||'member';
+    const opsi=[];
+    if(S.mainAdmin)opsi.push({key:'utama',label:'Admin Utama',ket:'Kendali penuh atas aplikasi, termasuk persetujuan akun dan penunjukan admin.'});
+    opsi.push({key:'admin',label:'Admin Biasa',ket:'Dapat mengelola data, kegiatan, dan menyetujui akun baru.'});
+    opsi.push({key:'member',label:'Anggota',ket:'Akses biasa sebagai anggota komunitas.'});
+    const tombolOpsi=opsi.map(o=>h('button',{type:'button',class:'role-opt'+(terpilih===o.key?' on':''),'aria-pressed':terpilih===o.key?'true':'false',onclick:()=>{S.approvalDialog={...d,peran:o.key};render()}},
+      h('b',{},o.label),h('small',{},o.ket)));
+    const lanjut=()=>{
+      if(terpilih==='utama'){
+        /* Persetujuan sebagai admin utama butuh konfirmasi perpindahan
+           lebih dulu (dialog jenis 'utama-baru' di bawah). */
+        S.approvalDialog={jenis:'utama-baru',user:d.user,peran:'utama'};render();return;
+      }
+      S.approvalDialog=null;setApproval(d.user.id,'approved',terpilih);
+    };
+    return h('div',{class:'confirm-overlay',onclick:tutup},
+      h('div',{class:'card confirm-card',onclick:ev=>ev.stopPropagation()},
+        h('b',{class:'confirm-title'},'Setujui sebagai…'),
+        h('p',{class:'confirm-text'},'Pilih peran untuk '+nama+' ('+(d.user.email||'-')+').'),
+        h('div',{class:'role-opts'},...tombolOpsi),
+        h('div',{class:'fl confirm-actions'},
+          h('button',{class:'btn s',onclick:tutup},'Batal'),
+          h('button',{class:'btn',onclick:lanjut},'Setujui'))));
+  }
   let judul,isi,label,aksi;
   if(d.jenis==='hapus'){
     judul='Hapus Akun';
     isi='Hapus akun '+nama+' ('+(d.user.email||'-')+')? Akun ini akan hilang dari daftar persetujuan dan tidak bisa masuk lagi. Tindakan ini tidak bisa dibatalkan.';
     label='Hapus';
     aksi=async()=>{S.approvalDialog=null;await hapusAkun(d.user.id)};
+  }else if(d.jenis==='utama-baru'){
+    /* Konfirmasi persetujuan sebagai admin utama: admin utama sebelumnya
+       (termasuk yang sedang masuk, bila itu dia) turun menjadi admin
+       biasa — semakna konfirmasi 'Jadikan Admin Utama' yang sudah ada. */
+    const lama=S.approvedUsers.find(user=>user.is_main_admin);
+    const namaLama=lama?(lama.name||lama.email||''):((S.mainAdmin&&(S.name||S.email))||'');
+    judul='Setujui sebagai Admin Utama';
+    isi=nama+' akan disetujui sebagai admin utama. '+(namaLama?namaLama+' yang saat ini menjadi admin utama':'Admin utama saat ini')+' akan turun menjadi admin biasa. Lanjutkan?';
+    label='Setujui sebagai Admin Utama';
+    aksi=async()=>{S.approvalDialog=null;await setApproval(d.user.id,'approved','utama')};
   }else{
     judul='Jadikan Admin Utama';
     isi=nama+' akan menjadi admin utama. Admin utama saat ini akan turun menjadi admin biasa. Lanjutkan?';
@@ -191,7 +265,7 @@ function wilayahAkun(user){
   return '';
 }
 function vApprovals(){
-  if(!S.mainAdmin)return [h('p',{class:'warn'},'Halaman ini hanya dapat diakses admin utama.')];
+  if(!S.admin)return [h('p',{class:'warn'},'Halaman ini hanya dapat diakses admin.')];
   const tab=S.approvalsTab==='disetujui'?'disetujui':'menunggu';
   const toggle=h('div',{class:'org-toggle'},
     h('button',{class:'org-toggle-btn'+(tab==='menunggu'?' on':''),onclick:()=>{S.approvalsTab='menunggu';render()}},'Menunggu ('+S.pendingUsers.length+')'),
@@ -199,7 +273,7 @@ function vApprovals(){
   if(tab==='menunggu'){
     const rows=S.pendingUsers.map(user=>h('div',{class:'card approval-row'},
       h('div',{style:'flex:1;min-width:0'},h('b',{},user.name||'Nama belum diisi'),h('small',{},user.email||'-'),h('small',{},new Date(user.created_at).toLocaleString('id-ID'))),
-      h('div',{class:'fl'},h('button',{class:'btn',onclick:()=>setApproval(user.id,'approved')},'Setujui'),h('button',{class:'btn s',onclick:()=>setApproval(user.id,'rejected')},'Tolak'),
+      h('div',{class:'fl'},h('button',{class:'btn',onclick:()=>{S.approvalDialog={jenis:'peran',user:{id:user.id,name:user.name,email:user.email},peran:'member'};render()}},'Setujui'),h('button',{class:'btn s',onclick:()=>setApproval(user.id,'rejected')},'Tolak'),
         (S.mainAdmin&&user.id!==S.uid)?h('button',{class:'btn s btn-eh',onclick:()=>{S.approvalDialog={jenis:'hapus',user:{id:user.id,name:user.name,email:user.email}};render()}},'Hapus'):null)));
     return [h('h1',{},'Persetujuan Akun'),toggle,...(rows.length?rows:[h('p',{class:'warn'},'Tidak ada pendaftar yang menunggu persetujuan.')]),dialogKonfirmasiAkun()];
   }
