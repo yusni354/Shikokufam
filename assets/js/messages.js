@@ -115,6 +115,13 @@ function conversationAvatar(group){
   if(group.photoUrl)return h('img',{class:'chat-avatar',src:group.photoUrl,alt:'Foto '+(group.name||'lawan bicara')});
   return h('div',{class:'chat-avatar'},(group.name||'?').trim().charAt(0).toUpperCase()||'?');
 }
+/* Avatar lawan bicara di kepala utas berfungsi sebagai tombol Kembali
+   ke daftar percakapan — menggantikan tombol Kembali tersendiri.
+   Tampilan avatar (ukuran/bentuk) tidak berubah; hanya dibungkus
+   tombol transparan dengan petunjuk aksesibel 'Kembali'. */
+function conversationBackAvatar(group){
+  return h('button',{class:'chat-avatar-back',type:'button',title:'Kembali','aria-label':'Kembali',onclick:()=>{S.openConversation=null;S.newChat=null;render()}},conversationAvatar(group));
+}
 function formatChatTime(ts){
   if(!ts)return '';
   const d=new Date(ts),now=new Date();
@@ -449,8 +456,7 @@ function vPesan(){
     if(user){const member=memberForUser(user);if(member&&member.foto)group.photoMember=member}
     return [
       h('div',{class:'conversation-toolbar'},
-        h('button',{class:'btn s',onclick:backToInbox},icon('back',16),h('span',{},'Kembali')),
-        conversationAvatar(group),
+        conversationBackAvatar(group),
         h('b',{},group.name)),
       h('section',{class:'chat-card'},
         h('div',{class:'chat-body'},h('p',{class:'warn chat-empty'},'Belum ada pesan. Tulis pesan pertama Anda di bawah.')),
@@ -475,8 +481,7 @@ function vPesan(){
       requestAnimationFrame(()=>{chatBody.scrollTop=chatBody.scrollHeight});
       return [
         h('div',{class:'conversation-toolbar'},
-          h('button',{class:'btn s',onclick:backToInbox},icon('back',16),h('span',{},'Kembali')),
-          conversationAvatar(group),
+          conversationBackAvatar(group),
           h('b',{},group.name)),
         h('section',{class:'chat-card'},
           chatBody,
