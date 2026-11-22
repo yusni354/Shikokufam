@@ -83,6 +83,7 @@ render();
           S.members = []; S.events = []; S.topics = []; S.cleaningDuties = []; S.pins = [];
           S.keuangan = []; S.kategoriCustom = []; S.financeForm = null; S.financePhoto = null;
           S.tanya = []; S.replies = []; S.messageSignature = ''; S.unreadMessages = 0;
+          S.openConversation = null; S.newChat = null; S.userDirectory = []; S.directoryLoaded = false;
           S.storageErrors = {}; S.memberMediaUrls.clear(); S.memberMediaPending.clear();
           S.memberMediaFailed.clear(); S.legacyMediaPaths.clear(); S.memberMediaError = '';
         }

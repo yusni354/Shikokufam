@@ -77,6 +77,14 @@ create table if not exists public.messages (
   attachments jsonb not null default '[]'::jsonb
 );
 alter table public.messages add column if not exists attachments jsonb not null default '[]'::jsonb;
+-- Penerima pesan langsung antar pengguna. NULL = "Tanya Admin" (pesan
+-- untuk admin, alur lama dari Home/maskot); terisi = pesan pribadi yang
+-- hanya boleh dibaca pengirim dan penerima itu (lihat kebijakan RLS
+-- "Message participants ..." di bawah).
+alter table public.messages
+  add column if not exists recipient_id uuid references auth.users(id) on delete set null;
+create index if not exists messages_recipient_created_at_idx
+  on public.messages (recipient_id, created_at desc);
 
 create table if not exists public.message_replies (
   id uuid primary key default gen_random_uuid(),
@@ -282,30 +290,49 @@ create policy "Main admins can delete profiles"
   to authenticated
   using (public.is_main_admin());
 
+-- ATURAN KOTAK MASUK PRIBADI: sebuah pesan hanya bisa dibaca, diubah,
+-- dan dihapus oleh pengirim dan penerimanya. Pesan tanpa penerima
+-- (recipient_id null) adalah "Tanya Admin": terlihat oleh pengirim dan
+-- SEMUA admin. Admin TIDAK bisa membaca percakapan langsung antar
+-- pengguna lain.
 drop policy if exists "Admins can read messages" on public.messages;
-create policy "Admins can read messages"
-  on public.messages for select
-  to authenticated
-  using (public.is_admin());
-
 drop policy if exists "Users can read their own messages" on public.messages;
-create policy "Users can read their own messages"
+drop policy if exists "Message participants can read messages" on public.messages;
+create policy "Message participants can read messages"
   on public.messages for select
   to authenticated
-  using (sender_id = (select auth.uid()));
+  using (
+    sender_id = (select auth.uid())
+    or recipient_id = (select auth.uid())
+    or (recipient_id is null and public.is_admin())
+  );
 
 drop policy if exists "Admins can update messages" on public.messages;
-create policy "Admins can update messages"
+drop policy if exists "Message participants can update messages" on public.messages;
+create policy "Message participants can update messages"
   on public.messages for update
   to authenticated
-  using (public.is_admin())
-  with check (public.is_admin());
+  using (
+    sender_id = (select auth.uid())
+    or recipient_id = (select auth.uid())
+    or (recipient_id is null and public.is_admin())
+  )
+  with check (
+    sender_id = (select auth.uid())
+    or recipient_id = (select auth.uid())
+    or (recipient_id is null and public.is_admin())
+  );
 
 drop policy if exists "Admins can delete messages" on public.messages;
-create policy "Admins can delete messages"
+drop policy if exists "Message participants can delete messages" on public.messages;
+create policy "Message participants can delete messages"
   on public.messages for delete
   to authenticated
-  using (public.is_admin());
+  using (
+    sender_id = (select auth.uid())
+    or recipient_id = (select auth.uid())
+    or (recipient_id is null and public.is_admin())
+  );
 
 grant usage on schema public to anon, authenticated;
 grant select on public.map_settings to anon, authenticated;
@@ -348,18 +375,24 @@ create policy "Owners can delete message attachments"
     and (storage.foldername(name))[1] = (select auth.uid())::text
   );
 
+-- Balasan mengikuti aturan pesan pokoknya: hanya pengirim dan penerima
+-- pesan pokok (atau admin, khusus pesan Tanya Admin tanpa penerima)
+-- yang bisa membaca dan mengirim balasan di utas itu.
 drop policy if exists "Message participants can read replies" on public.message_replies;
 create policy "Message participants can read replies"
   on public.message_replies for select
   to authenticated
   using (
-    public.is_admin()
-    or sender_id = (select auth.uid())
+    sender_id = (select auth.uid())
     or exists (
       select 1
       from public.messages
       where messages.id = message_replies.message_id
-        and messages.sender_id = (select auth.uid())
+        and (
+          messages.sender_id = (select auth.uid())
+          or messages.recipient_id = (select auth.uid())
+          or (messages.recipient_id is null and public.is_admin())
+        )
     )
   );
 
@@ -369,14 +402,15 @@ create policy "Message participants can send replies"
   to authenticated
   with check (
     sender_id = (select auth.uid())
-    and (
-      public.is_admin()
-      or exists (
-        select 1
-        from public.messages
-        where messages.id = message_replies.message_id
-          and messages.sender_id = (select auth.uid())
-      )
+    and exists (
+      select 1
+      from public.messages
+      where messages.id = message_replies.message_id
+        and (
+          messages.sender_id = (select auth.uid())
+          or messages.recipient_id = (select auth.uid())
+          or (messages.recipient_id is null and public.is_admin())
+        )
     )
   );
 
@@ -567,6 +601,17 @@ create policy "Approved members can submit a message"
     sender_id = (select auth.uid())
     and public.is_approved_member()
   );
+
+-- Direktori penerima pesan: pengguna yang sudah disetujui boleh membaca
+-- profil pengguna LAIN yang sudah disetujui (nama, foto, email untuk
+-- pemilih penerima "Pesan Baru" dan nama lawan bicara di kotak masuk).
+-- Profil yang masih menunggu persetujuan atau ditolak tetap hanya
+-- terlihat oleh pemiliknya sendiri dan admin.
+drop policy if exists "Approved members can read the user directory" on public.profiles;
+create policy "Approved members can read the user directory"
+  on public.profiles for select
+  to authenticated
+  using (public.is_approved_member() and approval_status = 'approved');
 
 -- Hapus kebijakan storage lama yang terlalu longgar (dari Schema.sql versi lama):
 -- tadinya SIAPA PUN (tanpa login) bisa membaca foto/dokumen anggota.

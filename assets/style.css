@@ -337,7 +337,7 @@ input[type=checkbox]{width:20px;height:20px;margin:0;flex:none;accent-color:var(
 @media (max-width:560px){.member-id-main{gap:11px;padding:15px 12px}.member-id-photo{width:90px;height:112px}.member-id-info h1{font-size:19px}.member-profile-page{padding-left:12px;padding-right:12px}}
 @media (max-width:560px){.visitor-page-heading{align-items:flex-start}.visitor-page-heading>.btn{padding:8px 10px}.visitor-japan-map{height:55vh;min-height:300px}.visitor-place-row{align-items:flex-start}.visitor-place-row strong{font-size:12px}.visitor-visit-row{align-items:flex-start;flex-wrap:wrap}.visitor-visit-row>div:last-child{text-align:left;width:100%;padding-left:0}}
 #ov{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;z-index:9}
-#dr{position:fixed;top:0;bottom:0;left:0;width:78%;max-width:320px;background:var(--card);z-index:10;transform:translateX(-100%);padding:calc(16px + env(safe-area-inset-top,0px)) 12px 16px;overflow:auto;border-radius:0 26px 26px 0;box-shadow:0 0 40px rgba(0,0,0,.2);transition:transform .22s ease}
+#dr{position:fixed;top:0;bottom:0;left:0;width:78%;max-width:320px;background:var(--card);z-index:10;transform:translateX(calc(-100% - 96px));padding:calc(16px + env(safe-area-inset-top,0px)) 12px 16px;overflow:auto;border-radius:0 26px 26px 0;box-shadow:0 0 40px rgba(0,0,0,.2);transition:transform .22s ease}
 body.open #dr{transform:none}body.open #ov{display:block}
 #dr a{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:14px;color:var(--ink);font-weight:600;cursor:pointer;transition:background .18s ease,color .18s ease}
 #dr a>.app-icon{color:var(--mut)}
@@ -375,6 +375,18 @@ body.open #dr{transform:none}body.open #ov{display:block}
 .conversation-row small{display:block;color:var(--mut);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .conversation-badge{display:grid;place-items:center;min-width:24px;height:24px;padding:0 6px;border-radius:999px;background:#d9455f;color:#fff;font-size:12px;font-weight:700}
 .conversation-toolbar{display:flex;align-items:center;gap:12px;margin:6px 0 12px}
+/* Kotak masuk pribadi: baris percakapan berisi foto/nama/cuplikan/waktu,
+   kepala daftar dengan tombol Pesan Baru, dan panel pemilih penerima */
+img.chat-avatar{object-fit:cover;display:block}
+.conversation-main{flex:1;min-width:0;text-align:left}
+.conversation-top{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.conversation-time{font-size:11px;color:var(--mut);flex:none}
+.inbox-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+.inbox-head h1{margin:0}
+.picker-card{display:block;width:100%;max-width:420px;max-height:calc(100vh - 32px);max-height:calc(100dvh - 32px);overflow-y:auto}
+.picker-list{margin-top:10px}
+.picker-list .conversation-row{margin-bottom:8px}
+.chat-empty{text-align:center;margin:auto;padding:16px}
 .attachment-tools{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
 .attachment-list{display:block;color:var(--mut);overflow-wrap:anywhere;margin-top:5px}
 .chat-bubble img,.chat-image{display:block;max-width:220px;max-height:220px;border-radius:12px;margin-top:6px}
