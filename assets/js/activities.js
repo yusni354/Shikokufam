@@ -243,10 +243,10 @@ function activityCard(event){
     h('div',{class:'activity-region-pick-grid'},...regionPicks)
   );
   if(S.admin){
-    const barcodeInput=h('input',{class:'activity-barcode-input',placeholder:'Pindai QR / masukkan ID anggota',autocomplete:'off'});
     const scanButton=h('button',{class:'btn s',type:'button'},icon('scan',16),h('span',{},'Absensi QR'));
-    /* Inti pencatatan dari kode QR/ID: dipakai kolom ketik manual DAN
-       pemindai kamera layar penuh. Mengembalikan hasil terstruktur
+    /* Inti pencatatan dari kode QR: dipakai pemindai kamera layar
+       penuh ('Absensi QR') — satu-satunya jalur pencatatan dari kode
+       (kolom ketik ID manual sudah dihapus). Mengembalikan hasil terstruktur
        {ok,kind,message,member} supaya tiap pemanggil bisa menampilkan
        umpan baliknya sendiri (teks status / animasi). Pemeriksaan
        'sudah tercatat' membaca data kegiatan TERBARU dari S.events,
@@ -265,19 +265,6 @@ function activityCard(event){
         return{ok:true,kind:'recorded',member,message:(member.nama||'Anggota')+' berhasil dicatat hadir.'};
       }catch(error){console.error(error);return{ok:false,kind:'error',message:'Gagal mencatat kehadiran: '+(error.message||'periksa koneksi')}}
     };
-    const processBarcode=async value=>{
-      const result=await resolveBarcode(value);
-      if(result.ok&&result.kind==='recorded'){
-        S.activityFeedback={eventId:event.id,message:(result.member?.nama||'Anggota')+' berhasil ditambahkan dan dicatat hadir.'};
-        render();
-      }else status.textContent=result.message;
-    };
-    const submitBarcode=async()=>{
-      const value=barcodeInput.value;
-      barcodeInput.value='';
-      await processBarcode(value);
-    };
-    barcodeInput.onkeydown=event=>{if(event.key==='Enter'){event.preventDefault();submitBarcode()}};
     /* ===== Pemindai QR LAYAR PENUH ('Absensi QR') =====
        Mengetuk tombol langsung membuka kamera memenuhi layar dengan
        bingkai bidik. Sesudah satu QR terbaca, animasi BERHASIL (centang
@@ -338,14 +325,14 @@ function activityCard(event){
       };
       (async()=>{
         if(!window.BarcodeDetector||typeof window.BarcodeDetector.getSupportedFormats!=='function'||!navigator.mediaDevices?.getUserMedia){
-          failOpen('Pemindaian QR lewat kamera tidak didukung browser ini. Ketuk Tutup QR, lalu gunakan kolom ID anggota pada kartu kegiatan.');
+          failOpen('Pemindaian QR lewat kamera tidak didukung browser ini. Ketuk Tutup QR untuk kembali.');
           return;
         }
         try{
           const formats=await window.BarcodeDetector.getSupportedFormats();
           if(!active)return;
           if(!formats.includes('qr_code')){
-            failOpen('Browser ini belum mendukung pembacaan QR. Ketuk Tutup QR, lalu gunakan kolom ID anggota pada kartu kegiatan.');
+            failOpen('Browser ini belum mendukung pembacaan QR. Ketuk Tutup QR untuk kembali.');
             return;
           }
           const detector=new window.BarcodeDetector({formats:['qr_code']});
@@ -393,7 +380,6 @@ function activityCard(event){
     if(expanded)content.push(
       h('div',{class:'activity-scanner',onclick:e=>e.stopPropagation()},
         h('h3',{},'Pemindaian QR'),
-        h('div',{class:'activity-scanner-row'},barcodeInput,h('button',{class:'btn s',onclick:submitBarcode},'Catat hadir')),
         h('div',{class:'activity-scanner-row'},scanButton),
         status)
     );
@@ -1342,18 +1328,24 @@ function vKegiatan(){
   };
   const semuaEvents=[...S.events].sort((a,b)=>(b.tanggal||'').localeCompare(a.tanggal||'')||(b.at||0)-(a.at||0));
   /* ===== Struktur Tahun & Bulan untuk daftar kartu: kartu yang tampil
-     hanya kegiatan SATU BULAN terpilih. Tahun terpilih = pilihan
-     pengguna (diingat di S selama aplikasi dibuka, pola yang sama
-     seperti Ringkasan); bawaan tahun kegiatan paling baru. Bulan hanya
-     ditawarkan yang memiliki kegiatan pada tahun terpilih; bawaan
-     bulan paling baru yang memiliki kegiatan. ===== */
+     hanya kegiatan SATU BULAN terpilih. Bawaan saat halaman DIBUKA =
+     bulan & tahun BERJALAN hari ini, diatur oleh go()/pemulihan
+     halaman di shell.js (bawaanArsipKegiatan) yang menulis
+     S.kegiatanTahun/S.kegiatanBulan setiap kali masuk halaman ini;
+     selama pengguna masih di halaman, pilihannya diingat di S dan
+     gambar ulang tidak mengubahnya. Bulan yang ditawarkan = bulan
+     yang memiliki kegiatan pada tahun terpilih, DITAMBAH bulan
+     berjalan bila tahun terpilih adalah tahun berjalan — jadi bulan
+     ini selalu bisa ditunjuk & dipilih walau belum ada kegiatannya
+     (daftar kartu tampil kosong dengan pesan sopan). ===== */
   const tahunBerjalan=new Date().getFullYear();
+  const bulanBerjalan=new Date().getMonth()+1;
   const tahunTersedia=[...new Set([tahunBerjalan,...semuaEvents.map(activityYear)].filter(y=>y!=null))].sort((a,b)=>b-a);
   const tahunTerpilih=tahunTersedia.includes(S.kegiatanTahun)?S.kegiatanTahun:(semuaEvents.length?activityYear(semuaEvents[0]):tahunBerjalan);
   if(semuaEvents.length)S.kegiatanTahun=tahunTerpilih;
   const eventsTahun=semuaEvents.filter(ev=>activityYear(ev)===tahunTerpilih);
-  const bulanTersedia=[...new Set(eventsTahun.map(activityMonth).filter(m=>m!=null))].sort((a,b)=>a-b);
-  const bulanTerpilih=bulanTersedia.includes(S.kegiatanBulan)?S.kegiatanBulan:(bulanTersedia.length?bulanTersedia[bulanTersedia.length-1]:null);
+  const bulanTersedia=[...new Set([...eventsTahun.map(activityMonth).filter(m=>m!=null),...(tahunTerpilih===tahunBerjalan?[bulanBerjalan]:[])])].sort((a,b)=>a-b);
+  const bulanTerpilih=bulanTersedia.includes(S.kegiatanBulan)?S.kegiatanBulan:(tahunTerpilih===tahunBerjalan?bulanBerjalan:(bulanTersedia.length?bulanTersedia[bulanTersedia.length-1]:null));
   if(bulanTerpilih!=null)S.kegiatanBulan=bulanTerpilih;
   const events=bulanTerpilih!=null?eventsTahun.filter(ev=>activityMonth(ev)===bulanTerpilih):[];
   let kegiatanFilters=null;
@@ -1373,8 +1365,7 @@ function vKegiatan(){
   }
   let kegiatanDaftar;
   if(!semuaEvents.length)kegiatanDaftar=h('p',{class:'warn'},'Belum ada kegiatan.');
-  else if(!eventsTahun.length)kegiatanDaftar=h('p',{class:'warn'},'Belum ada kegiatan pada tahun '+tahunTerpilih+'. Pilih tahun lain yang memiliki kegiatan.');
-  else if(!events.length)kegiatanDaftar=h('p',{class:'warn'},'Belum ada kegiatan pada bulan ini.');
+  else if(!events.length)kegiatanDaftar=h('p',{class:'warn'},bulanTerpilih!=null?'Belum ada kegiatan pada bulan '+NAMA_BULAN[bulanTerpilih-1]+' '+tahunTerpilih+'. Pilih bulan atau tahun lain yang memiliki kegiatan.':'Belum ada kegiatan pada tahun '+tahunTerpilih+'. Pilih tahun lain yang memiliki kegiatan.');
   else kegiatanDaftar=h('div',{class:'kegiatan-bulan-blok'},
     h('p',{class:'kegiatan-bulan-judul'},'Kegiatan '+NAMA_BULAN[bulanTerpilih-1]+' '+tahunTerpilih+' · '+events.length+' kegiatan'),
     h('div',{class:'activity-list'},...events.map(activityCard)));

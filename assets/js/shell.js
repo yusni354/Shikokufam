@@ -4,7 +4,17 @@ function syncAdminTheme(){
   document.body.classList.toggle('admin-dark',S.mainAdmin&&(S.adminMenuOpen||isAdminSettingsView()));
   $('#st').setAttribute('aria-expanded',String(S.adminMenuOpen));
 }
-function go(v){S.view=v;simpanViewTerakhir(v);S.adminMenuOpen=false;S.form=S.detail=S.dutyForm=null;S.financeForm=null;S.financePhoto=null;S.idPhoto=null;S.detailOrigin=null;if(v==='pesan'&&S.admin)S.openConversation=null;document.body.classList.remove('open');syncAdminTheme();render();if(v==='pesan'&&!S.admin)markMessagesRead()}
+/* Bawaan arsip Tahun+Bulan halaman Kegiatan: setiap kali halaman
+   Kegiatan DIBUKA, pemilihnya menunjuk BULAN & TAHUN BERJALAN (tanggal
+   perangkat hari ini) — bukan bulan kegiatan paling baru/terlama.
+   Diterapkan di sini, pada saat masuk halaman lewat go() (dan pada
+   pemulihan halaman terakhir sesudah muat ulang), BUKAN di dalam
+   gambar ulang: selama pengguna masih di halaman itu, pilihan bulan/
+   tahunnya lewat pemilih berjalan seperti biasa dan tidak di-reset
+   oleh render. Meninggalkan halaman lalu kembali → bawaan bulan
+   berjalan lagi. */
+function bawaanArsipKegiatan(){const kini=new Date();S.kegiatanTahun=kini.getFullYear();S.kegiatanBulan=kini.getMonth()+1}
+function go(v){if(v==='kegiatan')bawaanArsipKegiatan();S.view=v;simpanViewTerakhir(v);S.adminMenuOpen=false;S.form=S.detail=S.dutyForm=null;S.financeForm=null;S.financePhoto=null;S.idPhoto=null;S.detailOrigin=null;if(v==='pesan'&&S.admin)S.openConversation=null;document.body.classList.remove('open');syncAdminTheme();render();if(v==='pesan'&&!S.admin)markMessagesRead()}
 $('#mn').onclick=()=>document.body.classList.add('open');
 $('#mn').replaceChildren(icon('menu',21));
 $('#st').replaceChildren(icon('settings',19));
@@ -45,6 +55,9 @@ function pulihkanViewTerakhir(){
   if(v==='approvals'&&!S.mainAdmin)return;
   if(v==='pengaturan'&&!S.admin)return;
   S.view=v;
+  /* Memulihkan halaman Kegiatan sesudah muat ulang = membuka halaman
+     itu, jadi bawaan arsip bulan berjalan berlaku juga di sini. */
+  if(v==='kegiatan')bawaanArsipKegiatan();
 }
 /* Klik tulisan merek 'SHIKOKU FAMILY' di header -> kembali ke Home;
    go('landing') sekaligus menjadikan Home halaman tersimpan. Kursor
