@@ -21,9 +21,9 @@ async function saveSambutanPesan(teks){
   await S.db.collection('pengaturan').doc('sambutan').set({pesan:teks,at:Date.now()});
   S.sambutan=teks;
 }
-/* Halaman Pengaturan: khusus admin & admin utama */
+/* Halaman Pengaturan: khusus ADMIN UTAMA saja (admin biasa tidak bisa membukanya) */
 function vPengaturan(){
-  if(!S.admin)return [h('p',{class:'warn'},'Halaman ini hanya dapat diakses admin.')];
+  if(!S.mainAdmin)return [h('p',{class:'warn'},'Halaman ini hanya dapat diakses admin utama.')];
   const inp=h('textarea',{rows:3,maxlength:200,placeholder:SAMBUTAN_DEFAULT});
   inp.value=S.sambutan||'';
   return [h('h1',{},'Pengaturan'),

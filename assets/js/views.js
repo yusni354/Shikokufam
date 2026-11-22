@@ -44,7 +44,7 @@ function renderDrawer(){
   if(S.adminMenuOpen){
     d.replaceChildren(
       h('p',{class:'sub',style:'padding:0 14px'},h('b',{style:'color:var(--ink)'},'PENGATURAN ADMIN')),
-      ...ADMIN_MENU.map(([view,label,glyph])=>h('a',{class:S.view===view?'on':'',href:'#',onclick:navTo(view),...(view==='approvals'?{'data-approval-nav':'true'}:{})},icon(glyph),h('span',{},label),view==='approvals'&&S.admin&&S.pendingUsers.length>0&&h('span',{class:'nav-badge'},String(S.pendingUsers.length)))),
+      ...ADMIN_MENU.filter(([view])=>view!=='pengaturan'||S.mainAdmin).map(([view,label,glyph])=>h('a',{class:S.view===view?'on':'',href:'#',onclick:navTo(view),...(view==='approvals'?{'data-approval-nav':'true'}:{})},icon(glyph),h('span',{},label),view==='approvals'&&S.admin&&S.pendingUsers.length>0&&h('span',{class:'nav-badge'},String(S.pendingUsers.length)))),
       h('button',{class:'menu-logout',onclick:()=>go('landing')},icon('back',17),h('span',{},'Kembali ke menu utama'))
     );
     return;
@@ -152,7 +152,7 @@ function render(){
   $('#sw').style.display=S.admin?'flex':'none';
   updateApprovalBadges();
   const current=ALL.find(x=>x[0]===S.view);
-  if(!V[S.view]||(S.view==='approvals'&&!S.admin)||(S.view==='pengaturan'&&!S.admin))S.view='landing';
+  if(!V[S.view]||(S.view==='approvals'&&!S.admin)||(S.view==='pengaturan'&&!S.mainAdmin))S.view='landing';
   const content=[];
   const storageErrors=Object.values(S.storageErrors||{});
   if(storageErrors.length)content.push(h('p',{class:'warn storage-warning'},'Database bersama tidak dapat dibaca: '+storageErrors.join(' · ')+' Jalankan pembaruan skema Supabase, lalu muat ulang aplikasi.'));
