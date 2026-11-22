@@ -1460,6 +1460,15 @@ body.auth-locked .landing{padding-top:0}
    Warna pil & grafik status (Hadir/Izin/Cuti/Alpha) tidak berubah. */
 .activity-card{border-top:5px solid var(--activity-color,#dbe7ee)}
 .activity-card .activity-heading h2{color:var(--activity-color,#10222e)}
+/* Tanda HARI H: kartu kegiatan yang tanggalnya HARI INI (menurut
+   tanggal perangkat) latarnya MENYALA — rona terang hangat bercampur
+   warna aksen kartu itu sendiri + cahaya tepi (glow) halus mengikuti
+   warna aksen, sehingga langsung menonjol dibanding kartu lain.
+   Hanya latar & cahaya yang berubah: isi, susunan, dan warna teks
+   kartu tidak berubah (teks tetap hitam jelas di atas latar terang).
+   Berlaku di kartu daftar Kegiatan dan di kepala halaman Detail
+   Kegiatan yang sama (kelas yang sama). */
+.activity-card-today{background:linear-gradient(180deg,#fff8d6 0%,color-mix(in srgb,var(--activity-color,#dbe7ee) 13%,#fffdf8) 58%,color-mix(in srgb,var(--activity-color,#dbe7ee) 8%,#fffdf8) 100%);border-color:color-mix(in srgb,var(--activity-color,#dbe7ee) 42%,#e8c85a);box-shadow:0 0 0 2px color-mix(in srgb,var(--activity-color,#dbe7ee) 30%,transparent),0 0 22px color-mix(in srgb,var(--activity-color,#dbe7ee) 38%,transparent),0 10px 26px color-mix(in srgb,var(--activity-color,#dbe7ee) 26%,transparent)}
 /* Dropdown terkelola di formulir Buat Kegiatan: select memenuhi kolom
    formulir seperti field lain; panel tambah/hapus tampil di bawahnya
    di dalam kolom yang sama. */

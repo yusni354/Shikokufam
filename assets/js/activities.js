@@ -218,6 +218,16 @@ function leaveActivityDetail(){
   render();
   window.scrollTo(0,0);
 }
+/* Kunci tanggal HARI INI menurut tanggal perangkat (YYYY-MM-DD,
+   format yang sama dengan field 'tanggal' kegiatan). Dipakai untuk
+   menandai kartu kegiatan hari-H dengan latar menyala. */
+function activityTodayKey(){
+  const t=new Date();
+  return [t.getFullYear(),String(t.getMonth()+1).padStart(2,'0'),String(t.getDate()).padStart(2,'0')].join('-');
+}
+function activityIsToday(event){
+  return !!event&&!!event.tanggal&&String(event.tanggal)===activityTodayKey();
+}
 /* Kartu kegiatan RINGKAS di grid: hanya nama, tanggal & lokasi, dan
    TOTAL absensi gabungan semua wilayah (Hadir/Izin/Cuti/Alpha dari
    peta status tersimpan, dengan pemetaan data lama yang sama seperti
@@ -260,7 +270,8 @@ function activityCard(event){
   if(S.admin)content.push(h('div',{class:'activity-card-foot'},
     h('button',{class:'activity-gear-btn',type:'button','aria-label':'Pengaturan kegiatan '+(event.judul||''),title:'Pengaturan kegiatan',
       onclick:e=>{e.stopPropagation();S.kegiatanDialog={id:event.id,tahap:'atur'};render()}},icon('gear',16))));
-  const card=h('article',{class:'card activity-card',style:'--activity-color:'+warnaAksen,title:'Ketuk untuk membuka detail kegiatan'},...content);
+  const isToday=activityIsToday(event);
+  const card=h('article',{class:'card activity-card'+(isToday?' activity-card-today':''),style:'--activity-color:'+warnaAksen,title:isToday?'Hari ini · Ketuk untuk membuka detail kegiatan':'Ketuk untuk membuka detail kegiatan'},...content);
   card.addEventListener('click',e=>{
     if(e.target.closest('button,input,video,a,select,textarea,label'))return;
     openActivityDetail(event.id);
@@ -461,9 +472,10 @@ function vActivityDetail(event){
       onclick:e=>{e.stopPropagation();S.kegiatanDialog={id:event.id,tahap:'atur'};render()}},icon('gear',16))));
   const animate=S._activityDetailAnimate;
   S._activityDetailAnimate=false;
+  const detailIsToday=activityIsToday(event);
   return h('div',{class:'activity-detail'+(animate?' enter':'')},
     h('button',{class:'btn s activity-detail-back',onclick:()=>leaveActivityDetail()},icon('back',16),h('span',{},'Kembali')),
-    h('section',{class:'card activity-card activity-detail-card',style:'--activity-color:'+warnaAksen},...content));
+    h('section',{class:'card activity-card activity-detail-card'+(detailIsToday?' activity-card-today':''),style:'--activity-color:'+warnaAksen},...content));
 }
 /* Tahap 2: halaman fokus mengabsen anggota SATU wilayah untuk satu
    kegiatan. Seluruh anggota wilayah tampil; di kanan tiap baris ada
@@ -1503,7 +1515,14 @@ function vKegiatan(){
   const bulanTersedia=[...new Set([...eventsTahun.map(activityMonth).filter(m=>m!=null),...(tahunTerpilih===tahunBerjalan?[bulanBerjalan]:[])])].sort((a,b)=>a-b);
   const bulanTerpilih=bulanTersedia.includes(S.kegiatanBulan)?S.kegiatanBulan:(tahunTerpilih===tahunBerjalan?bulanBerjalan:(bulanTersedia.length?bulanTersedia[bulanTersedia.length-1]:null));
   if(bulanTerpilih!=null)S.kegiatanBulan=bulanTerpilih;
-  const events=bulanTerpilih!=null?eventsTahun.filter(ev=>activityMonth(ev)===bulanTerpilih):[];
+  /* Daftar kartu bulan terpilih diurutkan dari AWAL bulan sampai
+     AKHIR bulan: tanggal paling awal dulu, lalu jam untuk tanggal
+     yang sama, lalu waktu pembuatan sebagai penentu terakhir.
+     Urutan ini hanya untuk tampilan daftar kartu halaman Kegiatan;
+     semuaEvents di atas tetap dipakai apa adanya untuk menentukan
+     tahun/bulan yang tersedia. */
+  const events=(bulanTerpilih!=null?eventsTahun.filter(ev=>activityMonth(ev)===bulanTerpilih):[])
+    .sort((a,b)=>(a.tanggal||'').localeCompare(b.tanggal||'')||(a.waktu||'').localeCompare(b.waktu||'')||(a.at||0)-(b.at||0));
   let kegiatanFilters=null;
   if(semuaEvents.length){
     const yearSelect=h('select',{'aria-label':'Pilih tahun kegiatan',onchange:e=>{S.kegiatanTahun=Number(e.target.value);S.kegiatanBulan=null;render()}},
