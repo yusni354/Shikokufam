@@ -1662,3 +1662,310 @@ body.peta-view main{width:100%;max-width:1180px;padding:10px 12px 12px;display:f
   .peta-list-panel{width:352px}
   .peta-fit .peta-member-list{grid-template-columns:repeat(auto-fill,minmax(126px,1fr))}
 }
+
+/* ================================================================
+   LINTASAN POLES MENYELURUH (v146) — satu bahasa visual clay
+   Lapisan terakhir ini menyelaraskan SELURUH aplikasi tanpa
+   mengubah struktur/fungsi halaman mana pun:
+   - ritme jarak & hierarki huruf diseragamkan antar halaman
+   - tombol & field satu ukuran rasa di semua konteks
+   - sudut, bayangan, dan permukaan mengikuti skala yang sama
+   - keadaan hover / fokus / ditekan / nonaktif dipoles di mana-mana
+   - angka memakai digit tabular agar kolom & pil tidak bergeser
+   - lebar desktop dimanfaatkan lebih baik (daftar menjadi 2 kolom)
+   Aturan spesifik halaman yang sudah diputuskan sebelumnya (bilah
+   bawah peta, tombol mini btn-eh, komposer pesan, kepala rekap
+   lengket, dsb.) ditegaskan ulang bila perlu, tidak diubah.
+   ================================================================ */
+
+/* ---------- Fondasi: ritme, huruf, angka ---------- */
+body{line-height:1.5;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+::selection{background:#a9dcd2;color:#10222e}
+main{padding:18px 16px 34px}
+h1{font-size:25px;line-height:1.22;letter-spacing:-.01em;margin:6px 0 8px}
+h2{line-height:1.3}
+h3,h4{line-height:1.35}
+.sub{line-height:1.55}
+.card small,.member-card-info>small,.home-event small,.conversation-row small{line-height:1.45}
+.stats b,.fin-amount,.fin-total b,.peta-pill b,.activity-counts b,.rekap-num,.lap-pct,.duty-count,.org-group-count{font-variant-numeric:tabular-nums}
+button,[role="button"],a{-webkit-tap-highlight-color:transparent}
+img{max-width:100%}
+
+/* ---------- Fokus keyboard: cincin teal tema (menggantikan oranye) ---------- */
+a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,[role="button"]:focus-visible{outline:3px solid #2b7a8c;outline-offset:2px}
+input:focus-visible,select:focus-visible,textarea:focus-visible{outline:none}
+
+/* ---------- Tombol: satu rasa ukuran di semua halaman ---------- */
+.btn{min-height:44px;padding:10px 18px;font-size:15px;line-height:1.25;border-radius:999px;transition:transform .15s ease,box-shadow .15s ease,background .15s ease,border-color .15s ease}
+.btn:hover{box-shadow:0 10px 22px rgba(43,122,140,.38),inset 0 1px 0 rgba(255,255,255,.4)}
+.btn:active{transform:scale(.97)}
+.btn.s{min-height:36px;padding:7px 13px;font-size:13.5px}
+.btn.s:hover{border-color:#8fb0c2;box-shadow:0 6px 14px rgba(50,75,95,.16),inset 0 1px 0 #fff}
+.btn.s:active{transform:scale(.97)}
+.btn:disabled,.btn.s:disabled{opacity:.55;cursor:not-allowed;transform:none}
+/* Tombol mini edit/hapus TETAP mini (keputusan sebelumnya) */
+.btn.btn-eh{min-height:0;padding:2px 5px;font-size:10px;line-height:1.2;border-width:1.5px}
+.btn.btn-eh:hover{box-shadow:0 3px 8px rgba(50,75,95,.14)}
+/* Baris tombol: jarak napas yang sama di semua formulir & kartu */
+.fl{gap:8px;margin-top:12px}
+.fl .btn{flex:none}
+
+/* ---------- Field: tinggi & huruf seragam, nyaman di HP ---------- */
+input,textarea,select{font-size:16px;line-height:1.4;border-radius:14px;padding:11px 14px;margin:5px 0;transition:border-color .15s ease,box-shadow .15s ease,background .15s ease}
+input:hover,textarea:hover,select:hover{border-color:#a9bfce}
+input:focus,textarea:focus,select:focus{background:#ffffff;border-color:#2b7a8c;box-shadow:0 0 0 4px rgba(43,122,140,.16)}
+textarea{resize:vertical;min-height:44px}
+.lb{font-size:13.5px;color:#22384c;margin-top:14px}
+.lb input,.lb select,.lb textarea{margin-top:6px}
+.tag{background:#e3edf3;color:#22384c;border-radius:999px;padding:3px 9px;font-size:11.5px;font-weight:700;vertical-align:2px}
+.warn{line-height:1.55}
+.storage-warning,.approved-banner{border-radius:16px;padding:13px 15px;box-shadow:0 4px 14px rgba(50,75,95,.08)}
+
+/* ---------- Kartu bersama: permukaan & bayangan satu skala ---------- */
+.card{border-radius:22px;box-shadow:8px 10px 22px rgba(70,95,115,.14),-5px -5px 14px rgba(255,255,255,.55)}
+.card .e{box-shadow:inset 0 2px 5px rgba(255,255,255,.8),0 4px 10px rgba(70,95,115,.13)}
+button.card{transition:transform .15s ease,box-shadow .15s ease,border-color .15s ease}
+button.card:hover{border-color:#a9c6d6}
+button.card:active{transform:scale(.99)}
+.section-title{font-size:19px;margin:26px 2px 12px;letter-spacing:-.01em}
+.home-section-heading{margin:22px 2px 10px}
+.home-section-heading h2{font-size:18px;letter-spacing:-.01em}
+
+/* ---------- Header & laci navigasi ---------- */
+header{padding:10px 16px;gap:10px}
+#brand-title{font-size:14.5px;letter-spacing:.06em}
+header .logo{border-radius:13px}
+.user-profile{background:rgba(255,255,255,.45);border:1px solid rgba(255,255,255,.65);border-radius:999px;padding:3px 12px 3px 3px;box-shadow:0 3px 8px rgba(50,75,95,.12)}
+.user-name{color:#16283a;font-size:13.5px}
+.ic,.header-action{transition:background .15s ease,transform .15s ease}
+.ic:hover,.header-action:hover{background:rgba(255,255,255,.75)}
+.ic:active,.header-action:active{transform:scale(.94)}
+#dr a{padding:11px 14px;margin-bottom:2px;font-size:15px}
+#dr a:active{transform:scale(.98)}
+#dr .sub{font-size:11px;letter-spacing:.09em;margin:4px 0 10px}
+.menu-logout{font-size:14.5px;border-radius:14px;padding:12px 14px;transition:background .15s ease}
+.menu-logout:hover{background:rgba(255,255,255,.08)}
+
+/* ---------- Panel / modal bersama: masuk halus, sudut seragam ---------- */
+@keyframes polishPop{from{opacity:0;transform:scale(.985) translateY(4px)}to{opacity:1;transform:scale(1) translateY(0)}}
+@keyframes polishFade{from{opacity:0}to{opacity:1}}
+#qm{animation:polishFade .16s ease both}
+#qm .card,.confirm-card,.picker-card{border-radius:22px;animation:polishPop .18s ease both}
+.confirm-overlay{animation:polishFade .16s ease both}
+.confirm-card{padding:20px}
+.confirm-title{font-size:17.5px;line-height:1.3}
+.confirm-actions{gap:8px}
+.role-opt{border-radius:16px;padding:12px 14px;transition:border-color .15s ease,background .15s ease,box-shadow .15s ease}
+.role-opt:hover{border-color:#8fb0c2}
+.picker-card{padding:18px}
+
+/* ---------- Keadaan kosong: satu gaya di semua halaman ---------- */
+.member-empty,.duty-empty,.home-empty,.peta-empty,.chat-empty{background:#eef4f7;border:1.5px dashed #b9cbd8;border-radius:18px;color:#3d5568}
+.activity-empty{background:#eef4f7;border:1.5px dashed #b9cbd8;border-radius:14px;padding:14px 16px;text-align:center;color:#3d5568}
+
+/* ---------- Halaman Masuk / Daftar ---------- */
+.hero{border-radius:26px;padding:26px 22px 24px}
+.hero h1{letter-spacing:-.01em}
+.auth-card{border-radius:24px;padding:22px;margin-top:16px}
+.auth-card>b{font-size:20px;margin-bottom:6px}
+.auth-tabs{border-radius:999px;padding:4px;background:#dce7ee;margin:14px 0 6px}
+.auth-tab{border-radius:999px;padding:9px;font-size:14.5px;transition:background .15s ease,color .15s ease,box-shadow .15s ease}
+.auth-tab.on{box-shadow:0 3px 9px rgba(23,50,77,.13)}
+/* Kotak pesan di kartu masuk: hanya tampil bila ada isinya —
+   sebelumnya strip abu-abu kosong selalu terlihat di bawah form */
+.auth-card .warn:empty{display:none}
+.auth-card .warn{border-radius:12px;padding:9px 12px;font-size:13.5px;line-height:1.5}
+.auth-error{background:#fdecea!important;color:#8f1d14!important}
+.auth-success{background:#e2f4ea!important;color:#14532d!important}
+/* 'Lupa password?' menjadi tombol teks ramping rata kanan */
+.auth-forgot{display:flex;justify-content:flex-end;margin-top:2px}
+.auth-forgot .btn.s{width:auto;min-height:0;padding:6px 4px;background:transparent;border:0;box-shadow:none;color:#2b7a8c!important;font-weight:700;font-size:13.5px;text-decoration:underline;text-underline-offset:3px}
+.auth-forgot .btn.s:hover{background:transparent;box-shadow:none;color:#1d5a68!important}
+.pw-eye{border-radius:999px;transition:background .15s ease}
+.pw-eye:hover{background:#e3edf3}
+.benefits{gap:12px}
+.benefit{border-radius:20px;padding:16px 14px;box-shadow:8px 10px 20px rgba(70,95,115,.13),-4px -4px 12px rgba(255,255,255,.5)}
+.benefit strong{font-size:26px}
+.faq{padding:13px 2px}
+.faq summary{font-size:15px}
+.event-item{gap:14px;padding:13px 0}
+.event-date{border-radius:14px;padding:9px 8px}
+.landing-footer{padding:20px 4px 6px;font-size:12.5px}
+
+/* ---------- Home ---------- */
+.home-welcome{padding:22px 20px;border-radius:26px;margin-bottom:14px}
+.home-welcome h1{font-size:24px;letter-spacing:-.01em}
+.home-welcome p{line-height:1.55}
+.stats{gap:12px;margin-bottom:8px}
+.stats>div{border-radius:20px;padding:15px 10px 13px}
+.stats small{font-size:12px;letter-spacing:.02em}
+.stats b{font-size:23px}
+.home-shortcuts{gap:10px}
+.home-shortcut{border-radius:20px;min-height:100px;transition:transform .15s ease,border-color .15s ease,box-shadow .15s ease}
+.home-shortcut:active{transform:scale(.98)}
+.home-shortcut-icon{width:40px;height:40px;border-radius:14px}
+.home-shortcut b{font-size:13.5px;line-height:1.3}
+.home-event{border-radius:18px;padding:13px 14px;box-shadow:6px 8px 18px rgba(70,95,115,.1),-3px -3px 10px rgba(255,255,255,.5)}
+.home-event b{line-height:1.35}
+.home-duty{border-radius:18px;padding:13px 14px}
+.home-chart{border-radius:22px;padding:18px;margin-top:24px}
+.home-admin-link{border-radius:18px;padding:15px;transition:background .15s ease,transform .15s ease}
+.home-admin-link:hover{background:#dcebf3}
+.home-admin-link:active{transform:scale(.99)}
+.home-region-card{padding:13px;border-radius:19px}
+.home-region-member{border-radius:11px;padding:6px 7px;transition:background .13s ease}
+.home-region-member:active{background:rgba(255,255,255,.85)}
+
+/* ---------- Data Anggota: daftar, formulir, detail, kartu ID ---------- */
+.member-page-heading{margin:4px 0 14px}
+.member-eyebrow{letter-spacing:.12em}
+.member-toolbar{border-radius:18px;padding:12px;box-shadow:6px 8px 18px rgba(70,95,115,.1),-3px -3px 10px rgba(255,255,255,.5)}
+.member-filters{gap:9px;margin-top:9px}
+.member-results-count{margin:13px 4px 9px;font-size:13px}
+.member-grid{gap:11px}
+.member-card{border-radius:19px;padding:13px 14px;box-shadow:6px 8px 18px rgba(70,95,115,.1),-3px -3px 10px rgba(255,255,255,.5);transition:border-color .15s ease,box-shadow .15s ease,transform .15s ease}
+.member-card:hover{border-color:#a9c6d6}
+.member-card:active{transform:scale(.995)}
+.member-avatar{border-radius:16px}
+.member-name-line>b{line-height:1.3}
+.member-region-tag{padding:4px 10px}
+.member-detail{border-radius:22px;padding:18px;box-shadow:8px 10px 22px rgba(70,95,115,.13),-5px -5px 14px rgba(255,255,255,.55)}
+.member-detail-section{padding:15px 0}
+.member-detail-section h3{font-size:15.5px;margin-bottom:10px}
+.member-detail-grid{gap:11px 14px}
+.member-detail-item span{line-height:1.45}
+.member-detail-item small{font-size:11.5px;letter-spacing:.03em}
+.member-id-card{border-radius:22px}
+.member-id-main{padding:19px 17px 15px}
+.member-id-photo{border-radius:15px}
+.member-id-barcode{padding:13px 24px 15px}
+.member-profile-toolbar{padding-bottom:12px}
+.drop-zone{border-radius:15px;padding:17px 14px;background:#f4f8fa}
+.drop-zone:hover{border-color:#8fb0c2}
+.member-editor>.card{padding:18px}
+.member-section-heading{margin-bottom:12px}
+.dots{gap:7px;margin:8px 0 16px}
+.dots span{height:6px;border-radius:99px}
+
+/* ---------- Kegiatan, Detail & Absensi ---------- */
+.kegiatan-bulan-judul{font-size:15.5px;margin:2px 2px 11px}
+.activity-list{gap:11px}
+.activity-list>.activity-card{padding:14px;border-radius:20px;transition:transform .15s ease,box-shadow .15s ease,border-color .15s ease,opacity .15s ease}
+.activity-list>.activity-card:hover{border-color:#a9c6d6}
+.activity-card h2{line-height:1.3}
+.activity-counts b{padding:7px 11px}
+.activity-chart{height:15px;margin-top:11px}
+.activity-detail-card{padding:19px}
+.activity-detail-card h2{letter-spacing:-.01em}
+.activity-region-pick{border-radius:17px;padding:13px;transition:border-color .15s ease,box-shadow .15s ease,transform .15s ease}
+.activity-region-pick:hover{border-color:#a9c6d6}
+.activity-region-pick:active{transform:scale(.99)}
+.activity-region-section{border-radius:17px;padding:13px;background:#fbfdfe}
+.activity-participant{border-radius:13px;background:#fbfdfe}
+.absensi-row{border-radius:13px;background:#fbfdfe;padding:10px 10px 10px 13px}
+.absensi-seg{box-shadow:inset 0 1px 3px rgba(50,75,95,.08)}
+.absensi-opt{min-height:34px;display:inline-flex;align-items:center;justify-content:center;transition:background .13s ease,color .13s ease}
+.absensi-chip{padding:7px 11px}
+.activity-scanner-video{border-radius:16px}
+
+/* ---------- Ringkasan & Laporan ---------- */
+.ringkasan-tabs{border-radius:999px;padding:4px;background:#dce7ee;margin-bottom:14px}
+.ringkasan-tab{border-radius:999px;padding:9px 6px;transition:background .15s ease,color .15s ease,box-shadow .15s ease}
+.ringkasan-tab.on{box-shadow:0 3px 9px rgba(23,50,77,.13)}
+.ringkasan-summary h2{font-size:19px}
+.lap-card{padding:17px}
+.lap-h{font-size:15.5px;margin-bottom:11px}
+.laporan-wrap,.rekap-wrap{border-radius:14px}
+.laporan-table th,.laporan-table td{padding:8px 11px}
+.laporan-table tbody tr{transition:background .12s ease}
+.rekap-table th,.rekap-table td{padding:8px}
+.rekap-table tbody tr:hover td{background:#e9f3ee}
+.laporan-table tbody tr:hover td{background:#eef5f1}
+.rekap-title{font-size:16.5px}
+.rekap-subtitle{line-height:1.5}
+
+/* ---------- Kepengurusan ---------- */
+.org-toggle{border-radius:999px;padding:4px;background:#eef4f7;box-shadow:6px 8px 18px rgba(70,95,115,.1)}
+.org-toggle-btn{padding:8px 22px;font-size:13.5px;transition:background .15s ease,color .15s ease,box-shadow .15s ease}
+.org-table{border-radius:19px;box-shadow:6px 8px 18px rgba(70,95,115,.1),-3px -3px 10px rgba(255,255,255,.5)}
+.org-group-head{margin-bottom:11px}
+.org-group-heading{letter-spacing:-.01em}
+.org-row{transition:background .12s ease}
+.org-row:not(.org-row-head):hover{background:rgba(255,255,255,.55)}
+.org-person{border-radius:12px}
+.org-wa-btn{transition:background .15s ease,transform .15s ease}
+.org-wa-btn:active{transform:scale(.93)}
+.org-set-row{border-radius:0 0 18px 18px}
+.anggota-saran{border-radius:15px;padding:5px}
+.anggota-opt{border-radius:10px;padding:9px 10px}
+
+/* ---------- Persetujuan ---------- */
+.approval-row{padding:15px 16px;gap:12px}
+.approval-row .av{width:46px;height:46px;font-size:18px}
+.approval-actions{gap:7px}
+.approval-note{font-size:13.5px;margin-bottom:13px}
+
+/* ---------- Pesan ---------- */
+.inbox-head{margin-bottom:12px}
+.conversation-row{border-radius:17px;padding:12px 13px;box-shadow:5px 7px 16px rgba(70,95,115,.09);transition:border-color .15s ease,background .15s ease,transform .15s ease}
+.conversation-row:active{transform:scale(.99)}
+.conversation-main b{line-height:1.3}
+.chat-card{border-radius:22px;box-shadow:8px 10px 22px rgba(70,95,115,.13),-5px -5px 14px rgba(255,255,255,.55)}
+.chat-head{padding:6px 4px 13px}
+.chat-bubble{line-height:1.5;font-size:14.5px;box-shadow:0 2px 6px rgba(50,75,95,.07)}
+.chat-card .reply-box{padding-top:9px}
+.composer-field textarea{border-radius:20px}
+.composer-field .composer-plus,.composer-field .composer-mic{transition:background .15s ease,transform .15s ease}
+.composer-field .composer-plus:active,.composer-field .composer-mic:active{transform:scale(.92)}
+.attachment-menu{border-radius:15px;box-shadow:0 10px 26px rgba(23,50,77,.18)}
+.chat-dialog-preview{border-radius:11px}
+
+/* ---------- Keuangan ---------- */
+.fin-total{background:linear-gradient(115deg,#f8fbfc,#e9f4f1);border-color:#cfe0da;border-radius:19px;box-shadow:6px 8px 18px rgba(70,95,115,.1)}
+.fin-total b{color:#1d5c4e}
+.fin-summary-row{padding:10px 0}
+.fin-row{border-radius:17px;padding:12px 13px;box-shadow:5px 7px 16px rgba(70,95,115,.09);transition:border-color .15s ease}
+.fin-row:hover{border-color:#a9c6d6}
+.fin-thumb{border-radius:13px}
+.fin-amount{color:#1d5c4e}
+.fin-nota-preview{border-radius:14px}
+.fin-lightbox img{border-radius:14px}
+
+/* ---------- Forum & Jadwal Piket ---------- */
+.duty-heading{margin-bottom:13px}
+.duty-card{border-radius:20px;box-shadow:6px 8px 18px rgba(70,95,115,.1),-3px -3px 10px rgba(255,255,255,.5)}
+.duty-assignment{border-radius:12px;padding:10px 12px}
+.duty-form-assignment{border-radius:15px}
+
+/* ---------- Peta: poles seperlunya (struktur tidak diubah) ---------- */
+.peta-list-panel{box-shadow:6px 8px 18px rgba(70,95,115,.1),-3px -3px 10px rgba(255,255,255,.5)}
+.peta-bottombar{box-shadow:6px 8px 18px rgba(70,95,115,.1)}
+.peta-name-item{border-radius:11px}
+.peta-detail{border-radius:20px}
+.peta-chip{transition:border-color .15s ease,background .15s ease,color .15s ease,box-shadow .15s ease,transform .15s ease}
+.peta-chip:active{transform:scale(.98)}
+
+/* ---------- Musyawarah: hanya penyelarasan tema luar ---------- */
+.musy-root{box-shadow:0 12px 30px rgba(50,75,95,.16)}
+.musy-root .musy-wrap{border-radius:20px}
+.musy-root .musy-pages{border-radius:20px}
+
+/* ---------- Lebar desktop: daftar memanfaatkan ruang ---------- */
+@media (min-width:1024px){
+  main{padding:22px 20px 40px}
+  .member-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+  .fin-list{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+  .duty-list{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:start}
+  .fin-totals{gap:12px}
+}
+@media (min-width:1440px){
+  .member-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media (max-width:560px){
+  main{padding:14px 12px 28px}
+  h1{font-size:23px}
+  .hero{padding:22px 17px 20px;border-radius:23px}
+  .auth-card{padding:19px 16px}
+  .home-welcome{padding:19px 16px}
+  .confirm-card{padding:18px 16px}
+}
