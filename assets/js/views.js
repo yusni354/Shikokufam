@@ -63,6 +63,8 @@ function renderDrawer(){
    navigasi bawah: semua perpindahan halaman lewat drawer. */
 function setAuthLocked(locked){
   document.body.classList.toggle('auth-locked',!!locked);
+  /* Kunci satu-jendela halaman Peta tidak berlaku di layar terkunci */
+  if(locked)document.body.classList.remove('peta-view');
   if(locked){
     document.body.classList.remove('open');
     const qm=document.querySelector('#qm');if(qm)qm.remove();
@@ -157,6 +159,12 @@ function render(){
   updateApprovalBadges();
   const current=ALL.find(x=>x[0]===S.view);
   if(!V[S.view]||(S.view==='approvals'&&!S.admin)||(S.view==='pengaturan'&&!S.mainAdmin))S.view='landing';
+  /* Halaman Peta = SATU JENDELA tanpa gulir halaman: kelas 'peta-view'
+     pada body mengunci tinggi halaman setinggi layar (lihat CSS
+     .peta-fit di style.css); halaman lain tidak terpengaruh. Dipasang
+     di sini — sesudah pemulihan & validasi view — supaya nilainya
+     selalu mengikuti view yang benar-benar digambar. */
+  document.body.classList.toggle('peta-view',S.view==='peta');
   const content=[];
   const storageErrors=Object.values(S.storageErrors||{});
   if(storageErrors.length)content.push(h('p',{class:'warn storage-warning'},'Database bersama tidak dapat dibaca: '+storageErrors.join(' · ')+' Jalankan pembaruan skema Supabase, lalu muat ulang aplikasi.'));

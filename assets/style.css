@@ -1502,3 +1502,72 @@ body.auth-locked .landing{padding-top:0}
 .card .rekap-table .rekap-name,.card .rekap-table .rekap-name b{white-space:normal;overflow-wrap:normal;word-break:normal}
 .card .rekap-divider-label{white-space:nowrap;overflow-wrap:normal;word-break:normal}
 .card .laporan-table th{white-space:nowrap;overflow-wrap:normal;word-break:normal}
+
+/* ===== Halaman Peta SATU JENDELA (tanpa gulir halaman) =====
+   Saat view Peta aktif, render() memberi body kelas 'peta-view':
+   body menjadi kolom lentur setinggi layar (header diam di atas,
+   main mengisi sisa tinggi dan TIDAK bisa digulir). Di dalamnya
+   .peta-fit menyusun judul ringkas, kontrol, chip wilayah, lalu
+   .peta-split: peta sebagai ruang utama lentur + panel daftar nama.
+   Hanya daftar nama (dan chip bila sempit) yang boleh digulir DI
+   DALAM areanya sendiri. Desktop (≥900px): daftar di kolom kanan;
+   di bawah itu daftar menjadi pita di bawah peta. */
+body.peta-view{display:flex;flex-direction:column;height:100vh;height:100dvh;overflow:hidden}
+body.peta-view main{flex:1;min-height:0;overflow:hidden;width:100%;max-width:1180px;padding:10px 12px 12px;display:flex;flex-direction:column}
+@media (max-width:640px){body.peta-view main{padding:8px 8px 10px}}
+.peta-fit{flex:1;min-height:0;display:flex;flex-direction:column;gap:8px}
+.peta-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;flex:none}
+.peta-title{font-size:20px;margin:0;line-height:1.15}
+.peta-pills{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto}
+.peta-pill{display:inline-flex;align-items:baseline;gap:5px;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:4px 11px;font-size:12px;color:var(--mut);font-weight:600;box-shadow:0 2px 8px rgba(47,134,184,.07)}
+.peta-pill b{font-size:15px;color:#16283a;line-height:1}
+.peta-controls{display:flex;flex-wrap:wrap;gap:7px;align-items:center;flex:none}
+.peta-controls .peta-search{flex:1 1 180px;padding:1px 5px 1px 12px}
+.peta-controls .peta-search input{min-height:32px;font-size:14px}
+.peta-controls .btn.s{padding:6px 11px;font-size:13px;background:var(--card)}
+/* Chip wilayah: SATU baris yang bisa digeser menyamping di dalam
+   barisnya sendiri (halaman tetap tidak bergulir) */
+.peta-fit .peta-chips{display:flex;flex-wrap:nowrap;gap:6px;overflow-x:auto;overflow-y:hidden;padding:2px 1px 4px;flex:none;scrollbar-width:thin;-webkit-overflow-scrolling:touch}
+.peta-fit .peta-chip{width:auto;flex:none;min-height:32px;padding:5px 10px 5px 8px;font-size:12.5px}
+.peta-split{flex:1;min-height:0;display:flex;gap:10px;position:relative}
+.peta-fit .peta-map-card{flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;margin-bottom:0}
+.peta-fit .peta-map-head{padding:9px 12px 8px;flex:none;align-items:center}
+.peta-fit .peta-map-head h2{font-size:14.5px}
+.peta-fit .peta-map-head p{font-size:11.5px;margin-top:2px}
+.peta-map-head-main{min-width:0}
+.peta-fit .peta-map-head-side{flex-direction:row;align-items:center;gap:8px}
+.peta-fit #peta-map{flex:1;height:auto;min-height:0}
+.peta-fit .peta-map-foot{padding:6px 12px 8px;flex:none}
+.peta-fit .peta-map-foot span{font-size:11.5px}
+.peta-fit .peta-fix-banner,.peta-fit .peta-fix-notice,.peta-fit .peta-geo-status,.peta-fit .peta-notice{flex:none}
+/* Panel daftar nama: mengisi sisa ruang, daftarnya digulir di dalam */
+.peta-list-panel{flex:none;width:336px;min-height:0;display:flex;flex-direction:column;background:var(--card);border:1px solid var(--line);border-radius:20px;padding:11px 11px 9px;box-shadow:0 4px 16px rgba(47,134,184,.09)}
+.peta-list-head{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;flex:none}
+.peta-fit .peta-h2{font-size:15.5px;margin:0}
+.peta-list-sub{font-size:11px;color:var(--mut);line-height:1.35}
+.peta-fit .peta-belum{margin:7px 0 0;font-size:11px;line-height:1.45;flex:none}
+.peta-fit .peta-member-list{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;display:grid;grid-template-columns:repeat(auto-fill,minmax(126px,1fr));gap:5px;margin:9px 0 0;padding:0 2px 2px 0;align-content:start;scrollbar-width:thin;-webkit-overflow-scrolling:touch}
+.peta-name-item{width:100%;min-width:0;display:flex;align-items:center;gap:6px;padding:6px 8px;border:1.5px solid #e3ecf2;border-radius:10px;background:#f4f8fa;color:#111827;font-family:inherit;font-size:12.5px;font-weight:600;cursor:pointer;text-align:left;line-height:1.25}
+.peta-name-item:hover{border-color:#b9cbd8}
+.peta-name-item.on{border-color:#354b64;background:#fff;box-shadow:0 3px 10px rgba(50,75,95,.13)}
+.peta-name-dot{width:9px;height:9px;border-radius:50%;flex:none;border:1.5px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.14)}
+.peta-name-dot-empty{background:transparent;border:2px dashed #94a8b8;box-shadow:none;width:8px;height:8px}
+.peta-name-text{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.peta-name-item.unmapped{opacity:.72;font-weight:500}
+.peta-fit .peta-empty{margin-top:9px;padding:12px;font-size:12.5px;flex:none}
+/* Kartu detail anggota: panel melayang di atas sudut kiri-bawah
+   area split (di atas peta), bisa digulir di dalam panelnya sendiri */
+.peta-fit .peta-detail{position:absolute;left:10px;bottom:10px;z-index:1200;width:min(430px,calc(100% - 20px));max-height:calc(100% - 20px);overflow-y:auto;margin-bottom:0}
+.peta-fit .peta-detail h3{font-size:19px}
+@media (max-width:899px){
+  .peta-split{flex-direction:column}
+  .peta-list-panel{width:auto;flex:0 0 31%;min-height:120px}
+  .peta-fit .peta-detail{left:6px;bottom:6px;width:calc(100% - 12px)}
+  .peta-title{font-size:18px}
+  .peta-fit .peta-map-head p{display:none}
+  .peta-fit .peta-map-foot #peta-hint{display:none}
+}
+@media (max-height:560px){
+  .peta-list-panel{flex-basis:27%}
+  .peta-fit .peta-map-head{padding:6px 10px}
+}

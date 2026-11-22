@@ -762,6 +762,7 @@ async function petaGeocodeEntries(gen){
           const ada=PM.entries.find(en=>en.key===idkey);
           if(ada&&!ada.manual){ada.coords=[hasil.c[0],hasil.c[1]];ada.lvl=hasil.l;const mk=PM.markers[idkey];if(mk)mk.setLatLng(ada.coords)}
           else if(!ada)PM.entries.push(petaBuatEntry(item.m,item.i,hasil.c,hasil.l));
+          if(PM.belumList)PM.belumList=PM.belumList.filter(x=>x!==item.m);
           petaRefresh();
           const en2=PM.entries.find(en=>en.key===idkey);
           if(en2&&String(S.petaSelected)===idkey)petaShowDetail(en2);
@@ -1084,17 +1085,42 @@ function petaSpiderExpand(cl){
     mk.addTo(PM.spiderLayer);
   });
 }
+/* Daftar nama di halaman peta: NAMA SAJA (tanpa alamat/keterangan)
+   dalam chip rapat banyak-kolom supaya muat banyak dalam ruang kecil.
+   Titik warna di kiri nama = warna wilayahnya. Ketuk nama tetap
+   memusatkan peta ke pin & membuka detail seperti sebelumnya.
+   Anggota yang BELUM terpetakan (tanpa pin) tetap ikut tampil di
+   bagian akhir daftar yang sama dengan penanda titik berongga +
+   kelas 'unmapped', supaya tetap terjangkau dalam tata letak satu
+   jendela; ketuk namanya membuka kartu detail dengan keterangan
+   belum terpetakan (tanpa memindahkan peta, karena belum ada pin). */
 function petaRenderList(){
   const ul=document.getElementById('peta-list');if(!ul)return;
   const list=petaFiltered().slice().sort((a,b)=>a.region.localeCompare(b.region)||String(a.m.nama||'').localeCompare(String(b.m.nama||'')));
-  const empty=document.getElementById('peta-empty');if(empty)empty.style.display=list.length?'none':'block';
-  ul.replaceChildren(...list.map(en=>{
+  const q=String(S.petaSearch||'').toLowerCase();
+  const belumList=(PM.belumList||[]).filter(m=>{
+    if(S.petaFilter&&memberRegion(m)!==S.petaFilter)return false;
+    if(q&&!String(m.nama||'').toLowerCase().includes(q))return false;
+    return true;
+  }).slice().sort((a,b)=>memberRegion(a).localeCompare(memberRegion(b))||String(a.nama||'').localeCompare(String(b.nama||'')));
+  const empty=document.getElementById('peta-empty');if(empty)empty.style.display=(list.length||belumList.length)?'none':'block';
+  const anak=list.map(en=>{
     const m=en.m,c=regionColor(en.region);
-    return h('li',{},h('button',{type:'button',class:'peta-member-item'+(String(S.petaSelected)===en.key?' on':''),onclick:()=>petaSelect(en,{fly:true,popup:true})},
-      h('span',{class:'peta-avatar',style:'background:'+c},petaInisial(m.nama)),
-      h('span',{class:'peta-member-main'},h('strong',{},m.nama||'Tanpa nama'),h('span',{},[m.kota,m.pref].filter(Boolean).join(', ')||'—',m.alamat_jp?' • '+m.alamat_jp:'',en.manual?' • Posisi manual':'')),
-      h('span',{class:'peta-mini-badge',style:'background:'+c},en.region)));
-  }));
+    return h('li',{},h('button',{type:'button',class:'peta-name-item'+(String(S.petaSelected)===en.key?' on':''),title:(m.nama||'Tanpa nama')+' — '+en.region,onclick:()=>petaSelect(en,{fly:true,popup:true})},
+      h('span',{class:'peta-name-dot',style:'background:'+c}),
+      h('span',{class:'peta-name-text'},m.nama||'Tanpa nama')));
+  });
+  belumList.forEach((m,i)=>{
+    const key='belum-'+String(m.id||('idx'+i));
+    anak.push(h('li',{},h('button',{type:'button',class:'peta-name-item unmapped'+(String(S.petaSelected)===key?' on':''),title:(m.nama||'Tanpa nama')+' — belum terpetakan',onclick:()=>{
+        S.petaSelected=key;
+        petaShowDetail({m,region:memberRegion(m),coords:null,manual:false,belum:true,key,lvl:''});
+        petaRenderList();
+      }},
+      h('span',{class:'peta-name-dot peta-name-dot-empty'}),
+      h('span',{class:'peta-name-text'},m.nama||'Tanpa nama'))));
+  });
+  ul.replaceChildren(...anak);
 }
 function petaRenderStats(){
   const total=document.getElementById('peta-stat-total');if(total)total.textContent=String((S.members||[]).length);
@@ -1112,9 +1138,11 @@ function petaShowDetail(en){
   const card=document.getElementById('peta-detail');if(!card)return;
   const m=en.m,c=regionColor(en.region);
   const boxInfo=(label,value)=>h('div',{class:'peta-detail-box'},h('label',{},label),h('p',{},value||'—'));
-  const sumber=en.manual
+  const sumber=en.belum
+    ?'Belum terpetakan — alamat/kode pos Jepangnya belum berhasil dipetakan persis, jadi anggota ini belum punya pin di peta. Lengkapi alamatnya lewat menu Data Anggota supaya pinnya muncul.'
+    :(en.manual
     ?'Posisi manual — ditetapkan admin pada '+en.coords[0].toFixed(5)+', '+en.coords[1].toFixed(5)+'. Pin ini tidak digeser geocoding otomatis.'
-    :('Otomatis dari alamat — ketepatan '+(en.lvl||'Kode pos')+(en.lvl==='Alamat'?' (titik hasil geocoding alamat lengkap, dekat titik kode pos alamat ini)':' (titik kawasan kode pos alamat ini)'));
+    :('Otomatis dari alamat — ketepatan '+(en.lvl||'Kode pos')+(en.lvl==='Alamat'?' (titik hasil geocoding alamat lengkap, dekat titik kode pos alamat ini)':' (titik kawasan kode pos alamat ini)')));
   const anak=[
     h('div',{class:'peta-detail-top'},
       h('div',{style:'flex:1;min-width:0'},
@@ -1129,7 +1157,7 @@ function petaShowDetail(en){
       boxInfo('Stasiun terdekat • Kode pos',[m.stasiun,m.kodepos?('〒'+m.kodepos):''].filter(Boolean).join('  •  ')),
       boxInfo('Sumber posisi pin',sumber))
   ];
-  if(S.admin){
+  if(S.admin&&!en.belum){
     const tombol=[h('button',{type:'button',class:'btn s',onclick:()=>petaMulaiPerbaiki(en)},S.petaFixMode?'Geser pin ini di peta':'Perbaiki Posisi')];
     if(en.manual)tombol.push(h('button',{type:'button',class:'btn s',onclick:()=>petaKembalikanOtomatis(en)},'Kembalikan Otomatis'));
     anak.push(h('div',{class:'fl',style:'margin-top:12px'},...tombol));
@@ -1144,16 +1172,40 @@ function petaSelect(en,opts){
   petaShowDetail(en);petaRenderMarkers();petaRenderList();
   if(opts.fly&&PM.map)PM.map.flyTo(en.coords,Math.max(PM.map.getZoom(),11),{duration:.7});
   if(opts.popup&&PM.markers[en.key])setTimeout(()=>{const mk=PM.markers[en.key];if(mk)mk.openPopup()},opts.fly?750:60);
-  if(window.innerWidth<900){const card=document.getElementById('peta-detail');if(card)card.scrollIntoView({behavior:'smooth',block:'nearest'})}
+  /* Halaman peta kini satu jendela tanpa gulir: kartu detail tampil
+     sebagai panel melayang di atas area peta/daftar, jadi TIDAK ada
+     lagi scrollIntoView yang menggulir halaman ke kartu detail. */
 }
+/* Halaman Peta SATU JENDELA: seluruh isi (judul ringkas, kontrol,
+   chip wilayah, peta, dan daftar nama) muat dalam satu tinggi layar
+   TANPA halaman bisa digulir ke bawah — body diberi kelas 'peta-view'
+   oleh render() (views.js) dan CSS .peta-fit mengunci tingginya.
+   Peta mengambil ruang utama yang lentur; daftar nama menempati sisa
+   ruang (kolom kanan di desktop, pita bawah di HP) dan hanya AREA
+   DAFTAR itu yang bisa digulir di dalam areanya sendiri bila nama
+   sangat banyak. Daftar hanya menampilkan NAMA + titik warna wilayah
+   (tanpa alamat) supaya muat banyak. */
 function vPeta(){
   const {entries,belum}=petaEntries();
-  const stat=(id,val,label)=>h('div',{class:'peta-stat'},h('b',{id},String(val)),h('span',{},label));
+  PM.belumList=belum;
+  const stat=(id,val,label)=>h('span',{class:'peta-pill'},h('b',{id},String(val)),h('span',{},label));
   const styleBtn=(key,label)=>h('button',{type:'button',class:'peta-style-btn'+(PM.style===key?' on':''),'data-style':key,'aria-label':'Tampilan peta '+label},label);
   const fixAktif=!!(S.admin&&S.petaFixMode);
+  const topBar=h('div',{class:'peta-top'},
+    h('h1',{class:'peta-title'},'Peta & Wilayah'),
+    h('div',{class:'peta-pills'},
+      stat('peta-stat-total',(S.members||[]).length,'Total'),
+      stat('peta-stat-pin',entries.length,'Di peta'),
+      stat('peta-stat-wilayah',new Set((S.members||[]).map(m=>memberRegion(m))).size,'Wilayah')));
+  const controls=h('div',{class:'peta-controls'},
+    h('label',{class:'peta-search'},icon('search',16),h('input',{id:'peta-search',type:'search',placeholder:'Cari nama anggota…',autocomplete:'off'})),
+    h('button',{type:'button',class:'btn s',id:'peta-reset'},'Semua wilayah'),
+    h('button',{type:'button',class:'btn s',id:'peta-shikoku'},'Ke Shikoku'),
+    S.admin?h('button',{type:'button',class:'btn s'+(fixAktif?' peta-fix-on':''),id:'peta-fix-toggle'},fixAktif?'Selesai Memperbaiki':'Perbaiki Posisi Pin'):null);
+  const chipsRow=h('div',{class:'peta-chips',id:'peta-chips','aria-label':'Saringan warna wilayah'});
   const mapCard=h('section',{class:'peta-map-card'},
     h('div',{class:'peta-map-head'},
-      h('div',{},h('h2',{},'Peta Jepang — Shikoku & sekitarnya'),h('p',{},fixAktif?'Mode Perbaiki Posisi Pin aktif — geser pin ke posisi yang benar':'Ketuk pin untuk melihat nama anggota • Geser & zoom bebas')),
+      h('div',{class:'peta-map-head-main'},h('h2',{},'Peta Jepang — Shikoku & sekitarnya'),h('p',{},fixAktif?'Mode Perbaiki Posisi Pin aktif — geser pin ke posisi yang benar':'Ketuk pin untuk melihat nama anggota • Geser & zoom bebas')),
       h('div',{class:'peta-map-head-side'},
         h('div',{class:'peta-style-switch',role:'group','aria-label':'Pilihan tampilan peta'},styleBtn('jalan','Jalan'),styleBtn('satelit','Satelit'),styleBtn('terang','Terang')),
         h('span',{class:'peta-count-badge',id:'peta-count'},entries.length+' pin tampil'))),
@@ -1163,28 +1215,16 @@ function vPeta(){
     h('div',{id:'peta-geo-status',class:'peta-geo-status',style:'display:none'}),
     h('div',{id:'peta-notice',class:'peta-notice',style:'display:none'},'Server peta luar sedang tidak terjangkau, jadi yang tampil adalah ',h('b',{},'peta dasar cadangan lokal'),'. Pencarian, saringan wilayah, dan detail anggota tetap bekerja.'),
     h('div',{class:'peta-map-foot'},h('span',{id:'peta-attrib'},'Memuat peta dasar… • Leaflet'),h('span',{id:'peta-hint'},fixAktif?'Mode Perbaiki Posisi Pin aktif — geser pin untuk memindahkannya':'Menampilkan semua wilayah')));
-  const stats=h('div',{class:'peta-stats'},
-    stat('peta-stat-total',(S.members||[]).length,'Total anggota'),
-    stat('peta-stat-pin',entries.length,'Terpetakan di peta'),
-    stat('peta-stat-wilayah',new Set((S.members||[]).map(m=>memberRegion(m))).size,'Wilayah terisi'));
-  const detail=h('section',{id:'peta-detail',class:'peta-detail',style:'display:none'});
-  const controls=box(
-    h('div',{class:'peta-controls-row'},
-      h('label',{class:'peta-search'},icon('search',17),h('input',{id:'peta-search',type:'search',placeholder:'Cari nama anggota…',autocomplete:'off'})),
-      h('button',{type:'button',class:'btn s',id:'peta-reset'},'Semua wilayah'),
-      h('button',{type:'button',class:'btn s',id:'peta-shikoku'},'Ke Shikoku'),
-      S.admin?h('button',{type:'button',class:'btn s'+(fixAktif?' peta-fix-on':''),id:'peta-fix-toggle'},fixAktif?'Selesai Memperbaiki':'Perbaiki Posisi Pin'):null),
-    h('div',{class:'peta-legend-head'},h('h3',{},'Legenda warna wilayah'),h('span',{},'Angka = jumlah anggota terpetakan • Ketuk chip untuk menyaring, ketuk lagi untuk membatalkan')),
-    h('div',{class:'peta-chips',id:'peta-chips'}));
-  const listCard=box(
-    h('h2',{class:'peta-h2'},'Daftar Anggota'),
-    h('p',{class:'sub',style:'margin-bottom:4px'},'Ketuk nama untuk memusatkan peta ke pin-nya. Daftar mengikuti pencarian & saringan wilayah di atas.'),
+  const listPanel=h('section',{class:'peta-list-panel'},
+    h('div',{class:'peta-list-head'},
+      h('h2',{class:'peta-h2'},'Daftar Anggota'),
+      h('span',{class:'peta-list-sub'},'Ketuk nama untuk ke pin-nya • titik berongga = belum terpetakan')),
+    h('p',{class:'warn peta-belum',id:'peta-belum-note',style:belum.length?'':'display:none'},belum.length?belum.length+' anggota belum tampil di peta karena alamat/kode pos Jepangnya belum berhasil dipetakan persis. Lengkapi alamat mereka lewat menu Data Anggota supaya pin mereka muncul.':''),
     h('ul',{class:'peta-member-list',id:'peta-list'}),
     h('div',{class:'peta-empty',id:'peta-empty',style:'display:none'},'Tidak ada anggota yang cocok. Coba kata pencarian lain atau tampilkan semua wilayah.'));
-  const out=[h('h1',{},'Peta & Wilayah'),mapCard,stats];
-  if(belum.length)out.push(h('p',{class:'warn peta-belum',id:'peta-belum-note'},belum.length+' anggota belum tampil di peta karena alamat/kode pos Jepangnya belum berhasil dipetakan persis. Lengkapi alamat mereka lewat menu Daftar Anggota supaya pin mereka muncul.'));
-  out.push(detail,controls,listCard);
-  return out;
+  const detail=h('section',{id:'peta-detail',class:'peta-detail',style:'display:none'});
+  const split=h('div',{class:'peta-split'},mapCard,listPanel,detail);
+  return [h('div',{class:'peta-fit'},topBar,controls,chipsRow,split)];
 }
 /* Dipanggil render() sesudah halaman Peta terpasang di DOM: bangun (ulang)
    peta Leaflet dari data terbaru dan pasang semua pengendali halaman.
@@ -1197,7 +1237,9 @@ function initPetaMap(){
     if(PM.tileTimer){clearTimeout(PM.tileTimer);PM.tileTimer=null}
     if(PM.map){try{PM.map.remove()}catch(e){}PM.map=null;PM.layer=null;PM.markers={};PM.tileLayer=null;PM.fallbackLayer=null;PM.fallback=false;PM.spiderLayer=null;PM.spider=null;PM.clusters=[];PM.clusterOf={}}
     PM.gen=(PM.gen||0)+1;
-    PM.entries=petaEntries().entries;
+    const hasilAwal=petaEntries();
+    PM.entries=hasilAwal.entries;
+    PM.belumList=hasilAwal.belum;
     document.querySelectorAll('.peta-style-btn').forEach(b=>{b.classList.toggle('on',b.getAttribute('data-style')===PM.style);b.onclick=()=>petaSetStyle(b.getAttribute('data-style'))});
     const search=document.getElementById('peta-search');
     if(search){search.value=S.petaSearch||'';search.oninput=()=>{S.petaSearch=search.value.trim();petaRenderMarkers();petaRenderList();petaRenderStats()}}
@@ -1228,6 +1270,14 @@ function initPetaMap(){
     PM.chain=petaChain();
     petaTryBasemap(0);
     petaRefresh();
+    /* Tata letak satu jendela: tinggi peta lentur mengikuti sisa ruang
+       layar, jadi Leaflet perlu diberi tahu ukuran akhirnya sesudah
+       tata letak selesai (dan setiap ukuran jendela berubah). */
+    setTimeout(()=>{if(PM.map)PM.map.invalidateSize()},90);
+    if(!PM.resizeBound){
+      PM.resizeBound=true;
+      window.addEventListener('resize',()=>{if(PM.map&&S.view==='peta'){try{PM.map.invalidateSize()}catch(e){}}});
+    }
     /* Penempatan pin presisi dari alamat lengkap berjalan di latar —
        dijeda selama mode Perbaiki Posisi Pin aktif supaya pin yang
        sedang digeser tidak berpindah sendiri. */
