@@ -600,25 +600,30 @@ body.qr-full-lock{overflow:hidden}
 .qr-full-close:active{transform:scale(.97)}
 /* ===== Genie effect kartu kegiatan (ala minimize jendela macOS) =====
    Seperti jin tersedot masuk lampu: transform-origin selalu di titik
-   klik pengguna pada kartu (diatur JS per klik).
-   .genie-out (±170 ms): kartu yang diklik menyempit tak seragam
+   klik pengguna pada kartu (diatur JS per klik). Total gerak ±810–830
+   ms, dibagi dua fase yang mengalir tanpa patah:
+   .genie-out (250 ms): kartu yang diklik menyempit tak seragam
    (scaleX jauh lebih kecil dari scaleY yang justru meregang) sambil
    miring (skew mengikuti posisi klik lewat --gskew) dan sedikit
-   rotateX berperspektif — terasa tersedot melengkung ke titik klik.
-   .genie-in-open (±420 ms): kartu lebar hasil render mulai dari
+   rotateX berperspektif — warp-nya bergerak progresif lewat enam
+   tahapan rapat sehingga lengkung sedotannya terasa hidup dan halus,
+   makin cepat menjelang titik klik (easing akselerasi lembut).
+   .genie-in-open (580 ms): kartu lebar hasil render mulai dari
    keadaan tersedot (scaleX = rasio lebar kolom/lebar penuh, --gsx)
-   lalu mengembang melepas dengan sedikit lewatan elastis.
-   .genie-in-close (±400 ms): gerakan berkebalikan — kartu kolom
+   lalu mengembang melepas: warp terurai bertahap mengikuti lengkung
+   yang sama, ditutup ayunan elastis sangat halus sebelum menetap.
+   .genie-in-close (560 ms): gerakan berkebalikan — kartu kolom
    mulai meregang lebar dari titik klik lalu menyusut menetap ke
-   ukuran kolomnya. Hanya transform/opacity yang bergerak; tata
-   letak grid tidak berubah. */
-.activity-card.genie-out{animation:genieOut .17s ease-in both;will-change:transform}
-@keyframes genieOut{0%{transform:perspective(650px) rotateX(0deg) scale(1,1) skewX(0deg);opacity:1}38%{transform:perspective(650px) rotateX(1.5deg) scale(.84,1.05) skewX(calc(var(--gskew,0deg)*.55));opacity:1}100%{transform:perspective(650px) rotateX(3deg) scale(.42,1.14) skewX(var(--gskew,0deg)) translateY(5px);opacity:.5}}
+   ukuran kolomnya dengan tahapan dan tempo yang seirama.
+   Hanya transform/opacity yang bergerak; tata letak grid tidak
+   berubah. */
+.activity-card.genie-out{animation:genieOut .25s cubic-bezier(.5,.02,.72,.38) both;will-change:transform}
+@keyframes genieOut{0%{transform:perspective(700px) rotateX(0deg) scale(1,1) skewX(0deg);opacity:1}18%{transform:perspective(700px) rotateX(.6deg) scale(.965,1.012) skewX(calc(var(--gskew,0deg)*.18));opacity:1}38%{transform:perspective(700px) rotateX(1.4deg) scale(.9,1.045) skewX(calc(var(--gskew,0deg)*.42));opacity:.99}58%{transform:perspective(700px) rotateX(2.2deg) scale(.79,1.085) skewX(calc(var(--gskew,0deg)*.66));opacity:.96}78%{transform:perspective(700px) rotateX(2.9deg) scale(.62,1.12) skewX(calc(var(--gskew,0deg)*.86)) translateY(3px);opacity:.82}100%{transform:perspective(700px) rotateX(3.4deg) scale(.42,1.16) skewX(var(--gskew,0deg)) translateY(6px);opacity:.45}}
 .activity-card.genie-in{will-change:transform}
-.activity-card.genie-in-open{animation:genieInOpen .42s cubic-bezier(.25,1.1,.35,1) both}
-@keyframes genieInOpen{0%{transform:perspective(750px) rotateX(3deg) scale(var(--gsx,.34),1.13) skewX(var(--gskew,0deg));opacity:.45}52%{transform:perspective(750px) rotateX(0deg) scale(1.018,.992) skewX(calc(var(--gskew,0deg)*-.28));opacity:1}76%{transform:scale(.996,1.004) skewX(0deg)}100%{transform:scale(1,1) skewX(0deg);opacity:1}}
-.activity-card.genie-in-close{animation:genieInClose .4s cubic-bezier(.25,1.1,.35,1) both}
-@keyframes genieInClose{0%{transform:perspective(750px) rotateX(-2deg) scale(1.55,.9) skewX(var(--gskew,0deg));opacity:.5}52%{transform:perspective(750px) rotateX(0deg) scale(.978,1.012) skewX(calc(var(--gskew,0deg)*-.3));opacity:1}78%{transform:scale(1.004,.998) skewX(0deg)}100%{transform:scale(1,1) skewX(0deg);opacity:1}}
+.activity-card.genie-in-open{animation:genieInOpen .58s cubic-bezier(.22,1.04,.36,1) both}
+@keyframes genieInOpen{0%{transform:perspective(800px) rotateX(3.4deg) scale(var(--gsx,.34),1.16) skewX(var(--gskew,0deg));opacity:.45}16%{transform:perspective(800px) rotateX(2.6deg) scale(calc(var(--gsx,.34) + (1 - var(--gsx,.34))*.38),1.115) skewX(calc(var(--gskew,0deg)*.74));opacity:.62}32%{transform:perspective(800px) rotateX(1.7deg) scale(calc(var(--gsx,.34) + (1 - var(--gsx,.34))*.62),1.07) skewX(calc(var(--gskew,0deg)*.5));opacity:.8}48%{transform:perspective(800px) rotateX(.8deg) scale(calc(var(--gsx,.34) + (1 - var(--gsx,.34))*.83),1.032) skewX(calc(var(--gskew,0deg)*.28));opacity:.93}64%{transform:perspective(800px) rotateX(0deg) scale(calc(var(--gsx,.34) + (1 - var(--gsx,.34))*.96),1.01) skewX(calc(var(--gskew,0deg)*-.1));opacity:1}78%{transform:scale(1.011,.994) skewX(0deg);opacity:1}89%{transform:scale(.997,1.003) skewX(0deg)}100%{transform:scale(1,1) skewX(0deg);opacity:1}}
+.activity-card.genie-in-close{animation:genieInClose .56s cubic-bezier(.24,1.03,.36,1) both}
+@keyframes genieInClose{0%{transform:perspective(800px) rotateX(-2.4deg) scale(1.55,.9) skewX(var(--gskew,0deg));opacity:.5}18%{transform:perspective(800px) rotateX(-1.7deg) scale(1.36,.935) skewX(calc(var(--gskew,0deg)*.72));opacity:.66}36%{transform:perspective(800px) rotateX(-1deg) scale(1.2,.965) skewX(calc(var(--gskew,0deg)*.48));opacity:.82}54%{transform:perspective(800px) rotateX(-.4deg) scale(1.08,.99) skewX(calc(var(--gskew,0deg)*.24));opacity:.94}70%{transform:perspective(800px) rotateX(0deg) scale(1.02,1.004) skewX(calc(var(--gskew,0deg)*-.08));opacity:1}84%{transform:scale(.992,1.006) skewX(0deg)}100%{transform:scale(1,1) skewX(0deg);opacity:1}}
 @media(prefers-reduced-motion:reduce){.activity-card.genie-out,.activity-card.genie-in-open,.activity-card.genie-in-close{animation:none}.qr-full-frame::after{animation:none}.qr-full-result.ok.play,.qr-full-result.fail.play{animation-duration:.5s}}
 .activity-feedback{min-height:1.3em;color:var(--mut);font-size:14px}
 .activity-empty{color:var(--mut);margin:8px 0}

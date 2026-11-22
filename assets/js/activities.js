@@ -406,11 +406,12 @@ function activityCard(event){
   /* Klik pada badan kartu membuka/menutup daftar wilayah; klik pada
      tombol/field di dalam kartu (pemilih wilayah, pemindai)
      tidak ikut membuka/menutup. Urutan genie: (1) kartu yang diklik
-     TERSEDOT melengkung menuju titik klik (.genie-out ±170 ms —
-     menyempit tak seragam + skew/perspective ringan, transform-origin
-     di titik klik), (2) render menggambar keadaan baru, (3) kartu baru
-     mengembang melepas dari titik klik yang sama (membuka:
-     genie-in-open; menutup: genie-in-close, gerakan berkebalikan).
+     TERSEDOT melengkung menuju titik klik (.genie-out 250 ms —
+     menyempit tak seragam + skew/perspective progresif bertahap,
+     transform-origin di titik klik), (2) render menggambar keadaan
+     baru, (3) kartu baru mengembang melepas dari titik klik yang sama
+     (membuka: genie-in-open 580 ms; menutup: genie-in-close 560 ms,
+     gerakan berkebalikan). Total ±810–830 ms.
      Hanya transform/opacity yang bergerak — tata letak grid utuh.
      prefers-reduced-motion: langsung berganti tanpa animasi. */
   card.addEventListener('click',e=>{
@@ -442,9 +443,9 @@ function activityCard(event){
       if(genie.dir==='open'&&r.width)el.style.setProperty('--gsx',Math.min(1,Math.max(0.15,genie.w/r.width)).toFixed(3));
       const bersih=()=>{el.classList.remove('genie-in','genie-in-open','genie-in-close');el.removeAttribute('data-genie')};
       el.addEventListener('animationend',bersih,{once:true});
-      setTimeout(bersih,900);
+      setTimeout(bersih,1250);
       el.classList.add(genie.dir==='open'?'genie-in-open':'genie-in-close');
-    },170);
+    },250);
   });
   return card;
 }
@@ -1132,15 +1133,16 @@ function dialogRekapKegiatan(){
 /* ===== Panel pengaturan kegiatan dari tombol gigi kartu kegiatan =====
    Dibuka dengan mengetuk tombol roda gigi kecil di ujung bawah kartu
    kegiatan (khusus admin). Pola aplikasi yang sama seperti panel dari
-   kepala tabel Ringkasan: tanpa tombol X — mengetuk bidang di luar
-   kotak atau tombol penutup menutupnya. Tahap 'atur' berisi dua
-   pilihan: 'Edit Kegiatan' membuka formulir edit (field yang sama
-   seperti Buat Kegiatan TANPA Pengulangan: Nama & Lokasi dropdown
-   terkelola yang sama, Tanggal, Waktu — semua terisi nilai kegiatan
-   saat ini; menyimpan hanya memperbarui dokumen kegiatan itu, data
-   absensinya tidak berubah) dan 'Hapus Kegiatan' membuka konfirmasi
-   tegas yang menyebut nama kegiatan; sesudah dikonfirmasi kegiatan
-   beserta data absensinya terhapus dan daftar kartu digambar ulang. */
+   kepala tabel Ringkasan: tanpa tombol X dan tanpa tombol tutup —
+   panel hanya ditutup dengan mengetuk bidang di luar kotak. Tahap
+   'atur' berisi tepat dua pilihan: 'Edit' membuka formulir edit
+   (field yang sama seperti Buat Kegiatan TANPA Pengulangan: Nama &
+   Lokasi dropdown terkelola yang sama, Tanggal, Waktu — semua terisi
+   nilai kegiatan saat ini; menyimpan hanya memperbarui dokumen
+   kegiatan itu, data absensinya tidak berubah) dan 'Hapus' membuka
+   konfirmasi tegas yang menyebut nama kegiatan; sesudah dikonfirmasi
+   kegiatan beserta data absensinya terhapus dan daftar kartu
+   digambar ulang. */
 function dialogKegiatanKartu(){
   const d=S.kegiatanDialog;
   if(!d)return null;
@@ -1204,9 +1206,8 @@ function dialogKegiatanKartu(){
       h('b',{class:'confirm-title'},'Pengaturan Kegiatan'),
       h('p',{class:'confirm-text'},h('b',{},nama),h('br',{}),tglLabel),
       h('div',{class:'fl confirm-actions'},
-        h('button',{class:'btn s',onclick:tutup},'Tutup'),
-        h('button',{class:'btn',onclick:()=>{S.kegiatanDialog={...d,tahap:'edit'};render()}},'Edit Kegiatan'),
-        h('button',{class:'btn',onclick:()=>{S.kegiatanDialog={...d,tahap:'yakin'};render()}},'Hapus Kegiatan'))));
+        h('button',{class:'btn',onclick:()=>{S.kegiatanDialog={...d,tahap:'edit'};render()}},'Edit'),
+        h('button',{class:'btn',onclick:()=>{S.kegiatanDialog={...d,tahap:'yakin'};render()}},'Hapus'))));
 }
 /* ===== Pengulangan bulanan pada formulir Buat Kegiatan =====
    Tanggal pada formulir adalah AWAL rangkaian. Untuk pola 'tanggal',
