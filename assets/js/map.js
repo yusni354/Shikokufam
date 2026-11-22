@@ -1134,7 +1134,17 @@ function petaRenderStats(){
   const wil=document.getElementById('peta-stat-wilayah');if(wil)wil.textContent=String(new Set((S.members||[]).map(m=>memberRegion(m))).size);
 }
 function petaRefresh(){petaRenderChips();petaRenderMarkers();petaRenderList();petaRenderStats()}
+/* ===== Desktop (≥1024px): TANPA kartu detail anggota terpilih =====
+   Di layar lebar, mengklik nama di daftar atau pin TIDAK memunculkan
+   kartu detail melayang — kartu itu besar dan menutupi peta. Klik
+   cukup memusatkan peta ke pin anggota itu dan memberi penekanan
+   visual pada pin (ikon terpilih) serta namanya di daftar (kelas
+   'on'). Perbaikan posisi di desktop tetap lewat mode 'Perbaiki
+   Posisi Pin' di bilah alat. Di bawah 1024px (HP/tablet kecil)
+   panel detail tetap muncul seperti sebelumnya. */
+function petaLayarDesktop(){return typeof window!=='undefined'&&window.innerWidth>=1024}
 function petaShowDetail(en){
+  if(petaLayarDesktop()){petaHideDetail();return}
   const card=document.getElementById('peta-detail');if(!card)return;
   const m=en.m,c=regionColor(en.region);
   const boxInfo=(label,value)=>h('div',{class:'peta-detail-box'},h('label',{},label),h('p',{},value||'—'));
@@ -1169,22 +1179,32 @@ function petaShowDetail(en){
 function petaHideDetail(){const card=document.getElementById('peta-detail');if(card){card.style.display='none';card.replaceChildren()}}
 function petaSelect(en,opts){
   opts=opts||{};S.petaSelected=en.key;
-  petaShowDetail(en);petaRenderMarkers();petaRenderList();
-  if(opts.fly&&PM.map)PM.map.flyTo(en.coords,Math.max(PM.map.getZoom(),11),{duration:.7});
-  if(opts.popup&&PM.markers[en.key])setTimeout(()=>{const mk=PM.markers[en.key];if(mk)mk.openPopup()},opts.fly?750:60);
-  /* Halaman peta kini satu jendela tanpa gulir: kartu detail tampil
-     sebagai panel melayang di atas area peta/daftar, jadi TIDAK ada
-     lagi scrollIntoView yang menggulir halaman ke kartu detail. */
+  const desktop=petaLayarDesktop();
+  /* Desktop: TANPA kartu detail dan TANPA popup — klik cukup
+     memusatkan peta ke pin ini dan menandai pin + nama terpilih
+     (umpan balik visual), supaya peta tidak tertutup apa pun.
+     HP: kartu detail tampil sebagai lembar bawah yang tidak
+     menutupi seluruh peta, dan popup pin dibuka. */
+  if(desktop)petaHideDetail();else petaShowDetail(en);
+  petaRenderMarkers();petaRenderList();
+  if(en.coords&&PM.map&&(opts.fly||desktop))PM.map.flyTo(en.coords,Math.max(PM.map.getZoom(),11),{duration:.7});
+  if(opts.popup&&!desktop&&PM.markers[en.key])setTimeout(()=>{const mk=PM.markers[en.key];if(mk)mk.openPopup()},opts.fly?750:60);
+  if(desktop){
+    /* Nama terpilih digulir terlihat di dalam panel daftarnya sendiri
+       (panel memang bisa digulir di dalam areanya; halaman tidak). */
+    try{const on=document.querySelector('.peta-name-item.on');if(on)on.scrollIntoView({block:'nearest'})}catch(e){}
+  }
 }
-/* Halaman Peta SATU JENDELA: seluruh isi (judul ringkas, kontrol,
+/* Halaman Peta: di DESKTOP seluruh isi (judul ringkas, kontrol,
    chip wilayah, peta, dan daftar nama) muat dalam satu tinggi layar
    TANPA halaman bisa digulir ke bawah — body diberi kelas 'peta-view'
-   oleh render() (views.js) dan CSS .peta-fit mengunci tingginya.
-   Peta mengambil ruang utama yang lentur; daftar nama menempati sisa
-   ruang (kolom kanan di desktop, pita bawah di HP) dan hanya AREA
-   DAFTAR itu yang bisa digulir di dalam areanya sendiri bila nama
-   sangat banyak. Daftar hanya menampilkan NAMA + titik warna wilayah
-   (tanpa alamat) supaya muat banyak. */
+   oleh render() (views.js) dan CSS mengunci tingginya di layar
+   ≥900px; peta mengambil ruang utama yang lentur dan daftar nama di
+   kolom kanan hanya bisa digulir di dalam areanya sendiri. Di HP
+   berlaku aturan tersendiri: halaman BOLEH digulir alami, peta
+   bertinggi tetap di atas, dan daftar nama mengalir di bawahnya.
+   Daftar hanya menampilkan NAMA + titik warna wilayah (tanpa
+   alamat) supaya muat banyak. */
 function vPeta(){
   const {entries,belum}=petaEntries();
   PM.belumList=belum;
@@ -1276,7 +1296,7 @@ function initPetaMap(){
     setTimeout(()=>{if(PM.map)PM.map.invalidateSize()},90);
     if(!PM.resizeBound){
       PM.resizeBound=true;
-      window.addEventListener('resize',()=>{if(PM.map&&S.view==='peta'){try{PM.map.invalidateSize()}catch(e){}}});
+      window.addEventListener('resize',()=>{if(PM.map&&S.view==='peta'){try{PM.map.invalidateSize()}catch(e){}/* Jendela melebar ke ukuran desktop: kartu detail yang sedang terbuka ditutup — di desktop kartu itu tidak dipakai. */if(petaLayarDesktop())petaHideDetail()}});
     }
     /* Penempatan pin presisi dari alamat lengkap berjalan di latar —
        dijeda selama mode Perbaiki Posisi Pin aktif supaya pin yang

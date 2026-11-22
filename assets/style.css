@@ -1503,17 +1503,27 @@ body.auth-locked .landing{padding-top:0}
 .card .rekap-divider-label{white-space:nowrap;overflow-wrap:normal;word-break:normal}
 .card .laporan-table th{white-space:nowrap;overflow-wrap:normal;word-break:normal}
 
-/* ===== Halaman Peta SATU JENDELA (tanpa gulir halaman) =====
-   Saat view Peta aktif, render() memberi body kelas 'peta-view':
-   body menjadi kolom lentur setinggi layar (header diam di atas,
-   main mengisi sisa tinggi dan TIDAK bisa digulir). Di dalamnya
+/* ===== Halaman Peta: DESKTOP satu jendela, HP digulir alami =====
+   Saat view Peta aktif, render() memberi body kelas 'peta-view'.
+   Di layar ≥900px body menjadi kolom lentur setinggi layar (header
+   diam di atas, main mengisi sisa tinggi dan TIDAK bisa digulir);
    .peta-fit menyusun judul ringkas, kontrol, chip wilayah, lalu
-   .peta-split: peta sebagai ruang utama lentur + panel daftar nama.
-   Hanya daftar nama (dan chip bila sempit) yang boleh digulir DI
-   DALAM areanya sendiri. Desktop (≥900px): daftar di kolom kanan;
-   di bawah itu daftar menjadi pita di bawah peta. */
-body.peta-view{display:flex;flex-direction:column;height:100vh;height:100dvh;overflow:hidden}
-body.peta-view main{flex:1;min-height:0;overflow:hidden;width:100%;max-width:1180px;padding:10px 12px 12px;display:flex;flex-direction:column}
+   .peta-split: peta sebagai ruang utama lentur + panel daftar nama
+   di kolom kanan, dan hanya daftar nama (dan chip bila sempit) yang
+   boleh digulir DI DALAM areanya sendiri. Di HP berlaku aturan
+   tersendiri (lihat blok max-width:899px): halaman digulir alami,
+   peta bertinggi tetap di atas, daftar nama mengalir di bawahnya. */
+body.peta-view{display:flex;flex-direction:column}
+body.peta-view main{width:100%;max-width:1180px;padding:10px 12px 12px;display:flex;flex-direction:column}
+/* Kunci SATU JENDELA tanpa gulir halaman hanya berlaku di layar
+   ≥900px (desktop & tablet besar): body dikunci setinggi layar dan
+   main tidak bisa digulir. Di HP (aturan tersendiri di bawah)
+   halaman peta BOLEH digulir alami — peta bertinggi tetap di atas,
+   daftar nama mengalir di bawahnya mengikuti halaman. */
+@media (min-width:900px){
+  body.peta-view{height:100vh;height:100dvh;overflow:hidden}
+  body.peta-view main{flex:1;min-height:0;overflow:hidden}
+}
 @media (max-width:640px){body.peta-view main{padding:8px 8px 10px}}
 .peta-fit{flex:1;min-height:0;display:flex;flex-direction:column;gap:8px}
 .peta-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;flex:none}
@@ -1560,14 +1570,67 @@ body.peta-view main{flex:1;min-height:0;overflow:hidden;width:100%;max-width:118
 .peta-fit .peta-detail{position:absolute;left:10px;bottom:10px;z-index:1200;width:min(430px,calc(100% - 20px));max-height:calc(100% - 20px);overflow-y:auto;margin-bottom:0}
 .peta-fit .peta-detail h3{font-size:19px}
 @media (max-width:899px){
-  .peta-split{flex-direction:column}
-  .peta-list-panel{width:auto;flex:0 0 31%;min-height:120px}
-  .peta-fit .peta-detail{left:6px;bottom:6px;width:calc(100% - 12px)}
+  /* ===== Aturan HP tersendiri: halaman BOLEH digulir alami =====
+     Tidak ada kunci tinggi & tidak ada area gulir di dalam panel:
+     peta bertinggi tetap yang lega di bagian atas, lalu daftar nama
+     saja mengalir di bawahnya mengikuti guliran halaman sampai
+     habis. Kontrol tetap ringkas khas layar kecil. */
+  body.peta-view{height:auto;overflow:visible}
+  body.peta-view main{flex:none;min-height:0;overflow:visible}
+  .peta-fit{flex:none;min-height:0}
+  .peta-split{flex-direction:column;flex:none;min-height:0}
+  .peta-fit .peta-map-card{flex:none}
+  .peta-fit #peta-map{flex:none;height:54vh;min-height:340px}
+  .peta-list-panel{width:auto;flex:0 0 auto;min-height:0}
+  .peta-fit .peta-member-list{flex:none;min-height:0;overflow:visible}
+  /* Panel detail HP: LEMBAR BAWAH tetap (fixed) — muncul di bagian
+     bawah layar tanpa menutupi seluruh peta, isinya bisa digulir di
+     dalam lembarnya sendiri; ditutup lewat tombol 'Kembali ke
+     daftar' atau ketuk area peta di luar pin. */
+  .peta-fit .peta-detail{position:fixed;left:8px;right:8px;bottom:8px;width:auto;max-height:54vh;z-index:1600}
   .peta-title{font-size:18px}
   .peta-fit .peta-map-head p{display:none}
   .peta-fit .peta-map-foot #peta-hint{display:none}
 }
-@media (max-height:560px){
+@media (max-height:560px) and (min-width:900px){
   .peta-list-panel{flex-basis:27%}
+}
+@media (max-height:560px){
   .peta-fit .peta-map-head{padding:6px 10px}
+}
+
+/* ===== Peta di DESKTOP (≥1024px): tata letak lebar profesional =====
+   Lebar layar dimanfaatkan penuh: wadah utama diperlebar, peta
+   menjadi elemen dominan yang lega, panel daftar nama di kanan
+   lebih proporsional (tiga kolom nama), dan bilah atas — judul,
+   pil statistik, pencarian, tombol, chip wilayah — tertata sejajar
+   dengan jarak yang konsisten mengikuti tema clay aplikasi.
+   Kartu detail anggota TIDAK tampil di desktop (dijaga juga oleh
+   petaLayarDesktop di map.js): tidak ada elemen melayang yang
+   menutupi peta. Di bawah 1024px tata letak tetap seperti
+   sebelumnya dan panel detail tetap muncul. */
+@media (min-width:1024px){
+  body.peta-view main{max-width:1680px;padding:14px 20px 16px}
+  .peta-fit{gap:10px}
+  .peta-title{font-size:22px}
+  .peta-pill{padding:5px 13px;font-size:12.5px}
+  .peta-pill b{font-size:16px}
+  .peta-controls{gap:8px}
+  .peta-controls .peta-search{flex-basis:280px}
+  .peta-split{gap:12px}
+  .peta-fit .peta-map-head{padding:11px 16px 10px}
+  .peta-fit .peta-map-head h2{font-size:15.5px}
+  .peta-fit .peta-map-head p{font-size:12px;margin-top:3px}
+  .peta-fit .peta-map-foot{padding:8px 16px 10px}
+  .peta-list-panel{width:400px;border-radius:24px;padding:14px 14px 11px}
+  .peta-fit .peta-h2{font-size:16.5px}
+  .peta-list-sub{font-size:11.5px}
+  .peta-fit .peta-member-list{grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:6px;margin-top:11px}
+  .peta-name-item{padding:7px 9px;font-size:13px}
+  .peta-fit .peta-detail{display:none!important}
+}
+@media (min-width:1024px) and (max-width:1279px){
+  body.peta-view main{padding:12px 14px 14px}
+  .peta-list-panel{width:352px}
+  .peta-fit .peta-member-list{grid-template-columns:repeat(auto-fill,minmax(126px,1fr))}
 }
