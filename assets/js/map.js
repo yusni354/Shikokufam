@@ -1,4 +1,26 @@
 /* Peta anggota (Leaflet), persetujuan akun, sebaran wilayah */
+/* Leaflet dimuat MALAS: berkasnya (JS ±147 KB + CSS ±15 KB) tidak lagi
+   ikut dimuat saat aplikasi pertama dibuka, melainkan disuntikkan di
+   sini saat halaman Peta pertama dibuka atau panel pin formulir anggota
+   pertama dipakai — halaman lain tidak membutuhkannya. Suntikan gagal
+   (berkas tak terjangkau) → kedua pemakai jatuh ke tampilan tanpa peta
+   yang sudah ada, dan percobaan berikutnya boleh mengulang. */
+let petaLeafletJanji=null;
+function petaMuatLeaflet(){
+  if(typeof L!=='undefined')return Promise.resolve(true);
+  if(petaLeafletJanji)return petaLeafletJanji;
+  petaLeafletJanji=new Promise(resolve=>{
+    const css=document.createElement('link');
+    css.rel='stylesheet';css.href='assets/leaflet.css';
+    document.head.appendChild(css);
+    const s=document.createElement('script');
+    s.src='assets/js/leaflet.js';
+    s.onload=()=>resolve(typeof L!=='undefined');
+    s.onerror=()=>{petaLeafletJanji=null;resolve(false)};
+    document.head.appendChild(s);
+  });
+  return petaLeafletJanji;
+}
 function alamatJp(m,det){return [det?m.alamat_jp:'',m.kec_jp,m.kota,m.pref||m.wilayah,m.kodepos,'Japan'].filter(Boolean).join(', ')}
 async function loadPendingUsers(){
   if(!S.supabase){
@@ -1379,8 +1401,17 @@ function initPetaMap(){
     };
     if(S.petaFixMode&&!S.admin)S.petaFixMode=false;
     if(typeof L==='undefined'){
-      el.replaceChildren(h('div',{class:'peta-nomap'},h('b',{},'Peta sedang tidak tampil'),h('span',{},'Daftar anggota, legenda, dan saringan wilayah di bawah tetap bisa dipakai.')));
+      /* Leaflet dimuat malas: selama berkasnya masih dalam perjalanan,
+         wadah peta dibiarkan kosong dengan warna dasar kartunya —
+         pesan tidak tampil hanya muncul bila pemuatan benar-benar
+         gagal, bukan sebagai keadaan normal kunjungan pertama. */
       petaRefresh();
+      petaMuatLeaflet().then(ok=>{
+        const el2=document.getElementById('peta-map');
+        if(!el2||S.view!=='peta')return;
+        if(ok){el2.replaceChildren();initPetaMap()}
+        else el2.replaceChildren(h('div',{class:'peta-nomap'},h('b',{},'Peta sedang tidak tampil'),h('span',{},'Daftar anggota, legenda, dan saringan wilayah di bawah tetap bisa dipakai.')));
+      });
       return;
     }
     PM.map=L.map(el,{scrollWheelZoom:true}).setView([33.9,133.7],window.innerWidth<640?7:8);
@@ -1481,7 +1512,14 @@ function initFormPinMap(){
   try{
     formPinCleanup();
     if(typeof L==='undefined'){
-      el.replaceChildren(h('div',{class:'peta-nomap'},h('b',{},'Peta sedang tidak tampil'),h('span',{},'Periksa koneksi lalu coba lagi. Posisi pin otomatis dari alamat tetap bekerja.')));
+      /* Sama seperti peta utama: wadah dibiarkan kosong selama Leaflet
+         dimuat malas; pesan tidak tampil hanya bila pemuatan gagal. */
+      petaMuatLeaflet().then(ok=>{
+        const el2=document.getElementById('form-pin-map');
+        if(!el2||!S.formPinOpen)return;
+        if(ok){el2.replaceChildren();initFormPinMap()}
+        else el2.replaceChildren(h('div',{class:'peta-nomap'},h('b',{},'Peta sedang tidak tampil'),h('span',{},'Periksa koneksi lalu coba lagi. Posisi pin otomatis dari alamat tetap bekerja.')));
+      });
       return;
     }
     const f=S.form;
