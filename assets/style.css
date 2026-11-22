@@ -472,6 +472,16 @@ body.admin-dark .card .e{background:#293946;color:var(--acc)}
 .kegiatan-edit-card .activity-create-grid{margin-top:2px}
 .kegiatan-edit-card .activity-create-grid+.activity-create-grid{margin-top:8px}
 .kegiatan-edit-card .activity-field input,.kegiatan-edit-card .activity-field select{margin:4px 0 0;min-width:0}
+/* Panel Pengaturan Kegiatan dari kartu kegiatan: seluruh isi rata
+   tengah — judul, nama kegiatan, dan tanggal di tengah; tombol Edit &
+   Hapus (dan tombol tahap konfirmasi) sejajar di tengah panel dengan
+   ukuran seimbang. Hanya berlaku untuk panel dari tombol gigi kartu,
+   bukan panel rekap dari kepala tabel Ringkasan. */
+.kegiatan-atur-card{text-align:center}
+.kegiatan-atur-card .confirm-actions{justify-content:center}
+.kegiatan-atur-card .confirm-actions .btn{flex:1 1 0;max-width:170px}
+.kegiatan-edit-card .confirm-title{text-align:center}
+.kegiatan-edit-card .confirm-actions{justify-content:center}
 .ringkasan-summary,.ringkasan-item,.ringkasan-rekap{display:block;width:100%}
 .ringkasan-rekap{padding:12px}
 .rekap-wrap{overflow-x:auto;overflow-y:hidden;max-width:100%;margin-top:0;border:1px solid var(--line);border-radius:12px;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain}

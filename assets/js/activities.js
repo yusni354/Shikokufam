@@ -1154,7 +1154,7 @@ function dialogKegiatanKartu(){
   const tglLabel=tgl&&!Number.isNaN(tgl.getTime())?tgl.toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'}):'Tanggal belum ditentukan';
   if(d.tahap==='yakin'){
     return h('div',{class:'confirm-overlay',onclick:tutup},
-      h('div',{class:'card confirm-card',onclick:ev=>ev.stopPropagation()},
+      h('div',{class:'card confirm-card kegiatan-atur-card',onclick:ev=>ev.stopPropagation()},
         h('b',{class:'confirm-title'},'Hapus Kegiatan'),
         h('p',{class:'confirm-text'},'Hapus kegiatan "'+nama+'" ('+tglLabel+')? Kegiatan ini beserta seluruh data absensinya akan terhapus dan tidak bisa dibatalkan.'),
         h('div',{class:'fl confirm-actions'},
@@ -1202,7 +1202,7 @@ function dialogKegiatanKartu(){
           }},'Simpan'))));
   }
   return h('div',{class:'confirm-overlay',onclick:tutup},
-    h('div',{class:'card confirm-card',onclick:ev=>ev.stopPropagation()},
+    h('div',{class:'card confirm-card kegiatan-atur-card',onclick:ev=>ev.stopPropagation()},
       h('b',{class:'confirm-title'},'Pengaturan Kegiatan'),
       h('p',{class:'confirm-text'},h('b',{},nama),h('br',{}),tglLabel),
       h('div',{class:'fl confirm-actions'},
