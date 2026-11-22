@@ -359,6 +359,15 @@ body.open #dr{transform:none}body.open #ov{display:block}
 .chat-bubble{max-width:84%;padding:9px 12px;border-radius:16px;white-space:pre-wrap;overflow-wrap:anywhere}
 .chat-line.incoming .chat-bubble{background:#e3f1f8;border-top-left-radius:5px}
 .chat-line.outgoing .chat-bubble{background:#d7f5d0;border-top-right-radius:5px}
+/* Tekan lama pada gelembung pesan membuka pilihan Hapus: teks gelembung
+   tidak terseleksi dan menu sentuh bawaan peramban tidak muncul selama
+   ditekan; gelembung yang sedang ditekan tampak tertekan sampai panel
+   pilihan terbuka. Gulir tegak wadah utas tetap berjalan seperti biasa
+   (gerakan sebelum batas tekan lama membatalkan tekan lamanya). */
+.chat-bubble{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;touch-action:pan-y}
+.chat-bubble-pressed{filter:brightness(.93)}
+.chat-dialog-preview{padding:9px 12px;border-radius:12px;background:var(--line);font-size:13.5px;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere;max-height:110px;overflow:hidden}
+.chat-delete-option{width:100%}
 .chat-card .reply-box{margin-top:10px;flex:none;background:var(--card);padding-top:8px;border-top:1px solid var(--line);position:relative}
 .composer-row{display:flex;align-items:flex-end;gap:6px}
 .composer-row textarea{flex:1;min-width:0;margin:0}

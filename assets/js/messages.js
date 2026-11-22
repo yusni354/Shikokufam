@@ -1,6 +1,19 @@
 /* Pesan ke admin: muat, kirim, balas, lampiran, tampilan percakapan */
-function messageFromRow(row){return {id:row.id,nama:row.name,teks:row.message,attachments:row.attachments||[],at:new Date(row.created_at).getTime(),status:row.status,sender_id:row.sender_id,recipient_id:row.recipient_id||null}}
-function replyFromRow(row){return {id:row.id,message_id:row.message_id,by:row.sender_id,teks:row.message,attachments:row.attachments||[],at:new Date(row.created_at).getTime()}}
+/* hidden_for: daftar uid yang MENYEMBUNYIKAN baris ini dari tampilannya
+   sendiri (penghapusan "untuk saya saja" pada pesan kiriman lawan
+   bicara). Bentuknya larik uid di kolom jsonb hidden_for pada tabel
+   messages/message_replies; baris lama tanpa kolom itu terbaca []. */
+function hiddenForFromRow(row){
+  const v=row?row.hidden_for:null;
+  if(Array.isArray(v))return v.map(String);
+  if(typeof v==='string'){try{const p=JSON.parse(v);return Array.isArray(p)?p.map(String):[]}catch(e){return[]}}
+  return [];
+}
+function pesanTersembunyiUntukSaya(item){
+  return !!S.uid&&(item.hidden_for||[]).map(String).includes(String(S.uid));
+}
+function messageFromRow(row){return {id:row.id,nama:row.name,teks:row.message,attachments:row.attachments||[],at:new Date(row.created_at).getTime(),status:row.status,sender_id:row.sender_id,recipient_id:row.recipient_id||null,hidden_for:hiddenForFromRow(row)}}
+function replyFromRow(row){return {id:row.id,message_id:row.message_id,by:row.sender_id,teks:row.message,attachments:row.attachments||[],at:new Date(row.created_at).getTime(),hidden_for:hiddenForFromRow(row)}}
 /* Penyimpanan pesan mode lokal (tanpa Supabase): baris berbentuk sama seperti tabel Supabase */
 const LOCAL_MESSAGES_KEY='shikoku-family:messages';
 const LOCAL_REPLIES_KEY='shikoku-family:message-replies';
@@ -46,8 +59,8 @@ function incomingMessageItems(){
      admin) + balasan dari orang lain. loadMessages hanya memuat pesan
      yang melibatkan saya, jadi setiap pesan pokok dari orang lain
      memang ditujukan ke saya. */
-  const roots=(S.tanya||[]).filter(message=>message.sender_id!==S.uid);
-  const replies=(S.replies||[]).filter(reply=>reply.by!==S.uid);
+  const roots=(S.tanya||[]).filter(message=>message.sender_id!==S.uid&&!pesanTersembunyiUntukSaya(message));
+  const replies=(S.replies||[]).filter(reply=>reply.by!==S.uid&&!pesanTersembunyiUntukSaya(reply));
   return [...roots,...replies];
 }
 /* Kunci lawan bicara sebuah pesan pokok:
@@ -96,11 +109,16 @@ function conversationGroups(){
   return groups;
 }
 function conversationEntries(group){
+  /* Entri yang tampil di utas HANYA yang terlihat untuk saya: pesan yang
+     saya sembunyikan (hapus untuk saya saja) tidak ikut digambar, tidak
+     menjadi cuplikan terakhir, dan tidak dihitung belum dibaca. Setiap
+     entri membawa id + jenisnya (root = pesan pokok di tabel messages,
+     reply = balasan di tabel message_replies) untuk keperluan hapus. */
   const entries=[];
   group.messages.forEach(message=>{
-    entries.push({at:message.at||0,mine:message.sender_id===S.uid,teks:message.teks||'',attachments:message.attachments||[]});
-    (S.replies||[]).filter(reply=>reply.message_id===message.id).forEach(reply=>{
-      entries.push({at:reply.at||0,mine:reply.by===S.uid,teks:reply.teks||'',attachments:reply.attachments||[]});
+    if(!pesanTersembunyiUntukSaya(message))entries.push({id:message.id,kind:'root',message_id:message.id,at:message.at||0,mine:message.sender_id===S.uid,teks:message.teks||'',attachments:message.attachments||[]});
+    (S.replies||[]).filter(reply=>reply.message_id===message.id&&!pesanTersembunyiUntukSaya(reply)).forEach(reply=>{
+      entries.push({id:reply.id,kind:'reply',message_id:message.id,at:reply.at||0,mine:reply.by===S.uid,teks:reply.teks||'',attachments:reply.attachments||[]});
     });
   });
   entries.sort((a,b)=>a.at-b.at);
@@ -132,8 +150,8 @@ function formatChatTime(ts){
 function conversationUnread(group){
   const seen=userMessageSeen(),items=[];
   group.messages.forEach(message=>{
-    if(message.sender_id!==S.uid)items.push(message);
-    (S.replies||[]).filter(reply=>reply.message_id===message.id&&reply.by!==S.uid).forEach(reply=>items.push(reply));
+    if(message.sender_id!==S.uid&&!pesanTersembunyiUntukSaya(message))items.push(message);
+    (S.replies||[]).filter(reply=>reply.message_id===message.id&&reply.by!==S.uid&&!pesanTersembunyiUntukSaya(reply)).forEach(reply=>items.push(reply));
   });
   return items.filter(item=>!seen[item.id]).length;
 }
@@ -141,8 +159,8 @@ function markMessagesRead(group){
   if(!S.uid)return;
   const seen=userMessageSeen();
   const items=group?[
-    ...group.messages.filter(message=>message.sender_id!==S.uid),
-    ...(S.replies||[]).filter(reply=>group.messages.some(message=>message.id===reply.message_id)&&reply.by!==S.uid)
+    ...group.messages.filter(message=>message.sender_id!==S.uid&&!pesanTersembunyiUntukSaya(message)),
+    ...(S.replies||[]).filter(reply=>group.messages.some(message=>message.id===reply.message_id)&&reply.by!==S.uid&&!pesanTersembunyiUntukSaya(reply))
   ]:incomingMessageItems();
   items.forEach(item=>{if(item.at)seen[item.id]=item.at});
   try{localStorage.setItem('shikoku-family:message-seen:'+S.uid,JSON.stringify(seen))}catch(e){console.error('Status pesan tidak dapat disimpan:',e)}
@@ -150,7 +168,7 @@ function markMessagesRead(group){
      saya (saya penerimanya, atau saya admin untuk pesan Tanya Admin).
      Kebijakan RLS pesan mengizinkan para pihak percakapan memperbarui
      status pesan mereka sendiri. */
-  const incomingRoots=(group?group.messages:(S.tanya||[])).filter(message=>message.sender_id!==S.uid&&message.status==='unread');
+  const incomingRoots=(group?group.messages:(S.tanya||[])).filter(message=>message.sender_id!==S.uid&&message.status==='unread'&&!pesanTersembunyiUntukSaya(message));
   if(incomingRoots.length){
     if(S.supabase){
       S.supabase.from('messages').update({status:'read',read_at:new Date().toISOString()}).in('id',incomingRoots.map(message=>message.id))
@@ -190,8 +208,8 @@ async function loadMessages(){
     const ids=new Set(nextMessages.map(item=>item.id));
     const nextReplies=localMessageRows(LOCAL_REPLIES_KEY).filter(row=>ids.has(row.message_id)).map(replyFromRow).sort((a,b)=>a.at-b.at);
     const signature=JSON.stringify({
-      messages:nextMessages.map(item=>[item.id,item.status,item.at,item.attachments]),
-      replies:nextReplies.map(item=>[item.id,item.message_id,item.at,item.attachments])
+      messages:nextMessages.map(item=>[item.id,item.status,item.at,item.attachments,item.hidden_for]),
+      replies:nextReplies.map(item=>[item.id,item.message_id,item.at,item.attachments,item.hidden_for])
     });
     const changed=signature!==S.messageSignature;
     S.messageSignature=signature;
@@ -220,8 +238,8 @@ async function loadMessages(){
     nextReplies=(replies||[]).map(replyFromRow);
   }
   const signature=JSON.stringify({
-    messages:nextMessages.map(item=>[item.id,item.status,item.at,item.attachments]),
-    replies:nextReplies.map(item=>[item.id,item.message_id,item.at,item.attachments])
+    messages:nextMessages.map(item=>[item.id,item.status,item.at,item.attachments,item.hidden_for]),
+    replies:nextReplies.map(item=>[item.id,item.message_id,item.at,item.attachments,item.hidden_for])
   });
   const changed=signature!==S.messageSignature;
   S.messageSignature=signature;
@@ -239,7 +257,7 @@ async function submitMessage(data){
   const recipientId=data.recipient_id||null;
   if(!S.supabase){
     const rows=localMessageRows(LOCAL_MESSAGES_KEY);
-    rows.push({id:newLocalRowId('msg'),name:data.nama,message:data.teks,sender_id:S.uid,recipient_id:recipientId,status:'unread',attachments:data.attachments||[],created_at:new Date().toISOString()});
+    rows.push({id:newLocalRowId('msg'),name:data.nama,message:data.teks,sender_id:S.uid,recipient_id:recipientId,status:'unread',attachments:data.attachments||[],hidden_for:[],created_at:new Date().toISOString()});
     saveLocalMessageRows(LOCAL_MESSAGES_KEY,rows);
     return;
   }
@@ -256,7 +274,7 @@ async function submitReply(messageId,text,attachments=[]){
   if(!S.uid)throw new Error('Silakan login terlebih dahulu');
   if(!S.supabase){
     const replies=localMessageRows(LOCAL_REPLIES_KEY);
-    replies.push({id:newLocalRowId('rpl'),message_id:messageId,sender_id:S.uid,message:text,attachments,created_at:new Date().toISOString()});
+    replies.push({id:newLocalRowId('rpl'),message_id:messageId,sender_id:S.uid,message:text,attachments,hidden_for:[],created_at:new Date().toISOString()});
     saveLocalMessageRows(LOCAL_REPLIES_KEY,replies);
     const rows=localMessageRows(LOCAL_MESSAGES_KEY),row=rows.find(item=>item.id===messageId);
     if(row&&row.sender_id!==S.uid){row.status='replied';row.replied_at=new Date().toISOString();saveLocalMessageRows(LOCAL_MESSAGES_KEY,rows)}
@@ -273,6 +291,153 @@ async function submitReply(messageId,text,attachments=[]){
     }).eq('id',messageId);
     if(statusError)throw statusError;
   }
+}
+
+/* ===== Hapus pesan dari utas (pilihan 'Hapus' pada tekan lama) =====
+   Dua aturan yang berbeda mengikuti pemilik pesannya:
+   - Pesan kiriman SENDIRI dihapus sungguhan dari tabelnya (messages
+     untuk pesan pokok, message_replies untuk balasan): hilang dari
+     utas pengirim DAN penerima. Menghapus pesan pokok ikut menghapus
+     balasannya (di Supabase lewat cascade skema; di mode lokal baris
+     balasannya dibuang bersamaan di sini).
+   - Pesan kiriman LAWAN bicara hanya disembunyikan untuk akun saya:
+     uid saya ditambahkan ke kolom hidden_for baris itu. Barisnya tetap
+     ada, lawan bicara tetap melihatnya, dan aturan privasi percakapan
+     yang sudah berlaku tidak berubah — saringan tampil di
+     conversationEntries/incomingMessageItems yang menepikan baris
+     tersembunyi untuk saya. */
+async function hapusEntriPesan(d){
+  if(!S.uid||!d||!d.id)throw new Error('Pesan tidak ditemukan');
+  const tabel=d.kind==='reply'?'message_replies':'messages';
+  if(d.mine){
+    if(!S.supabase){
+      if(d.kind==='reply'){
+        saveLocalMessageRows(LOCAL_REPLIES_KEY,localMessageRows(LOCAL_REPLIES_KEY).filter(row=>row.id!==d.id));
+      }else{
+        saveLocalMessageRows(LOCAL_MESSAGES_KEY,localMessageRows(LOCAL_MESSAGES_KEY).filter(row=>row.id!==d.id));
+        saveLocalMessageRows(LOCAL_REPLIES_KEY,localMessageRows(LOCAL_REPLIES_KEY).filter(row=>row.message_id!==d.id));
+      }
+    }else{
+      const {error}=await S.supabase.from(tabel).delete().eq('id',d.id);
+      if(error)throw error;
+    }
+  }else{
+    const sumber=d.kind==='reply'?(S.replies||[]).find(item=>item.id===d.id):(S.tanya||[]).find(item=>item.id===d.id);
+    const dasar=sumber&&Array.isArray(sumber.hidden_for)?sumber.hidden_for:[];
+    const hidden=[...new Set([...dasar.map(String),String(S.uid)])];
+    if(!S.supabase){
+      const key=d.kind==='reply'?LOCAL_REPLIES_KEY:LOCAL_MESSAGES_KEY;
+      const rows=localMessageRows(key);let changed=false;
+      rows.forEach(row=>{if(row.id===d.id){row.hidden_for=hidden;changed=true}});
+      if(changed)saveLocalMessageRows(key,rows);
+    }else{
+      const {error}=await S.supabase.from(tabel).update({hidden_for:hidden}).eq('id',d.id);
+      if(error)throw error;
+    }
+  }
+  /* Segarkan dari sumbernya: utas, cuplikan + waktu di daftar
+     percakapan, dan hitungan belum dibaca mengikuti keadaan terbaru. */
+  S.messageSignature='';
+  await loadMessages();
+}
+/* ===== Tekan lama pada gelembung pesan =====
+   Pola yang sama seperti tekan lama Kepengurusan: tahan ±480 ms TANPA
+   bergerak untuk membuka panel pilihan; gerakan >10px sebelum batas
+   itu tercapai berarti niat menggulir dan tekan lama dibatalkan,
+   halaman bergulir seperti biasa. Sesudah aktif, gulir disentuh
+   dicegah (touchmove non-pasif) dan teks tidak terseleksi (CSS
+   .chat-bubble mematikan user-select & menu sentuh bawaan). Di
+   desktop: tahan klik kiri bekerja sama, dan KLIK KANAN pada gelembung
+   membuka panel yang sama lewat contextmenu. Ketukan biasa tidak
+   berubah; klik yang mengikuti lepasnya tekan lama pada tautan
+   lampiran di dalam gelembung ditelan satu kali. */
+function pasangTekanLamaPesan(bubble,entry){
+  let timer=null,aktif=false,selesai=false,startX=0,startY=0,pid=null;
+  const bukaPanel=()=>{
+    S.chatDialog={tahap:'menu',kind:entry.kind,id:entry.id,message_id:entry.message_id,mine:entry.mine,teks:entry.teks||'',lampiran:!!(entry.attachments&&entry.attachments.length),dibukaPada:Date.now()};
+    render();
+  };
+  const bersih=()=>{
+    if(timer){clearTimeout(timer);timer=null}
+    document.removeEventListener('pointermove',onMove);
+    document.removeEventListener('pointerup',onUp);
+    document.removeEventListener('pointercancel',onUp);
+    document.removeEventListener('touchmove',cegahGulir);
+  };
+  const cegahGulir=e=>{if(aktif)e.preventDefault()};
+  const onMove=e=>{
+    if(selesai||e.pointerId!==pid)return;
+    if(!aktif&&Math.hypot(e.clientX-startX,e.clientY-startY)>10){selesai=true;bersih()}
+  };
+  const onUp=e=>{
+    if(e.pointerId!==pid)return;
+    const pernahAktif=aktif;
+    selesai=true;bersih();
+    if(pernahAktif){
+      const telan=ev=>{ev.preventDefault();ev.stopPropagation()};
+      bubble.addEventListener('click',telan,{capture:true,once:true});
+      setTimeout(()=>bubble.removeEventListener('click',telan,{capture:true}),600);
+    }
+  };
+  bubble.addEventListener('pointerdown',ev=>{
+    if(ev.button!=null&&ev.button>0)return;
+    if(ev.target&&ev.target.closest&&ev.target.closest('audio,video'))return;
+    pid=ev.pointerId;startX=ev.clientX;startY=ev.clientY;aktif=false;selesai=false;
+    document.addEventListener('pointermove',onMove);
+    document.addEventListener('pointerup',onUp);
+    document.addEventListener('pointercancel',onUp);
+    document.addEventListener('touchmove',cegahGulir,{passive:false});
+    timer=setTimeout(()=>{
+      timer=null;
+      if(selesai)return;
+      aktif=true;
+      bubble.classList.add('chat-bubble-pressed');
+      if(navigator.vibrate){try{navigator.vibrate(15)}catch(_){}}
+      bukaPanel();
+    },480);
+  });
+  bubble.addEventListener('contextmenu',ev=>{
+    ev.preventDefault();
+    selesai=true;bersih();
+    bukaPanel();
+  });
+}
+/* Panel pilihan + konfirmasi hapus pesan, mengikuti pola panel aplikasi
+   lain (Pengaturan Kegiatan, Persetujuan): tanpa tombol X — mengetuk
+   bidang di luar kartu menutupnya. Tahap 'menu' berisi pratinjau pesan
+   dan tepat satu pilihan 'Hapus'; menekannya membuka tahap 'yakin',
+   konfirmasi tegas yang bunyinya mengikuti pemilik pesan (terhapus
+   untuk kedua pihak vs hilang dari tampilan saya saja). Ketukan di
+   luar yang datang <400 ms sesudah panel terbuka diabaikan: itulah
+   klik sisa dari lepasnya tekan lama yang membuka panel ini. */
+function dialogPesan(){
+  const d=S.chatDialog;
+  if(!d)return null;
+  const batal=()=>{S.chatDialog=null;render()};
+  const tutupLuar=()=>{if(Date.now()-(d.dibukaPada||0)<400)return;S.chatDialog=null;render()};
+  const cuplikan=(d.teks||'').trim()||(d.lampiran?'Lampiran':'Pesan');
+  if(d.tahap==='yakin'){
+    return h('div',{class:'confirm-overlay',onclick:tutupLuar},
+      h('div',{class:'card confirm-card',onclick:ev=>ev.stopPropagation()},
+        h('b',{class:'confirm-title'},'Hapus Pesan'),
+        h('p',{class:'confirm-text'},d.mine
+          ?'Hapus pesan ini? Pesan akan terhapus dari percakapan untuk Anda dan lawan bicara, dan tidak bisa dibatalkan.'
+          :'Hapus pesan ini dari tampilan Anda? Pesan hanya hilang untuk Anda — lawan bicara tetap melihatnya.'),
+        h('div',{class:'chat-dialog-preview'},cuplikan),
+        h('div',{class:'fl confirm-actions'},
+          h('button',{class:'btn s',onclick:batal},'Batal'),
+          h('button',{class:'btn',onclick:async()=>{
+            const target={...d};S.chatDialog=null;
+            try{await hapusEntriPesan(target)}
+            catch(error){console.error(error);alert('Gagal menghapus pesan: '+(error.message||'periksa koneksi'))}
+            render();
+          }},'Hapus'))));
+  }
+  return h('div',{class:'confirm-overlay',onclick:tutupLuar},
+    h('div',{class:'card confirm-card',onclick:ev=>ev.stopPropagation()},
+      h('b',{class:'confirm-title'},'Pesan'),
+      h('div',{class:'chat-dialog-preview'},cuplikan),
+      h('button',{class:'btn chat-delete-option',onclick:()=>{S.chatDialog={...d,tahap:'yakin'};render()}},icon('trash',17),h('span',{},'Hapus'))));
 }
 
 async function uploadMessageFiles(files){
@@ -467,8 +632,15 @@ function vPesan(){
     const group=groups.find(item=>item.key===S.openConversation);
     if(group){
       const entries=conversationEntries(group);
-      const chatBody=h('div',{class:'chat-body'},...entries.map(entry=>h('div',{class:'chat-line '+(entry.mine?'outgoing':'incoming')},
-        h('div',{class:'chat-bubble'},entry.teks,...entry.attachments.map(attachmentView).filter(Boolean)))));
+      /* Setiap gelembung bisa DITEKAN LAMA untuk membuka pilihan Hapus
+         (lihat pasangTekanLamaPesan). Utas yang semua pesannya
+         tersembunyi untuk saya tampil kosong dengan sopan, kolom
+         balasannya tetap hidup pada pesan pokok terakhir grup ini. */
+      const chatBody=h('div',{class:'chat-body'},...(entries.length?entries.map(entry=>{
+        const bubble=h('div',{class:'chat-bubble'},entry.teks,...entry.attachments.map(attachmentView).filter(Boolean));
+        pasangTekanLamaPesan(bubble,entry);
+        return h('div',{class:'chat-line '+(entry.mine?'outgoing':'incoming')},bubble);
+      }):[h('p',{class:'warn chat-empty'},'Belum ada pesan yang terlihat di percakapan ini.')]));
       let swipeStartX=0,swipeStartY=0;
       chatBody.ontouchstart=e=>{swipeStartX=e.changedTouches[0].clientX;swipeStartY=e.changedTouches[0].clientY};
       chatBody.ontouchend=e=>{
@@ -485,7 +657,8 @@ function vPesan(){
           h('b',{},group.name)),
         h('section',{class:'chat-card'},
           chatBody,
-          replyBox(group.messages[group.messages.length-1].id))
+          replyBox(group.messages[group.messages.length-1].id)),
+        dialogPesan()
       ];
     }
     /* Percakapan yang terbuka sudah tidak ada (data berubah): kembali
@@ -497,7 +670,7 @@ function vPesan(){
   const cards=groups.length?groups.map(group=>{
     const unread=conversationUnread(group);
     const last=group.last;
-    const snippet=last?((last.mine?'Anda: ':'')+(last.teks||(last.attachments&&last.attachments.length?'Lampiran':''))):'';
+    const snippet=last?((last.mine?'Anda: ':'')+(last.teks||(last.attachments&&last.attachments.length?'Lampiran':''))):'Belum ada pesan yang terlihat';
     return h('button',{class:'conversation-row',onclick:()=>{S.newChat=null;S.openConversation=group.key;markMessagesRead(group)}},
       conversationAvatar(group),
       h('div',{class:'conversation-main'},

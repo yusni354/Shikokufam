@@ -83,6 +83,11 @@ alter table public.messages add column if not exists attachments jsonb not null 
 -- "Message participants ..." di bawah).
 alter table public.messages
   add column if not exists recipient_id uuid references auth.users(id) on delete set null;
+-- Penyembunyian per pengguna (hapus pesan lawan bicara "untuk saya
+-- saja" lewat tekan lama di utas): uid yang tercantum di hidden_for
+-- tidak lagi melihat baris ini, pengguna lain tetap melihatnya.
+alter table public.messages
+  add column if not exists hidden_for jsonb not null default '[]'::jsonb;
 create index if not exists messages_recipient_created_at_idx
   on public.messages (recipient_id, created_at desc);
 
@@ -95,6 +100,7 @@ create table if not exists public.message_replies (
   attachments jsonb not null default '[]'::jsonb
 );
 alter table public.message_replies add column if not exists attachments jsonb not null default '[]'::jsonb;
+alter table public.message_replies add column if not exists hidden_for jsonb not null default '[]'::jsonb;
 
 create index if not exists messages_status_created_at_idx
   on public.messages (status, created_at desc);
@@ -343,7 +349,7 @@ grant select on public.profiles to authenticated;
 grant update on public.profiles to authenticated;
 grant delete on public.profiles to authenticated;
 grant select, update, delete on public.messages to authenticated;
-grant select, insert on public.message_replies to authenticated;
+grant select, insert, update, delete on public.message_replies to authenticated;
 
 alter table public.message_replies enable row level security;
 
@@ -403,6 +409,60 @@ create policy "Message participants can send replies"
   with check (
     sender_id = (select auth.uid())
     and exists (
+      select 1
+      from public.messages
+      where messages.id = message_replies.message_id
+        and (
+          messages.sender_id = (select auth.uid())
+          or messages.recipient_id = (select auth.uid())
+          or (messages.recipient_id is null and public.is_admin())
+        )
+    )
+  );
+
+-- Hapus pesan lewat tekan lama di utas: balasan kiriman sendiri dihapus
+-- sungguhan (delete) dan balasan lawan bicara disembunyikan untuk akun
+-- sendiri (update hidden_for). Keduanya hanya boleh dilakukan para
+-- pihak percakapan pesan pokoknya — aturan yang sama seperti membaca
+-- balasan di atas.
+drop policy if exists "Message participants can update replies" on public.message_replies;
+create policy "Message participants can update replies"
+  on public.message_replies for update
+  to authenticated
+  using (
+    sender_id = (select auth.uid())
+    or exists (
+      select 1
+      from public.messages
+      where messages.id = message_replies.message_id
+        and (
+          messages.sender_id = (select auth.uid())
+          or messages.recipient_id = (select auth.uid())
+          or (messages.recipient_id is null and public.is_admin())
+        )
+    )
+  )
+  with check (
+    sender_id = (select auth.uid())
+    or exists (
+      select 1
+      from public.messages
+      where messages.id = message_replies.message_id
+        and (
+          messages.sender_id = (select auth.uid())
+          or messages.recipient_id = (select auth.uid())
+          or (messages.recipient_id is null and public.is_admin())
+        )
+    )
+  );
+
+drop policy if exists "Message participants can delete replies" on public.message_replies;
+create policy "Message participants can delete replies"
+  on public.message_replies for delete
+  to authenticated
+  using (
+    sender_id = (select auth.uid())
+    or exists (
       select 1
       from public.messages
       where messages.id = message_replies.message_id
