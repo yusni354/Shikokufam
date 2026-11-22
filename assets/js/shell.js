@@ -14,7 +14,16 @@ function syncAdminTheme(){
    oleh render. Meninggalkan halaman lalu kembali → bawaan bulan
    berjalan lagi. */
 function bawaanArsipKegiatan(){const kini=new Date();S.kegiatanTahun=kini.getFullYear();S.kegiatanBulan=kini.getMonth()+1}
-function go(v){if(v==='kegiatan')bawaanArsipKegiatan();S.view=v;simpanViewTerakhir(v);S.adminMenuOpen=false;S.form=S.detail=S.dutyForm=null;S.financeForm=null;S.financePhoto=null;S.idPhoto=null;S.detailOrigin=null;if(v==='pesan'&&S.admin)S.openConversation=null;document.body.classList.remove('open');syncAdminTheme();render();if(v==='pesan'&&!S.admin)markMessagesRead()}
+/* Bawaan arsip Tahun+Bulan halaman Ringkasan & Laporan: aturan yang
+   sama seperti halaman Kegiatan — setiap kali halaman itu DIBUKA,
+   pemilih Tahun + Bulan (ruangan Kegiatan dan pemilih tahun di kepala
+   halaman) menunjuk BULAN & TAHUN BERJALAN hari ini, bukan bulan
+   paling baru yang ada kegiatannya. Diterapkan saat masuk halaman
+   lewat go() dan saat pemulihan halaman sesudah muat ulang, bukan di
+   dalam gambar ulang: berpindah bulan/tahun/ruangan selama masih di
+   halaman tidak di-reset; keluar lalu kembali → bulan berjalan lagi. */
+function bawaanArsipRingkasan(){const kini=new Date();S.ringkasanTahun=kini.getFullYear();S.ringkasanBulan=kini.getMonth()+1}
+function go(v){if(v==='kegiatan')bawaanArsipKegiatan();if(v==='ringkasan')bawaanArsipRingkasan();S.view=v;simpanViewTerakhir(v);S.adminMenuOpen=false;S.form=S.detail=S.dutyForm=null;S.financeForm=null;S.financePhoto=null;S.idPhoto=null;S.detailOrigin=null;if(v==='pesan'&&S.admin)S.openConversation=null;document.body.classList.remove('open');syncAdminTheme();render();if(v==='pesan'&&!S.admin)markMessagesRead()}
 $('#mn').onclick=()=>document.body.classList.add('open');
 $('#mn').replaceChildren(icon('menu',21));
 $('#st').replaceChildren(icon('settings',19));
@@ -58,6 +67,9 @@ function pulihkanViewTerakhir(){
   /* Memulihkan halaman Kegiatan sesudah muat ulang = membuka halaman
      itu, jadi bawaan arsip bulan berjalan berlaku juga di sini. */
   if(v==='kegiatan')bawaanArsipKegiatan();
+  /* Halaman Ringkasan & Laporan yang dipulihkan sesudah muat ulang
+     diperlakukan sama: bawaan arsipnya bulan berjalan lagi. */
+  if(v==='ringkasan')bawaanArsipRingkasan();
 }
 /* Klik tulisan merek 'SHIKOKU FAMILY' di header -> kembali ke Home;
    go('landing') sekaligus menjadikan Home halaman tersimpan. Kursor

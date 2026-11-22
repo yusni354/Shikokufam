@@ -884,10 +884,21 @@ function vRingkasan(){
   ].filter(y=>y!=null))].sort((a,b)=>b-a);
   const selected=years.includes(S.ringkasanTahun)?S.ringkasanTahun:currentYear;
   /* Kegiatan pada tahun terpilih & bulan-bulan yang memiliki kegiatan
-     di tahun itu (hanya dipakai ruangan Kegiatan untuk pemilih Bulan). */
+     di tahun itu (hanya dipakai ruangan Kegiatan untuk pemilih Bulan).
+     Bawaan saat halaman DIBUKA = bulan & tahun BERJALAN hari ini,
+     diatur oleh go()/pemulihan halaman di shell.js
+     (bawaanArsipRingkasan) yang menulis S.ringkasanTahun/
+     S.ringkasanBulan setiap kali masuk halaman ini; selama pengguna
+     masih di halaman, pilihannya diingat di S dan gambar ulang tidak
+     mengubahnya. Bulan yang ditawarkan = bulan yang memiliki kegiatan
+     pada tahun terpilih, DITAMBAH bulan berjalan bila tahun terpilih
+     adalah tahun berjalan — jadi bulan ini selalu bisa ditunjuk &
+     dipilih walau belum ada kegiatannya (rekapnya tampil kosong
+     dengan pesan sopan). */
   const eventsTahunIni=S.events.filter(event=>activityYear(event)===selected);
-  const bulanTersedia=[...new Set(eventsTahunIni.map(activityMonth).filter(m=>m!=null))].sort((a,b)=>a-b);
-  const bulanTerpilih=bulanTersedia.includes(S.ringkasanBulan)?S.ringkasanBulan:(bulanTersedia.length?bulanTersedia[bulanTersedia.length-1]:null);
+  const bulanBerjalan=new Date().getMonth()+1;
+  const bulanTersedia=[...new Set([...eventsTahunIni.map(activityMonth).filter(m=>m!=null),...(selected===currentYear?[bulanBerjalan]:[])])].sort((a,b)=>a-b);
+  const bulanTerpilih=bulanTersedia.includes(S.ringkasanBulan)?S.ringkasanBulan:(selected===currentYear?bulanBerjalan:(bulanTersedia.length?bulanTersedia[bulanTersedia.length-1]:null));
   if(ruang==='kegiatan'&&bulanTerpilih!=null)S.ringkasanBulan=bulanTerpilih;
   const yearSelect=h('select',{'aria-label':'Pilih tahun',onchange:e=>{S.ringkasanTahun=Number(e.target.value);S.ringkasanBulan=null;render()}},
     ...years.map(y=>h('option',{value:String(y)},String(y))));
@@ -962,6 +973,15 @@ function vRingkasan(){
   };
   const rekapEvents=events.filter(event=>activityMonth(event)===bulanTerpilih)
     .sort((a,b)=>(a.tanggal||'').localeCompare(b.tanggal||'')||(a.at||0)-(b.at||0));
+  /* Bulan terpilih belum memiliki kegiatan (mis. bulan berjalan yang
+     masih kosong): tampilkan pesan sopan untuk bulan itu saja, tanpa
+     tabel rekap & kartu bulanan yang serba nol; kartu ringkasan
+     tahunan tetap tampil karena ia mengikuti tahun terpilih. */
+  if(!rekapEvents.length){
+    return [...head,
+      h('p',{class:'warn'},'Belum ada kegiatan pada bulan '+namaBulanTerpilih+' '+selected+'. Pilih bulan atau tahun lain yang memiliki kegiatan.'),
+      summaryCard,dialogRekapKegiatan()];
+  }
   const regionOrder=new Map(wilayahEfektif().map(([name],index)=>[name,index]));
   const rekapMembers=S.members
     .filter(member=>String(member.status||'aktif').toLowerCase()!=='nonaktif')
