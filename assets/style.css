@@ -558,6 +558,17 @@ body.admin-dark .card .e{background:#293946;color:var(--acc)}
    slate gelap teks putih mengikuti kepala tabel, tidak menangkap
    ketukan dan tidak memengaruhi lebar kolom/tata letak tabel. */
 .rekap-tip{position:fixed;z-index:1200;max-width:min(280px,86vw);padding:6px 11px;border-radius:9px;background:#2c4a5e;color:#fff;font-size:12.5px;font-weight:600;line-height:1.35;text-align:center;box-shadow:0 8px 22px rgba(23,34,43,.35);pointer-events:none}
+/* Kepala tabel rekap MELAYANG: salinan baris kepala (thead) yang
+   ditempel tetap (fixed) tepat di bawah bilah atas aplikasi selama
+   tabel rekap digulir melewati layar, supaya keterangan kolom tetap
+   terbaca sampai baris terbawah; dikelola JS di activities.js
+   (selaraskanKepalaRekap) — lebar, posisi kiri, dan guliran
+   mendatarnya selalu disamakan dengan tabel aslinya, lalu ia hilang
+   tepat saat akhir tabel terlewati. z-index 4: di bawah bilah atas
+   aplikasi (5), di atas isi halaman. */
+.rekap-float-head{position:fixed;z-index:4;overflow:hidden;display:none;background:#2c4a5e;box-shadow:0 10px 16px rgba(23,34,43,.20)}
+.rekap-float-head .rekap-table{margin:0}
+@media print{.rekap-float-head{display:none!important}}
 .rekap-table thead th.rekap-ev-admin:hover{background:#35566e}
 .rekap-table th:first-child,.rekap-table td:first-child{position:sticky;left:0;text-align:left}
 .rekap-table thead th:first-child{z-index:3;background:#2c4a5e}

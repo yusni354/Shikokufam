@@ -885,6 +885,115 @@ function tampilRekapTip(th,nama){
 }
 document.addEventListener('scroll',sembunyiRekapTip,true);
 window.addEventListener('resize',sembunyiRekapTip);
+/* ===== Kepala tabel rekap yang MENGIKUTI guliran halaman =====
+   Saat halaman digulir ke bawah melewati tabel rekap, baris kepala
+   tabel (Nama | tanggal + singkatan kegiatan | Hadir | Izin | Cuti |
+   Alpha | % Hadir) harus tetap terlihat menempel tepat di bawah
+   bilah atas aplikasi sampai baris terbawah tabel, supaya keterangan
+   kolom selalu terbaca. Kepala asli tidak bisa memakai
+   position:sticky biasa: wadah tabel (.rekap-wrap) adalah wadah
+   gulir mendatar, jadi kepala lengket akan menempel pada wadah itu —
+   bukan pada jendela — dan ikut hilang saat halaman digulir.
+   Karena itu dipakai SALINAN kepala yang melayang (fixed, ditempel
+   ke <body>): isinya kloningan thead asli dengan lebar tiap kolom
+   disalin persis, posisinya diselaraskan pada setiap guliran —
+   tegak mengikuti gulir halaman, mendatar mengikuti gulir wadahnya
+   (scrollLeft disamakan, dan kolom Nama pada salinan ikut lengket
+   di kiri lewat aturan CSS th:first-child yang sama seperti tabel
+   asli). Salinan hanya tampil selama sebagian tabel masih berada di
+   bawah bilah atas; tepat saat akhir tabel terlewati ia hilang,
+   tidak melayang melewati batas bawah tabelnya. Tabel asli sama
+   sekali tidak diubah: gulir mendatar, label melayang nama kegiatan,
+   klik kepala kolom untuk admin, dan pembatas wilayah tetap bekerja
+   seperti sebelumnya — hover & klik pada salinan diteruskan ke
+   penangan kepala aslinya. */
+let rekapFloatEl=null,rekapFloatWrap=null,rekapFloatSig='';
+function geserTipDiBawahHeader(th){
+  /* Label nama kegiatan pada kepala melayang: bila posisi wajarnya
+     (di atas sel) tertutup bilah atas aplikasi, tampilkan di bawah
+     sel melayang supaya tetap terbaca. */
+  if(!rekapTipEl)return;
+  const hb=document.querySelector('header');
+  const batas=hb?hb.getBoundingClientRect().bottom:0;
+  if(parseFloat(rekapTipEl.style.top||'0')<batas)
+    rekapTipEl.style.top=(th.getBoundingClientRect().bottom+6)+'px';
+}
+function bangunKepalaRekapMelayang(wrap,table){
+  const thead=table.tHead;
+  if(!thead)return false;
+  if(!rekapFloatEl){
+    rekapFloatEl=h('div',{class:'rekap-float-head','aria-hidden':'true'});
+    document.body.appendChild(rekapFloatEl);
+  }
+  const cloneTable=h('table',{class:'rekap-table'});
+  cloneTable.style.width=table.offsetWidth+'px';
+  const cloneHead=thead.cloneNode(true);
+  const asal=thead.querySelectorAll('th'),salinan=cloneHead.querySelectorAll('th');
+  salinan.forEach((th,i)=>{
+    const o=asal[i];
+    if(!o)return;
+    th.style.width=o.offsetWidth+'px';
+    th.style.minWidth=o.offsetWidth+'px';
+    if(o.onmouseenter)th.onmouseenter=()=>{o.onmouseenter({currentTarget:th});geserTipDiBawahHeader(th)};
+    if(o.onmouseleave)th.onmouseleave=()=>sembunyiRekapTip();
+    if(o.onclick)th.onclick=()=>o.onclick();
+  });
+  cloneTable.appendChild(cloneHead);
+  rekapFloatEl.replaceChildren(cloneTable);
+  rekapFloatWrap=wrap;
+  rekapFloatSig=thead.innerHTML+'|'+table.offsetWidth;
+  return true;
+}
+function selaraskanKepalaRekap(){
+  const wrap=document.querySelector('.rekap-wrap');
+  const header=document.querySelector('header');
+  if(!wrap||!header){
+    if(rekapFloatEl)rekapFloatEl.style.display='none';
+    rekapFloatWrap=null;rekapFloatSig='';
+    return;
+  }
+  const table=wrap.querySelector('table.rekap-table');
+  if(!table||!table.tHead){
+    if(rekapFloatEl)rekapFloatEl.style.display='none';
+    return;
+  }
+  const sig=table.tHead.innerHTML+'|'+table.offsetWidth;
+  if(wrap!==rekapFloatWrap||sig!==rekapFloatSig){
+    if(!bangunKepalaRekapMelayang(wrap,table))return;
+  }
+  /* Tepi bawah bilah atas aplikasi (yang memang lengket di atas):
+     kepala melayang menempel tepat di bawahnya, tanpa celah dan
+     tanpa tertutup. */
+  const atasLengket=header.getBoundingClientRect().bottom;
+  const r=wrap.getBoundingClientRect();
+  const tinggiKepala=table.tHead.offsetHeight;
+  /* Tampil hanya selama kepala asli sudah terlewati ke atas TETAPI
+     sisa tabel di bawah bilah atas masih lebih tinggi dari kepala —
+     sesudah baris terakhir lewat, kepala ikut terlepas. */
+  if(!(r.top<atasLengket&&r.bottom>atasLengket+tinggiKepala)){
+    rekapFloatEl.style.display='none';
+    return;
+  }
+  rekapFloatEl.style.display='block';
+  rekapFloatEl.style.top=atasLengket+'px';
+  rekapFloatEl.style.left=(r.left+wrap.clientLeft)+'px';
+  rekapFloatEl.style.width=wrap.clientWidth+'px';
+  rekapFloatEl.style.height=tinggiKepala+'px';
+  if(rekapFloatEl.scrollLeft!==wrap.scrollLeft)rekapFloatEl.scrollLeft=wrap.scrollLeft;
+}
+const jadwalSelarasKepalaRekap=()=>requestAnimationFrame(selaraskanKepalaRekap);
+document.addEventListener('scroll',jadwalSelarasKepalaRekap,true);
+window.addEventListener('scroll',jadwalSelarasKepalaRekap,{passive:true});
+window.addEventListener('resize',jadwalSelarasKepalaRekap);
+/* Gambar ulang halaman (ganti ruangan/bulan/tahun, lipat wilayah,
+   data masuk) tidak selalu memicu gulir: selaraskan juga sesudah
+   klik/perubahan dan sesudah isi #app diganti. */
+document.addEventListener('click',jadwalSelarasKepalaRekap,true);
+document.addEventListener('change',jadwalSelarasKepalaRekap,true);
+if(window.MutationObserver){
+  const appEl=document.getElementById('app');
+  if(appEl)new MutationObserver(jadwalSelarasKepalaRekap).observe(appEl,{childList:true});
+}
 function vRingkasan(){
   const currentYear=new Date().getFullYear();
   const ruang=ringkasanRuangAktif();
