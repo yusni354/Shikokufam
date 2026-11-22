@@ -440,6 +440,159 @@ function dialogPesan(){
       h('button',{class:'btn chat-delete-option',onclick:()=>{S.chatDialog={...d,tahap:'yakin'};render()}},icon('trash',17),h('span',{},'Hapus'))));
 }
 
+/* ===== Hapus PERCAKAPAN dari daftar Pesan Masuk (tekan lama baris) =====
+   Berbeda dari hapus pesan kiriman sendiri di dalam utas: menghapus
+   percakapan TIDAK menghapus baris data apa pun dan TIDAK memakai
+   penghapusan sungguhan — untuk SEMUA pesan percakapan itu (pesan
+   pokok + balasannya, kiriman saya maupun kiriman lawan bicara) uid
+   saya hanya DITAMBAHKAN ke hidden_for. Akibatnya:
+   - percakapan hilang dari daftar Pesan Masuk saya (saringan tampil
+     di conversationEntries/incomingMessageItems menepikan baris
+     tersembunyi untuk saya, dan daftar hanya menggambar percakapan
+     yang masih punya entri terlihat);
+   - lencana belum dibaca percakapan itu dan total menu Pesan ikut
+     berkurang (keduanya dihitung dari entri yang terlihat saja);
+   - lawan bicara tetap melihat percakapannya UTUH di akunnya;
+   - pesan BARU sesudah itu (baris baru, hidden_for kosong) terlihat
+     lagi untuk saya, jadi percakapan muncul kembali berisi pesan
+     baru itu saja — pesan lama tetap tersembunyi untuk saya. */
+async function hapusPercakapan(group){
+  if(!S.uid||!group||!Array.isArray(group.messages)||!group.messages.length)throw new Error('Percakapan tidak ditemukan');
+  const rootSet=new Set(group.messages.map(message=>String(message.id)));
+  const hiddenBaru=item=>[...new Set([...(Array.isArray(item.hidden_for)?item.hidden_for:[]).map(String),String(S.uid)])];
+  const roots=group.messages.filter(message=>!pesanTersembunyiUntukSaya(message));
+  const replies=(S.replies||[]).filter(reply=>rootSet.has(String(reply.message_id))&&!pesanTersembunyiUntukSaya(reply));
+  if(!S.supabase){
+    const msgRows=localMessageRows(LOCAL_MESSAGES_KEY);let msgChanged=false;
+    msgRows.forEach(row=>{
+      if(!rootSet.has(String(row.id)))return;
+      const dasar=hiddenForFromRow(row);
+      if(dasar.map(String).includes(String(S.uid)))return;
+      row.hidden_for=[...new Set([...dasar.map(String),String(S.uid)])];msgChanged=true;
+    });
+    if(msgChanged)saveLocalMessageRows(LOCAL_MESSAGES_KEY,msgRows);
+    const rplRows=localMessageRows(LOCAL_REPLIES_KEY);let rplChanged=false;
+    rplRows.forEach(row=>{
+      if(!rootSet.has(String(row.message_id)))return;
+      const dasar=hiddenForFromRow(row);
+      if(dasar.map(String).includes(String(S.uid)))return;
+      row.hidden_for=[...new Set([...dasar.map(String),String(S.uid)])];rplChanged=true;
+    });
+    if(rplChanged)saveLocalMessageRows(LOCAL_REPLIES_KEY,rplRows);
+  }else{
+    for(const message of roots){
+      const {error}=await S.supabase.from('messages').update({hidden_for:hiddenBaru(message)}).eq('id',message.id);
+      if(error)throw error;
+    }
+    for(const reply of replies){
+      const {error}=await S.supabase.from('message_replies').update({hidden_for:hiddenBaru(reply)}).eq('id',reply.id);
+      if(error)throw error;
+    }
+  }
+  /* Segarkan dari sumbernya: daftar percakapan, cuplikan, dan
+     hitungan belum dibaca mengikuti keadaan terbaru. */
+  S.messageSignature='';
+  await loadMessages();
+}
+/* ===== Tekan lama pada baris percakapan di daftar Pesan Masuk =====
+   Pola gestur yang sama persis seperti tekan lama gelembung pesan:
+   tahan ±480 ms TANPA bergerak (>10px = niat menggulir, dibatalkan),
+   sesudah aktif gulir disentuh dicegah, getar halus di HP, dan di
+   desktop tahan klik kiri / KLIK KANAN (contextmenu) membuka panel
+   yang sama. Ketukan biasa tetap membuka percakapan; klik yang
+   mengikuti lepasnya tekan lama yang matang DITELAN — lewat penelan
+   klik pada baris (pola gelembung) DAN lewat cap waktu global di
+   bawah yang diperiksa onclick baris, karena render() yang membuka
+   panel mengganti elemen baris sebelum klik itu tiba. */
+let tekanLamaPercakapanPada=0;
+function pasangTekanLamaPercakapan(row,group){
+  let timer=null,aktif=false,selesai=false,startX=0,startY=0,pid=null;
+  const bukaPanel=()=>{
+    tekanLamaPercakapanPada=Date.now();
+    S.inboxDialog={tahap:'menu',key:group.key,name:group.name||'Anggota',dibukaPada:Date.now()};
+    render();
+  };
+  const bersih=()=>{
+    if(timer){clearTimeout(timer);timer=null}
+    document.removeEventListener('pointermove',onMove);
+    document.removeEventListener('pointerup',onUp);
+    document.removeEventListener('pointercancel',onUp);
+    document.removeEventListener('touchmove',cegahGulir);
+  };
+  const cegahGulir=e=>{if(aktif)e.preventDefault()};
+  const onMove=e=>{
+    if(selesai||e.pointerId!==pid)return;
+    if(!aktif&&Math.hypot(e.clientX-startX,e.clientY-startY)>10){selesai=true;bersih()}
+  };
+  const onUp=e=>{
+    if(e.pointerId!==pid)return;
+    const pernahAktif=aktif;
+    selesai=true;bersih();
+    if(pernahAktif){
+      tekanLamaPercakapanPada=Date.now();
+      const telan=ev=>{ev.preventDefault();ev.stopPropagation()};
+      row.addEventListener('click',telan,{capture:true,once:true});
+      setTimeout(()=>row.removeEventListener('click',telan,{capture:true}),600);
+    }
+  };
+  row.addEventListener('pointerdown',ev=>{
+    if(ev.button!=null&&ev.button>0)return;
+    pid=ev.pointerId;startX=ev.clientX;startY=ev.clientY;aktif=false;selesai=false;
+    document.addEventListener('pointermove',onMove);
+    document.addEventListener('pointerup',onUp);
+    document.addEventListener('pointercancel',onUp);
+    document.addEventListener('touchmove',cegahGulir,{passive:false});
+    timer=setTimeout(()=>{
+      timer=null;
+      if(selesai)return;
+      aktif=true;
+      row.classList.add('conversation-row-pressed');
+      if(navigator.vibrate){try{navigator.vibrate(15)}catch(_){}}
+      bukaPanel();
+    },480);
+  });
+  row.addEventListener('contextmenu',ev=>{
+    ev.preventDefault();
+    selesai=true;bersih();
+    bukaPanel();
+  });
+}
+/* Panel pilihan + konfirmasi hapus percakapan: pola panel aplikasi
+   yang sama (tanpa tombol X, mengetuk bidang di luar kartu menutup;
+   ketukan luar <400 ms sesudah panel terbuka diabaikan sebagai sisa
+   lepasnya tekan lama). Tahap 'menu' berisi nama lawan bicara dan
+   tepat satu pilihan 'Hapus'; menekannya membuka tahap 'yakin',
+   konfirmasi tegas yang MENYEBUT NAMA lawan bicara. Berlaku juga
+   untuk percakapan 'Admin' (namanya memang 'Admin'). */
+function dialogPercakapan(){
+  const d=S.inboxDialog;
+  if(!d)return null;
+  const batal=()=>{S.inboxDialog=null;render()};
+  const tutupLuar=()=>{if(Date.now()-(d.dibukaPada||0)<400)return;S.inboxDialog=null;render()};
+  if(d.tahap==='yakin'){
+    return h('div',{class:'confirm-overlay',onclick:tutupLuar},
+      h('div',{class:'card confirm-card',onclick:ev=>ev.stopPropagation()},
+        h('b',{class:'confirm-title'},'Hapus Percakapan'),
+        h('p',{class:'confirm-text'},'Hapus percakapan dengan '+(d.name||'Anggota')+'? Percakapan ini akan hilang dari daftar Pesan Masuk Anda. Lawan bicara tetap melihat percakapannya, dan percakapan akan muncul lagi bila ada pesan baru.'),
+        h('div',{class:'fl confirm-actions'},
+          h('button',{class:'btn s',onclick:batal},'Batal'),
+          h('button',{class:'btn',onclick:async()=>{
+            const target={...d};S.inboxDialog=null;
+            if(S.openConversation===target.key){S.openConversation=null;S.newChat=null}
+            try{
+              const group=conversationGroups().find(item=>item.key===target.key);
+              if(group)await hapusPercakapan(group);
+            }catch(error){console.error(error);alert('Gagal menghapus percakapan: '+(error.message||'periksa koneksi'))}
+            render();
+          }},'Hapus'))));
+  }
+  return h('div',{class:'confirm-overlay',onclick:tutupLuar},
+    h('div',{class:'card confirm-card',onclick:ev=>ev.stopPropagation()},
+      h('b',{class:'confirm-title'},'Percakapan'),
+      h('div',{class:'chat-dialog-preview'},d.name||'Anggota'),
+      h('button',{class:'btn chat-delete-option',onclick:()=>{S.inboxDialog={...d,tahap:'yakin'};render()}},icon('trash',17),h('span',{},'Hapus'))));
+}
+
 async function uploadMessageFiles(files){
   if(!files.length)return [];
   if(!S.supabase){
@@ -489,16 +642,30 @@ function attachmentPicker(){
   };
   const file=h('input',{type:'file',multiple:true,accept:'image/*,audio/*,video/*,application/pdf,.doc,.docx,.xls,.xlsx',style:'display:none'});
   const camera=h('input',{type:'file',accept:'image/*',capture:'environment',style:'display:none'});
-  file.onchange=()=>update(file);camera.onchange=()=>update(camera);
+  const gallery=h('input',{type:'file',multiple:true,accept:'image/*',style:'display:none'});
+  file.onchange=()=>update(file);camera.onchange=()=>update(camera);gallery.onchange=()=>update(gallery);
+  /* Menu '+' berisi TEPAT tiga pilihan: 'Gambar' (pilih gambar dari
+     galeri, input gambar tanpa capture), 'Kamera' (ambil foto lewat
+     kamera, input gambar dengan capture), dan 'File' (pilih berkas,
+     input berkas umum yang sudah ada). Pilihan 'Rekam' TIDAK ada di
+     menu ini — rekam suara kini tombol ikon mic di dalam field tulis
+     (lihat recordButton). */
   return {files,label,buttons:h('div',{class:'attachment-tools'},
-    h('button',{class:'btn s',onclick:()=>file.click()},icon('attachment',16),h('span',{},'File')),
-    h('button',{class:'btn s',onclick:()=>camera.click()},icon('camera',16),h('span',{},'Kamera')))};
+    h('button',{class:'btn s',onclick:()=>gallery.click()},icon('image',16),h('span',{},'Gambar')),
+    h('button',{class:'btn s',onclick:()=>camera.click()},icon('camera',16),h('span',{},'Kamera')),
+    h('button',{class:'btn s',onclick:()=>file.click()},icon('attachment',16),h('span',{},'File')))};
 }
-function replyBox(messageId){
-  const input=h('textarea',{rows:2,placeholder:'Tulis balasan...'});
-  const picker=attachmentPicker(),record=h('button',{class:'btn s'},icon('mic',16),h('span',{},'Rekam'));
+/* Tombol REKAM pesan suara: kini IKON MIC SAJA (tanpa tulisan) di
+   DALAM field tulis, sisi kanan dalam (.composer-mic pada
+   .composer-field). Alur rekamnya sama seperti sebelumnya: ketuk
+   mulai merekam (ikon berubah jadi ikon berhenti dengan kelas
+   'recording'), ketuk lagi berhenti — hasil rekaman masuk daftar
+   lampiran pemilih yang sama (label berubah 'Voice note siap
+   dikirim') dan terkirim bersama pesan saat tombol Kirim ditekan. */
+function recordButton(picker){
+  const btn=h('button',{class:'composer-mic',type:'button',title:'Rekam pesan suara','aria-label':'Rekam pesan suara'},icon('mic',18));
   let recorder,recorded=[];
-  record.onclick=async()=>{
+  btn.onclick=async()=>{
     if(recorder){recorder.stop();return}
     if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder){alert('Perekaman suara tidak didukung browser ini.');return}
     let stream;
@@ -506,10 +673,16 @@ function replyBox(messageId){
     recorded=[];
     recorder=new MediaRecorder(stream);
     recorder.ondataavailable=e=>{if(e.data.size)recorded.push(e.data)};
-    recorder.onstop=()=>{stream.getTracks().forEach(track=>track.stop());picker.files.push(new File(recorded,'voice-note.webm',{type:'audio/webm'}));picker.label.textContent='Voice note siap dikirim';recorder=null;record.replaceChildren(icon('mic',16),h('span',{},'Rekam'))};
-    recorder.start();record.textContent='⏹️ Selesai';
+    recorder.onstop=()=>{stream.getTracks().forEach(track=>track.stop());picker.files.push(new File(recorded,'voice-note.webm',{type:'audio/webm'}));picker.label.textContent='Voice note siap dikirim';recorder=null;btn.classList.remove('recording');btn.replaceChildren(icon('mic',18))};
+    recorder.start();btn.classList.add('recording');btn.replaceChildren(icon('stop',16));
   };
-  const menu=h('div',{class:'attachment-menu'},picker.buttons,record);
+  return btn;
+}
+function replyBox(messageId){
+  const input=h('textarea',{rows:2,placeholder:'Tulis balasan...'});
+  const picker=attachmentPicker();
+  const mic=recordButton(picker);
+  const menu=h('div',{class:'attachment-menu'},picker.buttons);
   const plus=h('button',{class:'composer-plus',type:'button',title:'Lampiran',onclick:()=>menu.classList.toggle('open')},'+');
   const send=h('button',{class:'btn',onclick:async e=>{
     if(!input.value.trim()&&!picker.files.length)return;
@@ -520,7 +693,11 @@ function replyBox(messageId){
       await loadMessages();
     }catch(error){e.currentTarget.disabled=false;alert('Gagal mengirim balasan: '+error.message)}
   }},'Kirim');
-  return h('div',{class:'reply-box'},menu,h('div',{class:'composer-row'},input,plus,send),picker.label);
+  /* Tombol '+' berada DI DALAM field tulis (pembungkus .composer-field,
+     sisi kiri dalam) dan ikon mic rekam suara di dalam field sisi
+     kanan dalam; Kirim tetap di luar field di kanan. Menu '+' hanya
+     berisi Gambar/Kamera/File — rekam tidak lagi di menu itu. */
+  return h('div',{class:'reply-box'},menu,h('div',{class:'composer-row'},h('div',{class:'composer-field'},input,plus,mic),send),picker.label);
 }
 
 /* Direktori penerima: daftar akun yang SUDAH DISETUJUI (id, nama,
@@ -592,6 +769,7 @@ function openNewMessagePicker(){
 function firstMessageBox(partner){
   const input=h('textarea',{rows:2,placeholder:'Tulis pesan...'});
   const picker=attachmentPicker();
+  const mic=recordButton(picker);
   const menu=h('div',{class:'attachment-menu'},picker.buttons);
   const plus=h('button',{class:'composer-plus',type:'button',title:'Lampiran',onclick:()=>menu.classList.toggle('open')},'+');
   const send=h('button',{class:'btn',onclick:async e=>{
@@ -605,7 +783,9 @@ function firstMessageBox(partner){
       render();
     }catch(error){e.currentTarget.disabled=false;alert('Gagal mengirim pesan: '+error.message)}
   }},'Kirim');
-  return h('div',{class:'reply-box'},menu,h('div',{class:'composer-row'},input,plus,send),picker.label);
+  /* Sama seperti kolom balasan utas: '+' di dalam field kiri, ikon
+     mic di dalam field kanan, Kirim di luar field. */
+  return h('div',{class:'reply-box'},menu,h('div',{class:'composer-row'},h('div',{class:'composer-field'},input,plus,mic),send),picker.label);
 }
 function vPesan(){
   if(!S.uid)return [h('h1',{},'Pesan Masuk'),accountForm()];
@@ -650,6 +830,18 @@ function vPesan(){
           setTimeout(()=>{S.openConversation=null;S.newChat=null;render()},220);
         }
       };
+      /* Penempatan LANGSUNG di pesan terbaru (paling bawah): tanpa
+         animasi gulir sama sekali. CSS .chat-body tidak lagi memakai
+         scroll-behavior smooth dan di sini perilaku gulir wadah
+         ditegaskan 'auto', lalu posisi diatur seketika pada frame
+         pertama (requestAnimationFrame berjalan sebelum frame itu
+         dilukis), jadi utas terbuka sudah diam di pesan terbaru —
+         tidak ada gerakan berjalan dari atas ke bawah. Jalur gambar
+         yang sama dipakai sesudah mengirim pesan sendiri (data dimuat
+         ulang lalu utas digambar ulang), jadi pesan yang baru dikirim
+         pun langsung tampil di posisi terbawah tanpa efek gulir.
+         Gulir manual pengguna di dalam utas tidak berubah. */
+      chatBody.style.scrollBehavior='auto';
       requestAnimationFrame(()=>{chatBody.scrollTop=chatBody.scrollHeight});
       return [
         h('div',{class:'conversation-toolbar'},
@@ -666,23 +858,38 @@ function vPesan(){
     S.openConversation=null;
   }
   /* Kotak masuk: daftar percakapan milik pengguna yang masuk saja,
-     aktivitas terbaru di atas. */
-  const cards=groups.length?groups.map(group=>{
+     aktivitas terbaru di atas. Hanya percakapan yang masih punya
+     entri TERLIHAT untuk saya yang digambar: percakapan yang sudah
+     dihapus dari daftar (semua pesannya tersembunyi untuk saya lewat
+     hidden_for) tidak tampil dan tidak terhitung lencananya, dan akan
+     tampil lagi sendiri begitu ada pesan baru yang terlihat. */
+  const visibleGroups=groups.filter(group=>group.last);
+  const cards=visibleGroups.length?visibleGroups.map(group=>{
     const unread=conversationUnread(group);
     const last=group.last;
     const snippet=last?((last.mine?'Anda: ':'')+(last.teks||(last.attachments&&last.attachments.length?'Lampiran':''))):'Belum ada pesan yang terlihat';
-    return h('button',{class:'conversation-row',onclick:()=>{S.newChat=null;S.openConversation=group.key;markMessagesRead(group)}},
+    /* Setiap baris bisa DITEKAN LAMA untuk membuka pilihan Hapus
+       percakapan (lihat pasangTekanLamaPercakapan). Ketukan biasa
+       membuka percakapan; klik sisa sesudah tekan lama yang matang
+       ditelan oleh penjaga cap waktu di onclick ini. */
+    const row=h('button',{class:'conversation-row inbox-row',onclick:()=>{
+        if(Date.now()-tekanLamaPercakapanPada<700)return;
+        S.newChat=null;S.openConversation=group.key;markMessagesRead(group);
+      }},
       conversationAvatar(group),
       h('div',{class:'conversation-main'},
         h('div',{class:'conversation-top'},h('b',{},group.name),last?h('span',{class:'conversation-time'},formatChatTime(last.at)):null),
         h('small',{},snippet)),
       unread>0&&h('span',{class:'conversation-badge'},String(unread)));
+    pasangTekanLamaPercakapan(row,group);
+    return row;
   }):[h('p',{class:'warn'},'Belum ada percakapan. Ketuk "Pesan Baru" untuk memulai percakapan dengan pengguna lain.')];
   return [
     h('div',{class:'inbox-head'},
       h('h1',{},'Pesan Masuk'),
       h('button',{class:'btn s',onclick:()=>openNewMessagePicker()},icon('edit',16),h('span',{},'Pesan Baru'))),
-    ...cards
+    ...cards,
+    dialogPercakapan()
   ];
 }
 /* ===== maskot: gambar diam, bisa digeser, ketuk untuk tanya admin ===== */
