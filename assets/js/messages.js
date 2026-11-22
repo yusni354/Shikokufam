@@ -398,7 +398,7 @@ function openNewMessagePicker(){
       const avatar=member&&member.foto
         ?h('img',{class:'chat-avatar',...memberMediaAttributes(member.foto,'src'),alt:'Foto '+(user.name||'pengguna')})
         :(user.avatar_url?h('img',{class:'chat-avatar',src:user.avatar_url,alt:'Foto '+(user.name||'pengguna')}):h('div',{class:'chat-avatar'},(user.name||'?').trim().charAt(0).toUpperCase()||'?'));
-      const sub=member?(typeof memberRegion==='function'?memberRegion(member):''):(user.role==='admin'?'Admin':'Anggota');
+      const sub=member?(typeof memberRegion==='function'?memberRegion(member):''):(user.is_main_admin?'Admin Utama':(user.role==='admin'?'Pengurus':'Anggota'));
       return h('button',{class:'conversation-row',onclick:()=>{
         overlay.remove();
         const existing=conversationGroups().find(group=>group.key===user.id);

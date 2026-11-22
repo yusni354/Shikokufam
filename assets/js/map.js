@@ -188,12 +188,12 @@ function dialogKonfirmasiAkun(){
   if(d.jenis==='peran'){
     /* Pilihan peran untuk pendaftar yang disetujui. Bawaan yang disorot
        adalah 'Anggota' (kasus terbanyak). Pilihan 'Admin Utama' hanya
-       tampil bagi admin utama yang sedang masuk; admin biasa hanya
-       melihat 'Admin Biasa' dan 'Anggota'. */
+       tampil bagi admin utama yang sedang masuk; pengurus hanya
+       melihat 'Pengurus' dan 'Anggota'. */
     const terpilih=d.peran||'member';
     const opsi=[];
     if(S.mainAdmin)opsi.push({key:'utama',label:'Admin Utama',ket:'Kendali penuh atas aplikasi, termasuk persetujuan akun dan penunjukan admin.'});
-    opsi.push({key:'admin',label:'Admin Biasa',ket:'Dapat mengelola data, kegiatan, dan menyetujui akun baru.'});
+    opsi.push({key:'admin',label:'Pengurus',ket:'Dapat mengelola data, kegiatan, dan menyetujui akun baru.'});
     opsi.push({key:'member',label:'Anggota',ket:'Akses biasa sebagai anggota komunitas.'});
     const tombolOpsi=opsi.map(o=>h('button',{type:'button',class:'role-opt'+(terpilih===o.key?' on':''),'aria-pressed':terpilih===o.key?'true':'false',onclick:()=>{S.approvalDialog={...d,peran:o.key};render()}},
       h('b',{},o.label),h('small',{},o.ket)));
@@ -227,12 +227,12 @@ function dialogKonfirmasiAkun(){
     const lama=S.approvedUsers.find(user=>user.is_main_admin);
     const namaLama=lama?(lama.name||lama.email||''):((S.mainAdmin&&(S.name||S.email))||'');
     judul='Setujui sebagai Admin Utama';
-    isi=nama+' akan disetujui sebagai admin utama. '+(namaLama?namaLama+' yang saat ini menjadi admin utama':'Admin utama saat ini')+' akan turun menjadi admin biasa. Lanjutkan?';
+    isi=nama+' akan disetujui sebagai admin utama. '+(namaLama?namaLama+' yang saat ini menjadi admin utama':'Admin utama saat ini')+' akan turun menjadi Pengurus. Lanjutkan?';
     label='Setujui sebagai Admin Utama';
     aksi=async()=>{S.approvalDialog=null;await setApproval(d.user.id,'approved','utama')};
   }else{
     judul='Jadikan Admin Utama';
-    isi=nama+' akan menjadi admin utama. Admin utama saat ini akan turun menjadi admin biasa. Lanjutkan?';
+    isi=nama+' akan menjadi admin utama. Admin utama saat ini akan turun menjadi Pengurus. Lanjutkan?';
     label='Jadikan Admin Utama';
     aksi=async()=>{S.approvalDialog=null;await jadikanAdminUtama(d.user)};
   }
@@ -246,7 +246,7 @@ function dialogKonfirmasiAkun(){
 }
 function peranAkun(user){
   if(user.is_main_admin)return 'Admin Utama';
-  if(user.role==='admin')return 'Admin';
+  if(user.role==='admin')return 'Pengurus';
   return 'Anggota';
 }
 function tanggalAkun(value){

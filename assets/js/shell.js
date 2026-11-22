@@ -33,7 +33,9 @@ $('#ov').onclick=()=>{
   if(S.adminMenuOpen){S.adminMenuOpen=false;render()}else syncAdminTheme();
 };
 $('#st').onclick=()=>{
-  if(!S.admin)return;
+  /* Drawer kanan hanya boleh dibuka ADMIN UTAMA; selain itu klik
+     tidak membuka apa pun dan keadaan terbuka apa pun ditutup. */
+  if(!S.mainAdmin){S.adminMenuOpen=false;document.body.classList.remove('open');syncAdminTheme();return}
   S.adminMenuOpen=!S.adminMenuOpen;
   document.body.classList.toggle('open',S.adminMenuOpen);
   $('#st').setAttribute('aria-expanded',String(S.adminMenuOpen));

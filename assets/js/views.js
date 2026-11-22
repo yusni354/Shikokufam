@@ -41,7 +41,7 @@ function updateApprovalBadges(){
 }
 function renderDrawer(){
   const d=$('#dr');
-  if(S.adminMenuOpen){
+  if(S.adminMenuOpen&&S.mainAdmin){
     d.replaceChildren(
       h('p',{class:'sub',style:'padding:0 14px'},h('b',{style:'color:var(--ink)'},'PENGATURAN ADMIN')),
       ...ADMIN_MENU.filter(([view])=>view!=='pengaturan'||S.mainAdmin).map(([view,label,glyph])=>h('a',{class:S.view===view?'on':'',href:'#',onclick:navTo(view),...(view==='approvals'?{'data-approval-nav':'true'}:{})},icon(glyph),h('span',{},label),view==='approvals'&&S.admin&&S.pendingUsers.length>0&&h('span',{class:'nav-badge'},String(S.pendingUsers.length)))),
@@ -108,7 +108,9 @@ function render(){
      berturut-turut; ia berhenti hanya lewat tombol 'Tutup QR'. */
   if(S.activityScannerStop&&!S.qrScannerOpen)S.activityScannerStop();
   if(S.view!=='musyawarah')window.__musyAlive=false;
-  if(!S.admin)S.adminMenuOpen=false;
+  /* Drawer kanan khusus admin utama: keadaan terbuka yang tersisa dari
+     sesi/peran sebelumnya ditutup paksa untuk selain admin utama. */
+  if(!S.mainAdmin)S.adminMenuOpen=false;
   syncAdminTheme();
   if(S.authLoading){
     setAuthLocked(true);
@@ -149,7 +151,9 @@ function render(){
      hanya sesudah sesi terpulihkan & disetujui — lihat shell.js). */
   pulihkanViewTerakhir();
   renderDrawer();
-  $('#sw').style.display=S.admin?'flex':'none';
+  /* Ikon roda gigi (jalan masuk drawer kanan) HANYA untuk admin utama:
+     admin biasa dan anggota tidak melihat tombolnya sama sekali. */
+  $('#sw').style.display=S.mainAdmin?'flex':'none';
   updateApprovalBadges();
   const current=ALL.find(x=>x[0]===S.view);
   if(!V[S.view]||(S.view==='approvals'&&!S.admin)||(S.view==='pengaturan'&&!S.mainAdmin))S.view='landing';
