@@ -51,7 +51,9 @@ function renderDrawer(){
     return;
   }
   d.replaceChildren(h('p',{class:'sub',style:'padding:0 14px'},h('b',{style:'color:var(--ink)'},'KOMUNITAS ID-JP')),
-    ...ALL.filter(x=>!x[2]||(x[3]?S.mainAdmin:S.admin))
+    /* Urutan tampil mengikuti urutan tersimpan hasil pengaturan admin
+       utama (urutkanMenu di shell.js); bawaan = urutan ALL. */
+    ...urutkanMenu(ALL).filter(x=>!x[2]||(x[3]?S.mainAdmin:S.admin))
       /* Menu yang dimatikan admin utama disembunyikan dari drawer
          Pengurus & Anggota; admin utama sendiri tetap melihatnya
          (redup, bertanda Nonaktif, lengkap dengan saklarnya). */
@@ -66,7 +68,12 @@ function renderDrawer(){
           if(!aktif)anak.push(h('span',{class:'menu-off-tag'},'Nonaktif'));
           anak.push(h('button',{type:'button',class:'menu-switch'+(aktif?' on':''),role:'switch','aria-checked':String(aktif),'aria-label':'Tampilkan menu '+x[1],title:aktif?'Sembunyikan menu ini dari semua pengguna':'Tampilkan menu ini untuk semua pengguna',onclick:ev=>{ev.preventDefault();ev.stopPropagation();aturMenuAktif(x[0],!aktif)}},h('span',{class:'menu-switch-knob'})));
         }
-        return h('a',{class:(S.view===x[0]?'on':'')+(S.mainAdmin&&!aktif?' menu-off':''),href:'#',onclick:navTo(x[0]),...(x[0]==='pesan'?{'data-message-nav':'true'}:{})},...anak);
+        const tautan=h('a',{class:(S.view===x[0]?'on':'')+(S.mainAdmin&&!aktif?' menu-off':''),href:'#',onclick:navTo(x[0]),'data-menu-view':x[0],...(x[0]==='pesan'?{'data-message-nav':'true'}:{}),...(S.mainAdmin&&x[0]!=='landing'?{title:'Tekan lama lalu seret untuk mengubah urutan menu'}:{})},...anak);
+        /* Geser posisi menu dengan tekan lama + seret: HANYA admin
+           utama, dan Home tidak ikut bergeser (pasangSeretMenu di
+           shell.js; Pengurus & Anggota tidak mendapat pendengar). */
+        if(S.mainAdmin&&x[0]!=='landing')pasangSeretMenu(tautan);
+        return tautan;
       }),
     h('button',{class:'menu-logout',onclick:()=>signOut()},icon('logout',17),h('span',{},'Keluar')),
     /* Tombol unduh aplikasi (PWA) untuk semua pengguna yang masuk,

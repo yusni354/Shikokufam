@@ -967,7 +967,7 @@ function orgTambahInline(grup){
    tombol Atur — khusus admin, gaya btn-eh yang sama seperti tombol
    kecil lain di aplikasi; konfirmasi hapus seperti biasa) ===== */
 function orgTombolHapus(nodes,node){
-  return h('button',{class:'btn s btn-eh',onclick:async()=>{
+  return h('button',{class:'org-icon-btn org-icon-btn-danger',title:'Hapus dapukan '+node.nama,'aria-label':'Hapus dapukan '+node.nama,onclick:async()=>{
     const anak=susunanAnak(nodes,node.id);
     const pesan='Hapus dapukan "'+node.nama+'"?'+(anak.length?' '+anak.length+' dapukan di bawahnya akan naik ke dapukan di atasnya ("'+(susunanCari(nodes,node.induk)||{}).nama+'").':'')+' Pemegangnya menjadi tidak menjabat.';
     if(!confirm(pesan))return;
@@ -976,7 +976,7 @@ function orgTombolHapus(nodes,node){
       if(S.susunanInline&&S.susunanInline.jenis==='atur'&&S.susunanInline.id===node.id)S.susunanInline=null;
       render();
     }catch(error){console.error(error);alert('Gagal menghapus dapukan: '+(error.message||'periksa koneksi'))}
-  }},'Hapus');
+  }},icon('trash',15));
 }
 /* ===== SUSUNAN KEPENGURUSAN BERBASIS TABEL =====
    Tampilan hierarki (Bagan) sudah dihapus: halaman Kepengurusan kini
@@ -1030,7 +1030,7 @@ function orgKepalaKelompok(grup){
       h('h2',{class:'org-group-heading'},grup.nama),
       h('p',{class:'org-group-sub'},subParts.join(' • '))),
     S.admin?h('button',{class:'org-group-edit-btn',title:'Ubah tulisan kepala kelompok ini','aria-label':'Ubah tulisan kepala kelompok '+grup.nama,onclick:()=>{S.susunanLabelEdit=grup.kunciEdit;render()}},icon('edit',15)):null,
-    S.admin&&grup.jenis==='kel'?h('button',{class:'btn s btn-eh org-group-del',title:'Hapus kelompok ini (hanya bila kosong)',onclick:async()=>{
+    S.admin&&grup.jenis==='kel'?h('button',{class:'org-icon-btn org-icon-btn-danger org-group-del',title:'Hapus kelompok ini (hanya bila kosong)','aria-label':'Hapus kelompok '+grup.nama+' (hanya bila kosong)',onclick:async()=>{
       if(grup.items.length){alert('Kelompok "'+grup.nama+'" masih berisi '+grup.items.length+' dapukan. Kosongkan dulu kelompok ini — hapus dapukannya lewat tombol Atur pada barisnya — sebelum kelompok bisa dihapus.');return}
       if(!confirm('Hapus kelompok "'+grup.nama+'"? Kartu kelompok kosong ini akan hilang dari tabel.'))return;
       try{
@@ -1040,7 +1040,7 @@ function orgKepalaKelompok(grup){
         if(S.susunanInline&&S.susunanInline.kunci===grup.kunciEdit)S.susunanInline=null;
         render();
       }catch(error){console.error(error);alert('Gagal menghapus kelompok: '+(error.message||'periksa koneksi'))}
-    }},'Hapus'):null,
+    }},icon('trash',15)):null,
     h('span',{class:'org-group-count'},terisi+'/'+grup.items.length+' terisi'));
 }
 /* ===== Geser urutan dapukan dengan TEKAN LAMA pada baris =====
@@ -1198,7 +1198,8 @@ function orgRow(nodes,node,urut){
      dan — untuk baris non-puncak — tombol Hapus kecil di sampingnya. */
   let aksiEl=null;
   if(S.admin){
-    const aturBtn=h('button',{class:'btn s',onclick:()=>toggleAturSusunan(node.id)},S.susunanInline&&S.susunanInline.jenis==='atur'&&S.susunanInline.id===node.id?'Tutup':'Atur');
+    const sedangAtur=S.susunanInline&&S.susunanInline.jenis==='atur'&&S.susunanInline.id===node.id;
+    const aturBtn=h('button',{class:'org-icon-btn',title:sedangAtur?'Tutup pengaturan':'Atur dapukan '+node.nama,'aria-label':sedangAtur?'Tutup pengaturan':'Atur dapukan '+node.nama,onclick:()=>toggleAturSusunan(node.id)},icon(sedangAtur?'close':'settings',15));
     aksiEl=h('div',{class:'org-c-aksi'},
       h('div',{class:'org-aksi-btns'},aturBtn,node.induk!==null?orgTombolHapus(nodes,node):null));
   }
@@ -1271,7 +1272,7 @@ function orgTabel(nodes){
         anakTabel.push(h('div',{class:'org-table-foot org-table-foot-form'},orgTambahInline(grup)));
       }else{
         anakTabel.push(h('div',{class:'org-table-foot'},
-          h('button',{class:'btn org-add-btn',onclick:()=>toggleTambahSusunan(grup.kunciEdit)},'+ Tambah Dapukan Baru')));
+          h('button',{class:'btn org-add-btn',title:'Tambah dapukan baru di kelompok ini','aria-label':'Tambah dapukan baru di kelompok ini',onclick:()=>toggleTambahSusunan(grup.kunciEdit)},icon('plus',15),h('span',{},'Tambah Dapukan'))));
       }
     }
     /* Tiap kelompok mendapat kelas palet pastel berputar (org-pal-0..4)
@@ -1285,10 +1286,10 @@ function orgTabel(nodes){
   /* Paling bawah halaman: tombol membuat kartu kelompok baru (admin). */
   if(S.admin){
     parts.push(h('div',{class:'org-add-group-wrap'},
-      h('button',{class:'btn org-add-group-btn',onclick:async()=>{
+      h('button',{class:'btn org-add-group-btn',title:'Tambah kartu kelompok baru','aria-label':'Tambah kartu kelompok baru',onclick:async()=>{
         try{await tambahKelompokBaru();render()}
         catch(error){console.error(error);alert('Gagal menambah kelompok: '+(error.message||'periksa koneksi'))}
-      }},'+ Tambah Kartu Kelompok')));
+      }},icon('plus',15),h('span',{},'Tambah Kelompok'))));
   }
   return h('div',{class:'org-table-wrap'},...parts);
 }
