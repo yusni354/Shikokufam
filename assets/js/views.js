@@ -51,9 +51,29 @@ function renderDrawer(){
     return;
   }
   d.replaceChildren(h('p',{class:'sub',style:'padding:0 14px'},h('b',{style:'color:var(--ink)'},'KOMUNITAS ID-JP')),
-    ...ALL.filter(x=>!x[2]||(x[3]?S.mainAdmin:S.admin)).map(x=>h('a',{class:S.view===x[0]?'on':'',href:'#',onclick:navTo(x[0]),...(x[0]==='pesan'?{'data-message-nav':'true'}:{})},
-      icon(x[4],19),h('span',{},x[1]),x[0]==='pesan'&&S.unreadMessages>0&&h('span',{class:'nav-badge'},String(S.unreadMessages)))),
-    h('button',{class:'menu-logout',onclick:()=>signOut()},icon('logout',17),h('span',{},'Keluar')));
+    ...ALL.filter(x=>!x[2]||(x[3]?S.mainAdmin:S.admin))
+      /* Menu yang dimatikan admin utama disembunyikan dari drawer
+         Pengurus & Anggota; admin utama sendiri tetap melihatnya
+         (redup, bertanda Nonaktif, lengkap dengan saklarnya). */
+      .filter(x=>S.mainAdmin||menuAktifUntuk(x[0]))
+      .map(x=>{
+        const aktif=menuAktifUntuk(x[0]);
+        const anak=[icon(x[4],19),h('span',{},x[1])];
+        if(x[0]==='pesan'&&S.unreadMessages>0)anak.push(h('span',{class:'nav-badge'},String(S.unreadMessages)));
+        /* Saklar on/off HANYA untuk admin utama, di semua menu selain
+           Home; menekan saklar tidak ikut membuka halamannya. */
+        if(S.mainAdmin&&x[0]!=='landing'){
+          if(!aktif)anak.push(h('span',{class:'menu-off-tag'},'Nonaktif'));
+          anak.push(h('button',{type:'button',class:'menu-switch'+(aktif?' on':''),role:'switch','aria-checked':String(aktif),'aria-label':'Tampilkan menu '+x[1],title:aktif?'Sembunyikan menu ini dari semua pengguna':'Tampilkan menu ini untuk semua pengguna',onclick:ev=>{ev.preventDefault();ev.stopPropagation();aturMenuAktif(x[0],!aktif)}},h('span',{class:'menu-switch-knob'})));
+        }
+        return h('a',{class:(S.view===x[0]?'on':'')+(S.mainAdmin&&!aktif?' menu-off':''),href:'#',onclick:navTo(x[0]),...(x[0]==='pesan'?{'data-message-nav':'true'}:{})},...anak);
+      }),
+    h('button',{class:'menu-logout',onclick:()=>signOut()},icon('logout',17),h('span',{},'Keluar')),
+    /* Tombol unduh aplikasi (PWA) untuk semua pengguna yang masuk,
+       tepat di bawah tombol Keluar; perilakunya di install.js. */
+    h('div',{class:'drawer-downloads'},
+      h('button',{class:'drawer-download-btn',onclick:()=>unduhAndroid()},icon('android',18),h('span',{},'Download Android')),
+      h('button',{class:'drawer-download-btn',onclick:()=>unduhIOS()},icon('apple',18),h('span',{},'Download iOS'))));
 }
 /* Gerbang awal: kerangka (header, drawer) hanya tampil untuk
    pengguna yang sudah masuk dan disetujui. Selama terkunci, body
@@ -159,7 +179,7 @@ function render(){
   $('#sw').style.display=S.mainAdmin?'flex':'none';
   updateApprovalBadges();
   const current=ALL.find(x=>x[0]===S.view);
-  if(!V[S.view]||(S.view==='approvals'&&!S.admin)||(S.view==='pengaturan'&&!S.mainAdmin))S.view='landing';
+  if(!V[S.view]||(S.view==='approvals'&&!S.admin)||(S.view==='pengaturan'&&!S.mainAdmin)||(!S.mainAdmin&&!menuAktifUntuk(S.view)))S.view='landing';
   /* Halaman Peta = SATU JENDELA tanpa gulir halaman: kelas 'peta-view'
      pada body mengunci tinggi halaman setinggi layar (lihat CSS
      .peta-fit di style.css); halaman lain tidak terpengaruh. Dipasang
@@ -238,5 +258,6 @@ function startDataSubscriptions(){
   add(()=>subscribePilihan());
   if(!S.supabase)add(()=>sub('pengaturan','pengaturan'));
   add(()=>subscribeSambutan());
+  add(()=>subscribeMenuAktif());
   add(()=>subscribeSusunan());
 }

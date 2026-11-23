@@ -1760,6 +1760,31 @@ header .logo{border-radius:13px}
 #dr .sub{font-size:11px;letter-spacing:.09em;margin:4px 0 10px}
 .menu-logout{font-size:14.5px;border-radius:14px;padding:12px 14px;transition:background .15s ease}
 .menu-logout:hover{background:rgba(255,255,255,.08)}
+/* Saklar tampil/sembunyi menu di drawer (khusus admin utama): tombol
+   kecil di ujung kanan item menu — menyala = latar hijau dengan kenop
+   di kanan, mati = latar abu dengan kenop di kiri. Item menu yang mati
+   tampil redup + lencana 'Nonaktif', dan itu hanya terlihat di drawer
+   admin utama; pengguna lain tidak melihat item itu sama sekali. */
+.menu-switch{margin-left:auto;flex:none;width:38px;height:22px;padding:0;border:1px solid rgba(0,0,0,.12);border-radius:999px;background:#7d93a5;display:inline-flex;align-items:center;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:background .15s ease}
+.menu-switch-knob{width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.35);transform:translateX(2px);transition:transform .15s ease;pointer-events:none}
+.menu-switch.on{background:#2e9e63}
+.menu-switch.on .menu-switch-knob{transform:translateX(18px)}
+#dr a.menu-off{opacity:.55}
+#dr a.menu-off:hover{opacity:.8}
+.menu-off-tag{flex:none;font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:2px 7px;border-radius:999px;background:rgba(255,255,255,.18)}
+@media (prefers-reduced-motion: reduce){.menu-switch,.menu-switch-knob{transition:none}}
+/* Tombol unduh aplikasi (PWA) di drawer, tepat di bawah tombol Keluar,
+   terlihat untuk semua pengguna yang masuk */
+.drawer-downloads{display:grid;gap:8px;margin-top:12px}
+.drawer-download-btn{display:flex;align-items:center;gap:10px;width:100%;padding:11px 14px;border:1px solid rgba(255,255,255,.22);border-radius:14px;background:rgba(255,255,255,.08);color:#e8f0f6;font-weight:600;font-size:14.5px;text-align:left;cursor:pointer;transition:background .15s ease}
+.drawer-download-btn:hover{background:rgba(255,255,255,.14)}
+.drawer-download-btn>.app-icon{color:#9fd8c9}
+.drawer-download-btn span{color:inherit}
+/* Panel petunjuk pasang aplikasi (dari tombol unduh di drawer) */
+.install-card{max-width:420px}
+.install-steps{margin:4px 0;padding-left:20px;line-height:1.55;font-size:14px;color:var(--ink)}
+.install-steps li{margin-bottom:6px}
+.install-steps li:last-child{margin-bottom:0}
 
 /* ---------- Panel / modal bersama: masuk halus, sudut seragam ---------- */
 @keyframes polishPop{from{opacity:0;transform:scale(.985) translateY(4px)}to{opacity:1;transform:scale(1) translateY(0)}}

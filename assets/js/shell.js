@@ -23,7 +23,51 @@ function bawaanArsipKegiatan(){const kini=new Date();S.kegiatanTahun=kini.getFul
    dalam gambar ulang: berpindah bulan/tahun/ruangan selama masih di
    halaman tidak di-reset; keluar lalu kembali → bulan berjalan lagi. */
 function bawaanArsipRingkasan(){const kini=new Date();S.ringkasanTahun=kini.getFullYear();S.ringkasanBulan=kini.getMonth()+1}
-function go(v){/* Halaman Pengaturan khusus ADMIN UTAMA: admin biasa yang somehow memanggilnya diarahkan ke Home, bukan sekadar menunya disembunyikan. */if(v==='pengaturan'&&!S.mainAdmin)v='landing';if(v==='kegiatan'){bawaanArsipKegiatan();/* Masuk halaman Kegiatan dari menu selalu menuju DAFTAR: detail kegiatan adalah sub-tampilan yang hanya dibuka dari kartu dan ditutup lewat tombol Kembali di dalamnya, jadi keadaan detail & absensi dibersihkan di sini (bukan saat kembali dari detail). */S.activityDetail=null;S.absensiEvent=null;S.absensiRegion=null;S.absensiDraft=null;try{sessionStorage.removeItem('shikoku-family:kegiatan-detail')}catch(e){/* storage terblokir: abaikan */}}if(v==='ringkasan')bawaanArsipRingkasan();S.view=v;simpanViewTerakhir(v);S.adminMenuOpen=false;S.chatDialog=null;S.inboxDialog=null;S.form=S.detail=S.dutyForm=null;S.financeForm=null;S.financePhoto=null;S.inventarisForm=null;S.inventarisPhoto=null;S.inventarisDetail=null;S.inventarisConfirm=null;S.inventarisPinjam=null;S.idPhoto=null;S.detailOrigin=null;S.detailReturnView=null;if(v==='pesan'){/* Masuk menu Pesan selalu menuju KOTAK MASUK (daftar percakapan pribadi pengguna yang masuk) untuk semua peran; percakapan hanya ditandai terbaca saat dibuka, bukan saat daftar ditampilkan. Direktori pengguna dimuat untuk nama/foto lawan bicara dan pemilih Pesan Baru. */S.openConversation=null;S.newChat=null;if(S.uid&&typeof loadUserDirectory==='function')loadUserDirectory().then(()=>{if(S.view==='pesan')renderDariData()})}document.body.classList.remove('open');syncAdminTheme();render()}
+/* ===== Saklar tampil/sembunyi menu drawer (khusus ADMIN UTAMA) =====
+   Keadaan tiap menu disimpan sebagai dokumen {id:'menu_aktif'} di
+   koleksi 'pengaturan': isinya peta idMenu -> boolean (true = tampil).
+   Bawaan semua menu tampil (id yang belum tercatat dianggap menyala).
+   Menu 'landing' (Home) tidak pernah bisa dimatikan: ia pintu masuk
+   aplikasi. Admin utama selalu melihat semua menu beserta saklarnya
+   (menu mati tampil redup bertanda Nonaktif); Pengurus & Anggota tidak
+   melihat saklar, tidak melihat menu yang dimatikan, dan halaman menu
+   itu pun tidak bisa mereka buka (penjagaan di go() dan render()). */
+function menuAktifUntuk(view){
+  if(view==='landing')return true;
+  if(!S.menuAktif)return true;
+  return S.menuAktif[view]!==false;
+}
+function subscribeMenuAktif(){
+  if(!S.db)return ()=>{};
+  try{
+    return S.db.collection('pengaturan').onSnapshot(snap=>{
+      const doc=(snap.docs||[]).find(d=>d.id==='menu_aktif');
+      const data=doc&&typeof doc.data==='function'?doc.data():null;
+      const next={};
+      if(data)Object.keys(data).forEach(k=>{if(typeof data[k]==='boolean')next[k]=data[k]});
+      if(JSON.stringify(next)!==JSON.stringify(S.menuAktif||{})){
+        S.menuAktif=next;
+        renderDariData();
+      }
+    },error=>{console.error('Pengaturan tampil menu gagal dimuat:',error)});
+  }catch(error){console.error('Pengaturan tampil menu gagal dimuat:',error);return ()=>{}}
+}
+async function aturMenuAktif(view,aktif){
+  if(!S.mainAdmin||view==='landing')return;
+  const sebelum={...(S.menuAktif||{})};
+  S.menuAktif={...sebelum,[view]:!!aktif};
+  render();
+  if(!S.db)return;
+  try{
+    await S.db.collection('pengaturan').doc('menu_aktif').set({...S.menuAktif,at:Date.now()});
+  }catch(e){
+    console.error(e);
+    S.menuAktif=sebelum;
+    alert('Gagal menyimpan pengaturan menu: '+(e.message||'periksa koneksi'));
+    render();
+  }
+}
+function go(v){/* Halaman Pengaturan khusus ADMIN UTAMA: admin biasa yang somehow memanggilnya diarahkan ke Home, bukan sekadar menunya disembunyikan. */if(v==='pengaturan'&&!S.mainAdmin)v='landing';/* Menu yang dimatikan admin utama tidak bisa dibuka pengguna lain: navigasi langsung ke halamannya terpental ke Home. */if(v!=='landing'&&!S.mainAdmin&&!menuAktifUntuk(v))v='landing';if(v==='kegiatan'){bawaanArsipKegiatan();/* Masuk halaman Kegiatan dari menu selalu menuju DAFTAR: detail kegiatan adalah sub-tampilan yang hanya dibuka dari kartu dan ditutup lewat tombol Kembali di dalamnya, jadi keadaan detail & absensi dibersihkan di sini (bukan saat kembali dari detail). */S.activityDetail=null;S.absensiEvent=null;S.absensiRegion=null;S.absensiDraft=null;try{sessionStorage.removeItem('shikoku-family:kegiatan-detail')}catch(e){/* storage terblokir: abaikan */}}if(v==='ringkasan')bawaanArsipRingkasan();S.view=v;simpanViewTerakhir(v);S.adminMenuOpen=false;S.chatDialog=null;S.inboxDialog=null;S.form=S.detail=S.dutyForm=null;S.financeForm=null;S.financePhoto=null;S.inventarisForm=null;S.inventarisPhoto=null;S.inventarisDetail=null;S.inventarisConfirm=null;S.inventarisPinjam=null;S.idPhoto=null;S.detailOrigin=null;S.detailReturnView=null;if(v==='pesan'){/* Masuk menu Pesan selalu menuju KOTAK MASUK (daftar percakapan pribadi pengguna yang masuk) untuk semua peran; percakapan hanya ditandai terbaca saat dibuka, bukan saat daftar ditampilkan. Direktori pengguna dimuat untuk nama/foto lawan bicara dan pemilih Pesan Baru. */S.openConversation=null;S.newChat=null;if(S.uid&&typeof loadUserDirectory==='function')loadUserDirectory().then(()=>{if(S.view==='pesan')renderDariData()})}document.body.classList.remove('open');syncAdminTheme();render()}
 $('#mn').onclick=()=>document.body.classList.add('open');
 $('#mn').replaceChildren(icon('menu',21));
 $('#st').replaceChildren(icon('settings',19));
