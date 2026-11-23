@@ -1171,39 +1171,38 @@ input,textarea,select{background:#f4f8fa;border-color:#bfcfdb}
    harus bisa melayang keluar dari kartu tanpa terpotong. */
 .org-table>.org-row-head{border-radius:19px 19px 0 0}
 .org-table>*:last-child{border-radius:0 0 19px 19px}
-/* Baris dapukan sedikit lebih ramping dari sebelumnya (±12%): padding,
-   foto, dan huruf turun satu tingkat kecil — tetap nyaman dibaca dan
-   diketuk di HP. */
-.org-row{display:grid;grid-template-columns:26px minmax(0,1fr) auto auto;gap:8px;align-items:center;padding:7px 12px;border-top:1px solid var(--line);position:relative}
-.org-table-admin .org-row{grid-template-columns:26px minmax(0,1fr) auto auto auto}
+/* Baris dapukan SEMINIMAL mungkin dan rapat: tiga kolom saja — nama
+   dapukan, nama pemegang, wilayah — tanpa foto, nomor, dan tombol.
+   Teks hitam tegas agar terbaca di semua latar pastel kelompok. */
+.org-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr) minmax(0,.9fr);grid-template-areas:'dap nama wil';gap:10px;align-items:center;padding:8px 12px;border-top:1px solid var(--line);position:relative}
 .org-row:first-child{border-top:0}
 .org-row-head{background:#eef4f7;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;padding-top:6px;padding-bottom:6px}
 .org-row-head span{color:#33566e}
+.org-row-head span:last-child{justify-self:end}
 .org-row-root{background:linear-gradient(145deg,#f0f8f3,#eef5fa)}
-.org-num{width:22px;height:22px;border-radius:50%;background:#e3f1f8;color:#2b6a7f;font-size:11px;font-weight:700;display:grid;place-items:center;flex:none}
-.org-row-root .org-num{background:#2b7a8c;color:#ffffff}
-.org-person{display:flex;align-items:center;gap:8px;background:none;border:0;padding:0;font:inherit;color:var(--ink);cursor:pointer;text-align:left;min-width:0;width:100%}
-.org-person-empty{cursor:default}
-.org-photo{width:34px;height:34px;flex:none;border-radius:10px;object-fit:cover}
-.org-avatar-ph{display:grid;place-items:center;background:linear-gradient(145deg,#dff2e7,#dceef8);color:#17384a;font-size:14px;font-weight:700}
-.org-photo-empty{background:#fdf3d7;color:#8a6d1f}
-.org-person-text{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
-/* Nama dapukan SENGAJA setengah ukuran nama pemegangnya (9px lawan
-   18px — perbandingan 2:1): nama orangnya yang menonjol sebagai
-   informasi utama baris, nama dapukannya kecil tegas di atasnya
-   berwarna hijau soft (#1f7a4d — cukup kontras di semua latar pastel
-   kelompok, tidak pucat hilang). */
-.org-jabatan{font-size:9px;font-weight:700;letter-spacing:.02em;line-height:1.3;overflow-wrap:anywhere;color:#1f7a4d}
-.org-holder{font-size:18px;font-weight:700;line-height:1.25;overflow-wrap:anywhere;color:#10222e}
-.org-vacant{align-self:flex-start;font-size:12px;font-weight:700;color:#7a5b12;background:#fdf3d7;border:1px dashed #d9b64a;padding:2px 9px;border-radius:999px;margin-top:2px}
+.org-c-dapukan{grid-area:dap;min-width:0}
+.org-c-nama{grid-area:nama;min-width:0}
+.org-c-wilayah{grid-area:wil;min-width:0;justify-self:end;text-align:right}
+.org-dapukan-name{display:block;font-size:14px;font-weight:700;line-height:1.3;overflow-wrap:anywhere;color:#10222e}
+.org-holder-name{display:block;font-size:15.5px;font-weight:700;line-height:1.3;overflow-wrap:anywhere;color:#10222e}
+.org-holder-empty{color:#7a5b12;font-size:13.5px}
 .org-row-vacant-row{background:#fffdf4}
 .org-wilayah-badge{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:600;background:#eef4f7;border:1px solid #dde7ee;padding:3px 8px;border-radius:999px;white-space:nowrap}
 .org-wilayah-dot{width:8px;height:8px;border-radius:50%;flex:none;display:block}
-.org-wa-btn{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;flex:none;padding:0;background:#2b7a8c;color:#ffffff;border-radius:999px;text-decoration:none;white-space:nowrap;box-shadow:0 3px 8px rgba(43,122,140,.22)}
-.org-wa-btn .app-icon{flex:none;display:block}
-.org-wa-btn:hover{background:#256a7a}
-.org-kontak-text{font-size:12.5px;font-weight:600;overflow-wrap:anywhere}
 .org-kontak-none{color:var(--mut);font-size:12.5px}
+/* Nama yang bisa diketuk-edit (khusus pengelola): tombol teks polos —
+   tampil persis seperti teks biasa, hanya kursor & sorotan sentuh
+   yang menandakan ia bisa diketuk. */
+.org-editable{width:100%;background:none;border:0;padding:3px 5px;margin:-3px -5px;font:inherit;text-align:left;cursor:pointer;border-radius:8px;-webkit-tap-highlight-color:transparent}
+.org-editable:hover{background:rgba(255,255,255,.65)}
+.org-editable:focus-visible{outline:2px solid var(--acc);outline-offset:1px}
+span.org-dapukan-name,span.org-holder-name{padding:3px 5px;margin:-3px -5px}
+/* Edit langsung di tempat: isian nama dapukan + ikon sampah kecil di
+   sampingnya (sampah hanya muncul selama nama sedang diedit). */
+.org-edit-wrap{display:flex;align-items:center;gap:6px;min-width:0}
+.org-inline-input{flex:1;min-width:0;margin:0;padding:8px 10px;border-radius:10px;font-size:14px;font-weight:600}
+.org-inline-trash{flex:none}
+.org-c-nama .anggota-picker{min-width:170px}
 /* ===== Warna kelompok dapukan: palet pastel berputar per kelompok =====
    Tiap kelompok (.org-pal-0..4) punya nuansa pastel lembut sendiri yang
    diterapkan konsisten pada ikon & lencana kepala kelompok, kepala
@@ -1222,8 +1221,6 @@ input,textarea,select{background:#f4f8fa;border-color:#bfcfdb}
 .org-pal .org-group-edit-btn:hover{background:var(--pal-chip)}
 .org-pal .org-row-head{background:var(--pal-bg)}
 .org-pal .org-row-root{background:var(--pal-bg)}
-.org-pal .org-num{background:var(--pal-chip);color:#17384a}
-.org-pal .org-row-root .org-num{background:var(--pal-accent);color:#ffffff}
 .org-pal .org-wilayah-badge{background:var(--pal-soft);border-color:var(--pal-line)}
 /* Kaki kartu: tombol '+ Tambah Dapukan Baru' di bagian bawah kartu
    kelompok terakhir (khusus admin, dirender dari orgTabel). */
@@ -1241,19 +1238,17 @@ input,textarea,select{background:#f4f8fa;border-color:#bfcfdb}
 .org-add-group-btn{width:auto;padding:7px 14px;font-size:13.5px;display:inline-flex;align-items:center;gap:6px}
 .org-mini{width:34px;height:34px;flex:none;border-radius:11px;object-fit:cover}
 span.org-mini{display:grid;place-items:center;font-size:14px}
+.org-avatar-ph{display:grid;place-items:center;background:linear-gradient(145deg,#dff2e7,#dceef8);color:#17384a;font-size:14px;font-weight:700}
 @media (max-width:720px){
   .org-row-head-v2{display:none}
-  /* HP: baris menjadi kartu lega — jabatan & pengurus di baris pertama,
-     wilayah + kontak mengalir di baris kedua, tombol Atur di kanan. */
-  .org-table .org-row-v2,.org-table-admin .org-row-v2{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;padding:9px 10px}
-  .org-c-main{flex:1 1 calc(100% - 41px);min-width:0;order:1}
-  .org-num{order:0}
-  .org-c-wilayah{order:2;margin-left:28px}
-  .org-c-kontak{order:3}
-  .org-c-aksi{order:4;margin-left:auto}
+  /* HP: baris tetap tiga isi — nama dapukan di kiri atas, wilayah di
+     kanan atas, nama pemegang satu baris penuh di bawahnya. Semua
+     membungkus di batas kata, tidak ada yang meluber menyamping. */
+  .org-table .org-row-v2{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:'dap wil' 'nama nama';row-gap:3px;padding:8px 10px}
   .org-group-count{display:none}
-  .org-holder{font-size:16px}
-  .org-jabatan{font-size:8px}
+  .org-dapukan-name{font-size:13.5px}
+  .org-holder-name{font-size:15px}
+  .org-wilayah-badge{white-space:normal;text-align:left}
 }
 
 /* ===== Kepengurusan: seret baris dengan tekan lama, tombol aksi
@@ -1266,10 +1261,9 @@ span.org-mini{display:grid;place-items:center;font-size:14px}
 .org-row-dragging{z-index:20;opacity:.97;background:var(--pal-bg,#eef6fa);box-shadow:0 14px 30px rgba(31,58,80,.28),inset 0 0 0 2px #2b7a8c;border-radius:12px;user-select:none;-webkit-user-select:none}
 .org-drop-above{box-shadow:inset 0 3px 0 #2b7a8c}
 .org-drop-below{box-shadow:inset 0 -3px 0 #2b7a8c}
-.org-aksi-btns{display:flex;gap:5px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
-/* Tombol aksi baris Kepengurusan kini IKON KECIL saja tanpa teks
-   (Atur = roda gigi, Hapus = tempat sampah): kotak 30px membulat,
-   fungsi dijelaskan lewat title & aria-label pada tombolnya. */
+/* Ikon kecil saja tanpa teks (dipakai ikon sampah saat baris diedit
+   namanya): kotak 30px membulat, fungsi dijelaskan lewat title &
+   aria-label pada tombolnya. */
 .org-icon-btn{width:30px;height:30px;flex:none;border-radius:10px;border:1px solid var(--pal-line,#c4dde9);background:var(--pal-soft,#eef6fa);color:#2b6a7f;display:grid;place-items:center;cursor:pointer;padding:0}
 .org-icon-btn:hover{background:var(--pal-chip,#dceef7)}
 .org-icon-btn-danger{color:#b03a3a;border-color:#ecc9c9;background:#fdf1f1}
@@ -1284,18 +1278,7 @@ span.org-mini{display:grid;place-items:center;font-size:14px}
 .anggota-opt-info{flex:1;min-width:0}
 .anggota-opt-info b{display:block;font-size:14px;overflow-wrap:anywhere}
 .anggota-opt-info small{display:block;color:var(--mut);font-size:12px;margin-top:1px}
-@media (max-width:720px){
-  .org-aksi-btns{justify-content:flex-start}
-}
-
-/* ===== Kepengurusan: pengaturan INLINE satu dapukan di dalam tabel =====
-   Baris pengaturan melebar tepat di bawah baris dapukan (bukan kartu
-   terpisah di atas halaman). Isinya hanya dua blok field bertajuk
-   (Nama Dapukan, Pemegang Dapukan) dan satu tombol Simpan di bawahnya
-   yang menerapkan kedua field sekaligus. */
-.org-set-row{position:relative;z-index:6;border-top:1px solid var(--line);background:var(--pal-soft,#f4f9fb);padding:10px 14px 12px}
-.org-set-head{display:block;font-size:15px}
-.org-set-blok{border-top:1px solid var(--line);padding-top:9px;margin-top:10px}
+/* Judul blok pada formulir tambah dapukan inline di kaki kartu */
 .org-set-judul{display:block;font-size:15px;margin-bottom:8px}
 
 /* ===== Gerbang awal: hanya halaman login tanpa kerangka =====
@@ -1948,10 +1931,6 @@ header .logo{border-radius:13px}
 .org-group-heading{letter-spacing:-.01em}
 .org-row{transition:background .12s ease}
 .org-row:not(.org-row-head):hover{background:rgba(255,255,255,.55)}
-.org-person{border-radius:12px}
-.org-wa-btn{transition:background .15s ease,transform .15s ease}
-.org-wa-btn:active{transform:scale(.93)}
-.org-set-row{border-radius:0 0 18px 18px}
 .anggota-saran{border-radius:15px;padding:5px}
 .anggota-opt{border-radius:10px;padding:9px 10px}
 

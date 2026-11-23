@@ -721,13 +721,15 @@ function subscribeSusunan(){
   }catch(error){console.error('Susunan pengurus gagal dimuat:',error);return ()=>{}}
 }
 /* ===== Aksi perubahan struktur (semua lewat simpanSusunan) ===== */
-/* Simpan pengaturan satu dapukan SEKALIGUS (nama + pemegang) — dipakai
-   tombol Simpan tunggal pada panel pengaturan inline. */
-async function simpanPengaturanDapukan(id,nama,memberId){
-  await simpanSusunan(susunanSimpul().map(n=>n.id===id?{...n,nama,pemegang:memberId||''}:n));
-}
+/* Ganti nama dapukan saja — dipakai edit langsung pada nama dapukan
+   yang tertera di barisnya. */
 async function gantiNamaJabatan(id,nama){
   await simpanSusunan(susunanSimpul().map(n=>n.id===id?{...n,nama}:n));
+}
+/* Ganti pemegang dapukan saja — dipakai edit langsung pada nama
+   pemegang yang tertera di barisnya (pemilih anggota di tempat). */
+async function gantiPemegangDapukan(id,memberId){
+  await simpanSusunan(susunanSimpul().map(n=>n.id===id?{...n,pemegang:memberId||''}:n));
 }
 /* Tambah dapukan baru TANPA pilihan posisi/acuan: dapukan baru selalu
    masuk sebagai saudara di KELOMPOK YANG SAMA dengan sasarannya, pada
@@ -795,19 +797,14 @@ async function hapusKelompok(id){
   await simpanSusunan(susunanSimpul(),susunanKelompok().filter(k=>k.id!==id));
   return true;
 }
-/* ===== Pengaturan INLINE di dalam tabel (tanpa panel di atas halaman,
-   tanpa tombol X) =====
-   S.susunanInline menandai SATU pengaturan yang sedang terbuka:
-   {jenis:'atur', id} — pengaturan baris dapukan itu, melebar tepat di
-   bawah barisnya di dalam tabel; {jenis:'tambah', kunci} — formulir
-   tambah dapukan di kaki kartu kelompok berkunci itu. Mengetuk 'Atur'
-   pada baris yang sedang terbuka menutupnya; membuka baris lain
-   memindahkan pengaturannya ke sana. */
-function toggleAturSusunan(id){
-  const cur=S.susunanInline;
-  S.susunanInline=cur&&cur.jenis==='atur'&&cur.id===id?null:{jenis:'atur',id};
-  render();
-}
+/* ===== Edit LANGSUNG di dalam tabel (tanpa panel, tanpa tombol X) =====
+   S.susunanInline menandai SATU edit yang sedang terbuka:
+   {jenis:'edit-nama', id} — nama dapukan baris itu berubah menjadi
+   isian teks di tempatnya; {jenis:'edit-pemegang', id} — nama pemegang
+   baris itu berubah menjadi pemilih anggota di tempatnya;
+   {jenis:'tambah', kunci} — formulir tambah dapukan di kaki kartu
+   kelompok berkunci itu. Membuka edit pada baris lain memindahkannya
+   ke sana; mengetuk bidang di luar edit pemegang membatalkannya. */
 function toggleTambahSusunan(kunci){
   const cur=S.susunanInline;
   S.susunanInline=cur&&cur.jenis==='tambah'&&cur.kunci===kunci?null:{jenis:'tambah',kunci};
@@ -822,8 +819,11 @@ function tutupInlineSusunan(){S.susunanInline=null;render()}
    seluruh daftar anggota. Baris teratas selalu '— Tanpa pemegang —'
    untuk mengosongkan jabatan. Daftar menutup saat memilih saran atau
    menyentuh bidang di luar field/daftar. Nilai komponen (.value) tetap
-   uid anggota terpilih atau '' supaya pemanggil tidak berubah. */
-function susunanPilihAnggota(currentId){
+   uid anggota terpilih atau '' supaya pemanggil tidak berubah. Bila
+   pemanggil memberi onPilih, fungsi itu dipanggil SETIAP kali pengguna
+   memilih saran (termasuk '— Tanpa pemegang —') — dipakai edit
+   langsung pemegang di baris tabel, yang menyimpan begitu dipilih. */
+function susunanPilihAnggota(currentId,onPilih){
   const daftar=[...S.members].sort((a,b)=>(a.nama||'').localeCompare(b.nama||'','id'));
   const cariNama=id=>daftar.find(m=>m.id===id)||null;
   let terpilih=cariNama(currentId)?currentId:'';
@@ -844,6 +844,7 @@ function susunanPilihAnggota(currentId){
     const m=terpilih?cariNama(terpilih):null;
     input.value=m?(m.nama||''):'';
     tutup();
+    if(typeof onPilih==='function')onPilih(terpilih);
   };
   const buka=()=>{
     const teks=input.value;
@@ -910,38 +911,111 @@ function susunanPilihAnggota(currentId){
   Object.defineProperty(wadah,'value',{get:()=>terpilih,set:v=>pilih(v||'')});
   return wadah;
 }
-/* ===== Pengaturan INLINE satu dapukan =====
-   Melebar tepat di bawah baris dapukan itu di dalam tabel (bukan kartu
-   terpisah di atas halaman). Isinya SENGAJA sederhana: hanya dua field
-   isian — Nama Dapukan dan Pemegang Dapukan (combobox anggota yang
-   sama) — dan SATU tombol 'Simpan'. Perubahan nama/pemegang TIDAK
-   langsung diterapkan per ketukan; keduanya baru tersimpan saat
-   tombol Simpan ditekan. Menggeser urutan dilakukan dengan menekan
-   lama barisnya lalu menyeretnya, dan menghapus lewat
-   tombol Hapus kecil pada baris itu sendiri — keduanya di luar panel
-   ini. Sesudah tombol Simpan BERHASIL menyimpan, panel otomatis
-   tertutup sendiri (S.susunanInline dikosongkan sebelum render);
-   bila penyimpanan gagal, panel tetap terbuka dan pesan kesalahan
-   tampil seperti pola aplikasi. Panel juga bisa ditutup manual lewat
-   tombol Atur/Tutup pada baris. */
-function orgPengaturanInline(nodes,node){
+/* ===== Ketuk-untuk-edit pada nama yang tertera di baris =====
+   Nama dapukan & nama pemegang pada baris (khusus admin) adalah tombol
+   teks. Ketukan yang membuka edit dibedakan dari seret/gulir seperti
+   pola aplikasi: tekanan yang BERGERAK lebih dari 10px atau menahan
+   lebih dari ±600 ms MEMBATALKAN niat edit (gerakan itu milik seret
+   tekan-lama baris / gulir halaman), dan klik susulan dari ketukan
+   yang sama ditekan supaya edit tidak terbuka dua kali. Ketukan dari
+   papan ketik (Enter/Spasi pada tombol terfokus) tetap membuka edit. */
+function pasangKetukEdit(el,aksi){
+  let startX=0,startY=0,startT=0,batal=false,baruSaja=false;
+  el.addEventListener('pointerdown',ev=>{
+    if(ev.button!=null&&ev.button>0)return;
+    startX=ev.clientX;startY=ev.clientY;startT=Date.now();batal=false;
+  });
+  el.addEventListener('pointermove',ev=>{
+    if(Math.hypot(ev.clientX-startX,ev.clientY-startY)>10)batal=true;
+  });
+  el.addEventListener('pointerup',()=>{
+    if(batal||Date.now()-startT>600)return;
+    baruSaja=true;
+    setTimeout(()=>{baruSaja=false},350);
+    aksi();
+  });
+  el.addEventListener('click',ev=>{
+    if(baruSaja){ev.preventDefault();return}
+    aksi();
+  });
+}
+/* ===== Isian edit nama dapukan DI TEMPAT =====
+   Menggantikan teks nama dapukan pada baris itu sendiri: isian teks
+   yang sudah terfokus & terpilih, tersimpan saat Enter atau saat fokus
+   berpindah, batal dengan Escape. Selama baris ini sedang diedit
+   namanya, ikon sampah kecil tampil di samping isiannya — satu-satunya
+   jalan menghapus dapukan (dapukan puncak tidak bisa dihapus). Tombol
+   sampah bekerja pada pointerdown dengan preventDefault supaya fokus
+   isian tidak berpindah lebih dulu (yang akan menyimpan & menggambar
+   ulang sebelum hapus sempat berjalan). */
+function orgEditNamaInline(nodes,node){
+  const input=h('input',{type:'text',class:'org-inline-input',value:node.nama,maxlength:'60','aria-label':'Nama dapukan'});
+  let selesai=false;
+  const selesaiEdit=()=>{S.susunanInline=null;render()};
+  const simpan=async()=>{
+    if(selesai)return;
+    selesai=true;
+    const nama=input.value.trim();
+    if(!nama||nama===node.nama){selesaiEdit();return}
+    try{await gantiNamaJabatan(node.id,nama)}
+    catch(error){console.error(error);alert('Gagal mengganti nama dapukan: '+(error.message||'periksa koneksi'))}
+    selesaiEdit();
+  };
+  const batalEdit=()=>{if(selesai)return;selesai=true;selesaiEdit()};
+  input.addEventListener('keydown',ev=>{
+    if(ev.key==='Enter'){ev.preventDefault();simpan()}
+    else if(ev.key==='Escape'){ev.preventDefault();batalEdit()}
+  });
+  input.addEventListener('blur',()=>{simpan()});
+  setTimeout(()=>{if(input.isConnected){input.focus();input.select()}},0);
+  const anak=[input];
+  if(node.induk!==null){
+    const trash=h('button',{type:'button',class:'org-icon-btn org-icon-btn-danger org-inline-trash',title:'Hapus dapukan '+node.nama,'aria-label':'Hapus dapukan '+node.nama},icon('trash',15));
+    trash.addEventListener('pointerdown',async ev=>{
+      ev.preventDefault();ev.stopPropagation();
+      if(selesai)return;
+      const anak2=susunanAnak(nodes,node.id);
+      const pesan='Hapus dapukan "'+node.nama+'"?'+(anak2.length?' '+anak2.length+' dapukan di bawahnya akan naik ke dapukan di atasnya ("'+(susunanCari(nodes,node.induk)||{}).nama+'").':'')+' Pemegangnya menjadi tidak menjabat.';
+      if(!confirm(pesan))return;
+      selesai=true;
+      try{await hapusJabatan(node.id);S.susunanInline=null;render()}
+      catch(error){console.error(error);selesai=false;alert('Gagal menghapus dapukan: '+(error.message||'periksa koneksi'))}
+    });
+    anak.push(trash);
+  }
+  return h('div',{class:'org-edit-wrap'},...anak);
+}
+/* ===== Pemilih pemegang DI TEMPAT =====
+   Menggantikan teks nama pemegang pada baris itu sendiri dengan
+   combobox anggota yang sama seperti sebelumnya (saran foto + nama +
+   wilayah, baris teratas '— Tanpa pemegang —'). Begitu pengguna
+   MEMILIH saran, pemegang langsung tersimpan dan baris kembali ke
+   teks (nama + wilayah mengikuti pemegang baru). Menekan bidang di
+   luar pemilih membatalkan edit tanpa mengubah apa pun. */
+function orgEditPemegangInline(node){
   const current=pemegangJabatan(node);
-  const inputNama=h('input',{type:'text',value:node.nama,maxlength:'60',placeholder:'Nama dapukan'});
-  const selPemegang=susunanPilihAnggota(current?current.id:'');
-  return h('div',{class:'org-set-row'},
-    h('b',{class:'org-set-head'},'Pengaturan Dapukan — '+node.nama),
-    h('div',{class:'org-set-blok'},
-      h('b',{class:'org-set-judul'},'Nama Dapukan'),
-      inputNama),
-    h('div',{class:'org-set-blok'},
-      h('b',{class:'org-set-judul'},'Pemegang Dapukan'),
-      selPemegang),
-    h('div',{class:'fl'},h('button',{class:'btn',onclick:async()=>{
-      const nama=inputNama.value.trim();
-      if(!nama){alert('Nama dapukan tidak boleh kosong.');return}
-      try{await simpanPengaturanDapukan(node.id,nama,selPemegang.value||'');S.susunanInline=null;render()}
-      catch(error){console.error(error);alert('Gagal menyimpan pengaturan dapukan: '+(error.message||'periksa koneksi'))}
-    }},'Simpan')));
+  const picker=susunanPilihAnggota(current?current.id:'',async memberId=>{
+    S.susunanInline=null;
+    if((memberId||'')===(current?current.id:'')){render();return}
+    try{await gantiPemegangDapukan(node.id,memberId||'')}
+    catch(error){console.error(error);alert('Gagal mengganti pemegang dapukan: '+(error.message||'periksa koneksi'))}
+    render();
+  });
+  setTimeout(()=>{
+    const inp=picker.querySelector('input');
+    if(inp&&inp.isConnected)inp.focus();
+  },30);
+  /* Tekan di luar pemilih = batal edit (pendengar membersihkan dirinya
+     sendiri begitu pemilih terlepas dari dokumen karena gambar ulang). */
+  const onDocPointer=ev=>{
+    if(!picker.isConnected){document.removeEventListener('pointerdown',onDocPointer,true);return}
+    if(!picker.contains(ev.target)){
+      document.removeEventListener('pointerdown',onDocPointer,true);
+      if(S.susunanInline&&S.susunanInline.jenis==='edit-pemegang'&&S.susunanInline.id===node.id){S.susunanInline=null;render()}
+    }
+  };
+  setTimeout(()=>document.addEventListener('pointerdown',onDocPointer,true),60);
+  return picker;
 }
 /* Formulir tambah dapukan INLINE di kaki kartu sebuah kelompok:
    hanya nama dapukan + pemegang (combobox anggota) + Simpan/Batal —
@@ -963,21 +1037,7 @@ function orgTambahInline(grup){
       }},'Simpan'),
       h('button',{class:'btn s',onclick:tutupInlineSusunan},'Batal')));
 }
-/* ===== Tombol hapus dapukan (kecil, pada baris itu sendiri di samping
-   tombol Atur — khusus admin, gaya btn-eh yang sama seperti tombol
-   kecil lain di aplikasi; konfirmasi hapus seperti biasa) ===== */
-function orgTombolHapus(nodes,node){
-  return h('button',{class:'org-icon-btn org-icon-btn-danger',title:'Hapus dapukan '+node.nama,'aria-label':'Hapus dapukan '+node.nama,onclick:async()=>{
-    const anak=susunanAnak(nodes,node.id);
-    const pesan='Hapus dapukan "'+node.nama+'"?'+(anak.length?' '+anak.length+' dapukan di bawahnya akan naik ke dapukan di atasnya ("'+(susunanCari(nodes,node.induk)||{}).nama+'").':'')+' Pemegangnya menjadi tidak menjabat.';
-    if(!confirm(pesan))return;
-    try{
-      await hapusJabatan(node.id);
-      if(S.susunanInline&&S.susunanInline.jenis==='atur'&&S.susunanInline.id===node.id)S.susunanInline=null;
-      render();
-    }catch(error){console.error(error);alert('Gagal menghapus dapukan: '+(error.message||'periksa koneksi'))}
-  }},icon('trash',15));
-}
+
 /* ===== SUSUNAN KEPENGURUSAN BERBASIS TABEL =====
    Tampilan hierarki (Bagan) sudah dihapus: halaman Kepengurusan kini
    langsung menampilkan tabel. Data pohon dapukan tetap dipakai di
@@ -988,8 +1048,8 @@ function orgTombolHapus(nodes,node){
    kelompok per dapukan yang mempunyai bawahan, dengan nama dapukan itu
    sebagai kepala kelompok; terakhir kelompok-kelompok tambahan buatan
    admin. Semua baris RATA SEJAJAR (tanpa indentasi dan tanpa garis
-   pemandu) dan diberi nomor urut yang MULAI DARI 1 PADA SETIAP KARTU
-   kelompok (baris pertama tiap kartu selalu nomor 1). */
+   pemandu) dan SEMINIMAL mungkin: isinya hanya nama dapukan, nama
+   pemegang, dan wilayah pemegang. */
 /* Kepala kelompok: pemisah ringan antar kelompok pada tabel. Bagi admin
    tulisannya bisa disunting langsung lewat ikon pensil di sampingnya:
    kepala kelompok puncak menyunting label tersimpan 'labelKelompokPuncak',
@@ -1031,7 +1091,7 @@ function orgKepalaKelompok(grup){
       h('p',{class:'org-group-sub'},subParts.join(' • '))),
     S.admin?h('button',{class:'org-group-edit-btn',title:'Ubah tulisan kepala kelompok ini','aria-label':'Ubah tulisan kepala kelompok '+grup.nama,onclick:()=>{S.susunanLabelEdit=grup.kunciEdit;render()}},icon('edit',15)):null,
     S.admin&&grup.jenis==='kel'?h('button',{class:'org-icon-btn org-icon-btn-danger org-group-del',title:'Hapus kelompok ini (hanya bila kosong)','aria-label':'Hapus kelompok '+grup.nama+' (hanya bila kosong)',onclick:async()=>{
-      if(grup.items.length){alert('Kelompok "'+grup.nama+'" masih berisi '+grup.items.length+' dapukan. Kosongkan dulu kelompok ini — hapus dapukannya lewat tombol Atur pada barisnya — sebelum kelompok bisa dihapus.');return}
+      if(grup.items.length){alert('Kelompok "'+grup.nama+'" masih berisi '+grup.items.length+' dapukan. Kosongkan dulu kelompok ini — ketuk nama dapukannya lalu hapus lewat ikon sampah yang muncul — sebelum kelompok bisa dihapus.');return}
       if(!confirm('Hapus kelompok "'+grup.nama+'"? Kartu kelompok kosong ini akan hilang dari tabel.'))return;
       try{
         const ok=await hapusKelompok(grup.kelompokId);
@@ -1048,18 +1108,17 @@ function orgKepalaKelompok(grup){
    dapukan (±450 ms tanpa bergerak) sampai baris terangkat masuk mode
    seret, lalu menggesernya ke atas/bawah di dalam KELOMPOK TAMPIL-nya
    sendiri sambil tetap menekan, dan melepas untuk menjatuhkan. Selama
-   menyeret, baris mengikuti jari/kursor (transform), baris tujuan
-   ditandai garis sisip di tepi atas/bawahnya, dan nomor urut pada
-   baris-baris diperbarui langsung mengikuti posisi seret. Saat
-   dilepas di posisi baru, urutan disimpan otomatis lewat
-   susunanAturUrutanGrup lalu halaman digambar ulang.
+   menyeret, baris mengikuti jari/kursor (transform) dan baris tujuan
+   ditandai garis sisip di tepi atas/bawahnya. Saat dilepas di posisi
+   baru, urutan disimpan otomatis lewat susunanAturUrutanGrup lalu
+   halaman digambar ulang.
    Bedakan dengan gulir halaman: sentuhan yang BERGERAK sebelum batas
    tekan lama tercapai membatalkan niat seret dan halaman bergulir
    seperti biasa; sesudah mode seret aktif, gerakan menggeser baris
    (gulir dicegah lewat pendengar touchmove non-pasif). Tekan lama
-   pada tombol/tautan di baris (Atur, Hapus, WA, kartu ID) tidak
-   memicu seret, dan melepas jauh di luar kelompok atau membatalkan
-   sentuhan tidak mengubah urutan. */
+   pada nama yang bisa diketuk-edit (tombol teks) atau pada field edit
+   yang sedang terbuka tidak memicu seret, dan melepas jauh di luar
+   kelompok atau membatalkan sentuhan tidak mengubah urutan. */
 function orgPasangSeretTekanLama(rowEl,node,nodes){
   rowEl.addEventListener('pointerdown',ev=>{
     if(ev.button!=null&&ev.button>0)return;
@@ -1114,16 +1173,6 @@ function orgPasangSeretTekanLama(rowEl,node,nodes){
         r.classList.toggle('org-drop-above',i===targetIdx&&targetIdx<startIdx);
         r.classList.toggle('org-drop-below',i===targetIdx&&targetIdx>startIdx);
       });
-      /* Nomor urut mengikuti posisi seret secara langsung. */
-      const urutanBaru=rows.slice();
-      urutanBaru.splice(startIdx,1);
-      urutanBaru.splice(targetIdx,0,rowEl);
-      const numAwal=rows[0].querySelector('.org-num');
-      const base=numAwal?parseInt(numAwal.textContent,10)||1:1;
-      urutanBaru.forEach((r,i)=>{
-        const numEl=r.querySelector('.org-num');
-        if(numEl)numEl.textContent=String(base+i);
-      });
     };
     const onUp=async e=>{
       if(e.pointerId!==pid||selesai)return;
@@ -1134,7 +1183,7 @@ function orgPasangSeretTekanLama(rowEl,node,nodes){
       if(!pernahAktif)return;
       /* Batal: sentuhan dibatalkan sistem, atau dilepas jauh di luar
          kelompok — urutan tidak berubah, gambar ulang untuk
-         mengembalikan nomor urut seperti semula. */
+         mengembalikan tampilan baris seperti semula. */
       const batal=e.type==='pointercancel'||e.clientY<rects[0].top-24||e.clientY>rects[rects.length-1].bottom+24;
       if(batal){render();return}
       if(t===startIdx)return;
@@ -1158,63 +1207,57 @@ function orgPasangSeretTekanLama(rowEl,node,nodes){
     document.addEventListener('touchmove',cegahGulir,{passive:false});
   });
 }
-function orgRow(nodes,node,urut){
+/* ===== Baris dapukan SEMINIMAL mungkin =====
+   Isi baris HANYA tiga hal: nama dapukan, nama pemegang, dan wilayah
+   pemegang (tampilan saja, mengikuti pemegang terpilih; pemegang
+   kosong → '—'). Tidak ada foto, nomor urut, tombol WhatsApp, tombol
+   Atur/Hapus, dan tidak ada panel pengaturan: bagi Pengurus & Admin
+   Utama, mengetuk nama dapukan membuka isian teks DI TEMPAT dan
+   mengetuk nama pemegang membuka pemilih anggota DI TEMPAT (lihat
+   orgEditNamaInline & orgEditPemegangInline). Anggota biasa hanya
+   melihat teks biasa yang tidak bisa diketuk. */
+function orgRow(nodes,node){
   const member=pemegangJabatan(node);
   const depth=susunanKedalaman(nodes,node);
-  const wilayahTampil=member?memberRegion(member):(node.wilayah||'');
-  const waUrl=member&&member.wa?whatsappUrl(member.wa):'';
-  /* Sel utama: foto + jabatan (tegas) + nama pemegang di bawahnya */
-  let personEl;
-  if(member){
-    const avatar=member.foto
-      ?h('img',{class:'org-photo',...memberMediaAttributes(member.foto,'src'),alt:'Foto '+(member.nama||'pengurus')})
-      :h('span',{class:'org-photo org-avatar-ph'},(member.nama||'?').trim().slice(0,1).toUpperCase());
-    personEl=h('button',{class:'org-person',title:'Lihat kartu ID '+(member.nama||''),onclick:()=>openMember(member,'susunan')},
-      avatar,
-      h('span',{class:'org-person-text'},
-        h('b',{class:'org-jabatan'},node.nama),
-        h('span',{class:'org-holder'},member.nama||'Nama belum diisi')));
+  const wilayahTampil=member?memberRegion(member):'';
+  const sedangEditNama=S.admin&&S.susunanInline&&S.susunanInline.jenis==='edit-nama'&&S.susunanInline.id===node.id;
+  const sedangEditPemegang=S.admin&&S.susunanInline&&S.susunanInline.jenis==='edit-pemegang'&&S.susunanInline.id===node.id;
+  /* Sel nama dapukan */
+  let dapukanEl;
+  if(sedangEditNama){
+    dapukanEl=orgEditNamaInline(nodes,node);
+  }else if(S.admin){
+    dapukanEl=h('button',{type:'button',class:'org-editable org-dapukan-name',title:'Ketuk untuk mengganti nama dapukan','aria-label':'Ganti nama dapukan '+node.nama},node.nama);
+    pasangKetukEdit(dapukanEl,()=>{S.susunanInline={jenis:'edit-nama',id:node.id};render()});
   }else{
-    personEl=h('div',{class:'org-person org-person-empty'},
-      h('span',{class:'org-photo org-avatar-ph org-photo-empty'},icon('team',20)),
-      h('span',{class:'org-person-text'},
-        h('b',{class:'org-jabatan'},node.nama),
-        h('span',{class:'org-vacant'},'Belum ditetapkan')));
+    dapukanEl=h('span',{class:'org-dapukan-name'},node.nama);
   }
-  /* Sel kontak: tombol WhatsApp bila nomor ada, selain itu email/teks */
-  let kontakEl;
-  if(member&&waUrl){
-    kontakEl=h('a',{class:'org-wa-btn',href:waUrl,target:'_blank',rel:'noopener noreferrer',title:'WhatsApp','aria-label':'WhatsApp'},
-      icon('whatsapp',20));
-  }else if(member&&member.email){
-    kontakEl=h('span',{class:'org-kontak-text'},member.email);
+  /* Sel nama pemegang */
+  let pemegangEl;
+  if(sedangEditPemegang){
+    pemegangEl=orgEditPemegangInline(node);
+  }else if(S.admin){
+    pemegangEl=h('button',{type:'button',class:'org-editable org-holder-name'+(member?'':' org-holder-empty'),title:'Ketuk untuk mengganti pemegang dapukan','aria-label':'Ganti pemegang dapukan '+node.nama},member?(member.nama||'Nama belum diisi'):'Belum ditetapkan');
+    pasangKetukEdit(pemegangEl,()=>{S.susunanInline={jenis:'edit-pemegang',id:node.id};render()});
   }else{
-    kontakEl=h('span',{class:'org-kontak-none'},'—');
+    pemegangEl=member
+      ?h('span',{class:'org-holder-name'},member.nama||'Nama belum diisi')
+      :h('span',{class:'org-holder-name org-holder-empty'},'Belum ditetapkan');
   }
   const rowClass='org-row org-row-v2'
     +(depth===0?' org-row-root':'')
     +(member?'':' org-row-vacant-row');
-  /* Sel aksi (khusus admin): tombol Atur/Tutup panel pengaturan inline
-     dan — untuk baris non-puncak — tombol Hapus kecil di sampingnya. */
-  let aksiEl=null;
-  if(S.admin){
-    const sedangAtur=S.susunanInline&&S.susunanInline.jenis==='atur'&&S.susunanInline.id===node.id;
-    const aturBtn=h('button',{class:'org-icon-btn',title:sedangAtur?'Tutup pengaturan':'Atur dapukan '+node.nama,'aria-label':sedangAtur?'Tutup pengaturan':'Atur dapukan '+node.nama,onclick:()=>toggleAturSusunan(node.id)},icon(sedangAtur?'close':'settings',15));
-    aksiEl=h('div',{class:'org-c-aksi'},
-      h('div',{class:'org-aksi-btns'},aturBtn,node.induk!==null?orgTombolHapus(nodes,node):null));
-  }
   const rowEl=h('div',{class:rowClass,'data-depth':String(depth),'data-node-id':node.id},
-    h('span',{class:'org-num','aria-hidden':'true'},String(urut)),
-    h('div',{class:'org-c-main'},personEl),
+    h('div',{class:'org-c-dapukan'},dapukanEl),
+    h('div',{class:'org-c-nama'},pemegangEl),
     h('div',{class:'org-c-wilayah'},
       wilayahTampil
         ?h('span',{class:'org-wilayah-badge'},h('i',{class:'org-wilayah-dot',style:'background:'+regionColor(wilayahTampil),'aria-hidden':'true'}),wilayahTampil)
-        :h('span',{class:'org-kontak-none'},'—')),
-    h('div',{class:'org-c-kontak'},kontakEl),
-    aksiEl);
+        :h('span',{class:'org-kontak-none'},'—')));
   /* Admin menggeser urutan baris ini dengan TEKAN LAMA pada barisnya
-     (baris puncak tidak bisa digeser). Anggota biasa tidak mendapat
-     pendengar apa pun: barisnya bersih tanpa alat seret. */
+     (baris puncak tidak bisa digeser); pendengar seret mengabaikan
+     ketukan pada tombol/field, jadi tidak tertukar dengan ketuk-edit.
+     Anggota biasa tidak mendapat pendengar apa pun. */
   if(S.admin&&node.induk!==null)orgPasangSeretTekanLama(rowEl,node,nodes);
   return rowEl;
 }
@@ -1248,18 +1291,11 @@ function orgTabel(nodes){
   const groups=orgKelompokTampil(nodes);
   const groupEls=groups.map((grup,gi)=>{
     const anakTabel=[h('div',{class:'org-row org-row-head org-row-head-v2'},
-      h('span',{},'No'),
-      h('span',{},'Dapukan & Pengurus'),
-      h('span',{},'Wilayah'),
-      h('span',{},'Kontak'),
-      S.admin?h('span',{},''):null)];
-    grup.items.forEach((item,idx)=>{
-      anakTabel.push(orgRow(nodes,item,idx+1));
-      /* Pengaturan baris ini melebar TEPAT di bawah barisnya, di dalam
-         tabel — bukan panel terpisah di atas halaman. */
-      if(S.admin&&S.susunanInline&&S.susunanInline.jenis==='atur'&&S.susunanInline.id===item.id){
-        anakTabel.push(orgPengaturanInline(nodes,item));
-      }
+      h('span',{},'Dapukan'),
+      h('span',{},'Nama'),
+      h('span',{},'Wilayah'))];
+    grup.items.forEach(item=>{
+      anakTabel.push(orgRow(nodes,item));
     });
     if(!grup.items.length){
       anakTabel.push(h('p',{class:'org-group-empty'},S.admin?'Kelompok ini masih kosong. Tambahkan dapukan lewat tombol di bawah kartu ini.':'Kelompok ini masih kosong.'));
@@ -1297,15 +1333,16 @@ function orgTabel(nodes){
    (tanpa pemilih Bagan/Tabel dan tanpa tampilan hierarki). Bagian atas
    halaman hanya judul, lalu langsung kartu-kartu kelompok — tidak ada
    ringkasan angka dan tidak ada tombol susunan awal. Tidak ada mode
-   khusus untuk mengatur: bagi ADMIN semua alat pengaturan tampil
-   langsung dan selalu di tabel — tekan lama pada baris untuk
-   menggeser urutannya, tombol Atur pada tiap baris yang membuka
-   pengaturannya MELEBAR TEPAT DI BAWAH BARIS ITU di dalam tabel,
-   tombol Hapus kecil di sampingnya, tombol '+ Tambah Dapukan Baru' di
-   kaki tiap kartu kelompok, tombol '+ Tambah Kartu Kelompok' di
-   paling bawah halaman, dan ikon pensil pada tiap kepala kelompok
-   untuk mengubah tulisannya. Anggota biasa hanya melihat kartu-kartu
-   tabel yang bersih. */
+   khusus untuk mengatur: bagi Pengurus & Admin Utama pengeditan
+   dilakukan LANGSUNG pada nama yang tertera di barisnya — ketuk nama
+   dapukan untuk mengganti namanya (ikon sampah untuk menghapus hanya
+   muncul selama nama itu diedit), ketuk nama pemegang untuk mengganti
+   pemegangnya lewat pemilih anggota di tempat — ditambah tekan lama
+   pada baris untuk menggeser urutannya, tombol '+ Tambah Dapukan' di
+   kaki tiap kartu kelompok, tombol '+ Tambah Kelompok' di paling
+   bawah halaman, dan ikon pensil pada tiap kepala kelompok untuk
+   mengubah tulisannya. Anggota biasa hanya melihat kartu-kartu tabel
+   yang bersih berisi teks nama dapukan, nama pemegang, dan wilayah. */
 function vSusunan(){
   const nodes=susunanSimpul();
   const out=[h('h1',{},'Kepengurusan'),guard()];
