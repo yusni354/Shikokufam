@@ -2043,6 +2043,11 @@ span.piket-chip-ava{display:grid;place-items:center;font-size:12px;font-weight:7
 .piket-icon-btn{flex:none;margin-top:7px}
 .piket-add-petugas{margin-top:10px}
 .piket-add-tugas{margin-top:12px}
+.piket-group-saved-tag{flex:none;font-size:10.5px;font-weight:700;letter-spacing:.03em;color:#22705f;background:#cdeee6;border-radius:999px;padding:2px 8px}
+.piket-form-group-foot{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:12px;padding-top:10px;border-top:1px dashed var(--line)}
+.piket-form-group-foot .piket-group-del{margin-left:auto}
+.piket-task-saved{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;font-weight:700;color:#22705f}
+.piket-task-saved-form{margin:10px 0 0}
 .anggota-opt-manual b{color:#7a5b12}
 @media (min-width:1024px){
   .piket-list{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:start}

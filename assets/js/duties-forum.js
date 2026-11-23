@@ -57,10 +57,19 @@ function dutyAvatar(member,nama,kelas){
    tugas yang sama (getExcluded) TIDAK ditawarkan lagi, jadi satu
    orang tidak bisa dipilih dua kali dalam satu tugas. Daftar saran
    menutup saat memilih atau menyentuh bidang di luar (tanpa tombol X).
-   Nilai komponen (.value) = nama petugas saat ini (string). */
+   Nilai komponen (.value) = nama petugas saat ini (string).
+   PERBAIKAN PENCARIAN: saringan memakai nama TERPANCANG (terpilih)
+   yang hanya berubah saat saran dipilih — bukan 'nilai' yang ikut
+   berubah pada setiap ketukan. Versi sebelumnya membandingkan isi
+   field dengan 'nilai' sesudah 'nilai' ditimpa isi field itu sendiri,
+   jadi perbandingannya selalu sama, saringan tidak pernah berjalan,
+   dan daftar lengkap selalu tampil walau sudah mengetik. Daftar
+   anggota juga diambil segar pada setiap daftar dibuka, bukan
+   ditangkap sekali saat komponen dibuat. */
 function piketPilihPetugas(namaAwal,getExcluded,onChange){
-  const daftar=dutyAnggotaAktif();
   let nilai=String(namaAwal||'');
+  let terpilih=nilai;
+  const norm=s=>String(s||'').trim().toLowerCase().replace(/\s+/g,' ');
   let sorot=-1;
   let barisPilihan=[];
   const input=h('input',{type:'text',placeholder:'Ketik atau pilih nama petugas…',autocomplete:'off',role:'combobox','aria-expanded':'false','aria-autocomplete':'list'});
@@ -77,22 +86,26 @@ function piketPilihPetugas(namaAwal,getExcluded,onChange){
   };
   const pilih=nama=>{
     nilai=String(nama||'');
+    terpilih=nilai;
     input.value=nilai;
     tutup();
     beritahu();
   };
   const buka=()=>{
+    const daftar=dutyAnggotaAktif();
     const teks=input.value;
-    /* Isi field yang masih sama dengan nilai terpilih dianggap belum
-       mengetik: tampilkan daftar lengkap (minus yang sudah dipilih
-       pada tugas yang sama). */
-    const q=teks.trim()===nilai.trim()?'' : teks.trim().toLowerCase();
-    const terkecuali=new Set((typeof getExcluded==='function'?getExcluded():[]).map(n=>String(n||'').trim().toLowerCase()).filter(Boolean));
+    /* Isi field yang masih sama persis dengan nama terpancang dianggap
+       belum mengetik: tampilkan daftar lengkap (minus yang sudah
+       dipilih pada tugas yang sama). Selain itu saring menurut ketikan
+       saat ini — tidak peka huruf besar/kecil, cocok dari tengah nama,
+       dan mengikuti teks terbaru termasuk sesudah dihapus/diubah. */
+    const q=norm(teks)===norm(terpilih)?'':norm(teks);
+    const terkecuali=new Set((typeof getExcluded==='function'?getExcluded():[]).map(norm).filter(Boolean));
     const cocok=daftar.filter(m=>{
-      const nama=String(m.nama||'').trim();
+      const nama=norm(m.nama);
       if(!nama)return false;
-      if(terkecuali.has(nama.toLowerCase()))return false;
-      return !q||nama.toLowerCase().includes(q);
+      if(terkecuali.has(nama))return false;
+      return !q||nama.includes(q);
     });
     barisPilihan=[];sorot=-1;
     const anak=[];
@@ -106,8 +119,8 @@ function piketPilihPetugas(namaAwal,getExcluded,onChange){
       anak.push(baris);
     });
     const ketikan=teks.trim();
-    const persis=ketikan&&daftar.some(m=>String(m.nama||'').trim().toLowerCase()===ketikan.toLowerCase());
-    if(ketikan&&!persis&&!terkecuali.has(ketikan.toLowerCase())){
+    const persis=ketikan&&daftar.some(m=>norm(m.nama)===norm(ketikan));
+    if(ketikan&&!persis&&!terkecuali.has(norm(ketikan))){
       const barisManual=h('div',{class:'anggota-opt anggota-opt-manual',role:'option'},
         h('span',{class:'org-mini org-avatar-ph'},icon('edit',15)),
         h('span',{class:'anggota-opt-info'},h('b',{},'Pakai nama manual: “'+ketikan+'”'),h('small',{},'Tidak ada di daftar anggota — tersimpan apa adanya')));
@@ -181,7 +194,7 @@ function vPiket(){
           h('b',{class:'piket-head-tanggal'},dateLabel(duty.tanggal)),
           h('span',{class:'piket-summary'},kelompok.length+' tugas · '+totalPetugas+' petugas')),
         S.admin&&h('div',{class:'piket-actions'},
-          h('button',{class:'btn s btn-eh',title:'Edit jadwal',onclick:()=>{S.dutyForm={id:duty.id,tanggal:duty.tanggal||'',groups:dutyKelompokTugas(duty).map(g=>({tugas:g.tugas,petugas:g.petugas.length?[...g.petugas]:['']}))};if(!S.dutyForm.groups.length)S.dutyForm.groups=[{tugas:'',petugas:['']}];render()}},icon('edit',15),h('span',{},'Edit')),
+          h('button',{class:'btn s btn-eh',title:'Edit jadwal',onclick:()=>{S.dutyForm={id:duty.id,tanggal:duty.tanggal||'',groups:dutyKelompokTugas(duty).map(g=>({tugas:g.tugas,petugas:g.petugas.length?[...g.petugas]:[''],tugasAsli:g.tugas,petugasTersimpan:[...g.petugas]}))};if(!S.dutyForm.groups.length)S.dutyForm.groups=[{tugas:'',petugas:['']}];S.dutyTaskNotice=null;S.dutyTaskConfirm=null;render()}},icon('edit',15),h('span',{},'Edit')),
           h('button',{class:'btn s btn-eh',title:'Hapus jadwal',onclick:async()=>{
             if(!confirm('Hapus jadwal piket tanggal '+dateLabel(duty.tanggal)+'?'))return;
             try{await S.db.collection('cleaning_duties').doc(duty.id).delete()}catch(error){console.error(error);alert('Gagal menghapus jadwal: '+(error.message||'periksa koneksi'))}
@@ -197,6 +210,7 @@ function vPiket(){
   const mendatang=terurut.filter(d=>!d.tanggal||d.tanggal>=todayKey);
   const lewat=terurut.filter(d=>d.tanggal&&d.tanggal<todayKey);
   let editor=null;
+  let dialogTugas=null;
   if(S.admin&&form){
     /* Bentuk formulir: groups = [{tugas, petugas:[nama, ...]}] */
     if(!Array.isArray(form.groups)||!form.groups.length)form.groups=[{tugas:'',petugas:['']}];
@@ -204,6 +218,92 @@ function vPiket(){
     const date=h('input',{type:'date'});
     date.value=form.tanggal||'';
     date.oninput=()=>{form.tanggal=date.value};
+    /* ===== Simpan & hapus PER TUGAS =====
+       Tiap blok tugas punya tombol Simpan tugas dan Hapus tugas sendiri.
+       Dasar hitungannya potret petugas yang SUDAH tersimpan per blok
+       (tugasAsli + petugasTersimpan, dicatat saat formulir dibuka dan
+       diperbarui sesudah tiap simpan/hapus per tugas), jadi menyimpan
+       atau menghapus satu tugas menulis ulang dokumen dari potret itu
+       ditambah blok yang bersangkutan — tugas lain pada tanggal yang
+       sama tidak tertimpa, termasuk perubahan blok lain yang belum
+       disimpan. Hasil tulis tetap assignments[{nama, tugas}] supaya
+       Home dan ruangan Jadwal Piket di Ringkasan membaca data yang sama. */
+    const bersihPetugas=g=>[...new Map((g.petugas||[]).map(n=>String(n||'').trim()).filter(Boolean).map(n=>[n.toLowerCase(),n])).values()];
+    /* Normalisasi potret: blok pada formulir edit yang belum membawa
+       tugasAsli (dibangun dari jadwal tersimpan) memakai isi awalnya
+       sebagai potret tersimpan, supaya simpan/hapus per tugas punya
+       dasar yang benar dari jalur pembuka formulir mana pun. */
+    if(form.id)form.groups.forEach(g=>{
+      if(g.tugasAsli===undefined){g.tugasAsli=(g.tugas||'').trim();g.petugasTersimpan=bersihPetugas(g)}
+    });
+    const pasanganLain=kecuali=>form.groups.flatMap((g,gi)=>{
+      if(gi===kecuali||!(g.tugasAsli||'').trim())return [];
+      return (g.petugasTersimpan||[]).map(nama=>({nama,tugas:g.tugasAsli}));
+    });
+    const tulisDokumen=async assignments=>{
+      const data={tanggal:form.tanggal,assignments,nama:assignments[0].nama,tugas:assignments[0].tugas,at:Date.now()};
+      if(form.id)await S.db.collection('cleaning_duties').doc(form.id).update(data);
+      else{const ref=await S.db.collection('cleaning_duties').add(data);if(ref&&ref.id)form.id=ref.id}
+    };
+    const simpanTugas=async gi=>{
+      const grup=form.groups[gi];if(!grup)return;
+      const tugas=(grup.tugas||'').trim();
+      const petugas=bersihPetugas(grup);
+      if(!form.tanggal){alert('Tanggal wajib diisi sebelum menyimpan tugas.');return}
+      if(!tugas){alert('Isi nama tugasnya dulu, lalu simpan tugas ini.');return}
+      if(!petugas.length){alert('Tugas "'+tugas+'" belum punya petugas. Tambahkan minimal 1 petugas dulu.');return}
+      try{
+        await tulisDokumen([...pasanganLain(gi),...petugas.map(nama=>({nama,tugas}))]);
+        grup.tugasAsli=tugas;grup.petugasTersimpan=[...petugas];
+        S.dutyTaskNotice={gi,text:'Tugas "'+tugas+'" tersimpan.'};
+        render();
+      }catch(error){console.error(error);alert('Gagal menyimpan tugas: '+(error.message||'periksa koneksi'))}
+    };
+    const mintaHapusTugas=gi=>{
+      const grup=form.groups[gi];if(!grup)return;
+      const adaIsi=(grup.tugas||'').trim()||bersihPetugas(grup).length||(grup.tugasAsli||'').trim();
+      /* Blok yang masih kosong langsung dibuang dari formulir; blok
+         berisi melewati dialog konfirmasi yang menyebut nama tugasnya. */
+      if(!adaIsi){form.groups.splice(gi,1);if(!form.groups.length)form.groups=[{tugas:'',petugas:['']}];gambarGroups();return}
+      S.dutyTaskConfirm={gi};render();
+    };
+    const hapusTugas=async gi=>{
+      const grup=form.groups[gi];if(!grup)return;
+      const namaTugas=(grup.tugasAsli||grup.tugas||'').trim()||'Tugas '+(gi+1);
+      S.dutyTaskConfirm=null;
+      try{
+        if(form.id&&(grup.tugasAsli||'').trim()){
+          const sisa=pasanganLain(gi);
+          /* Tugas terakhir pada tanggal itu: dokumennya ikut dihapus
+             supaya tidak ada jadwal kosong tanpa tugas. */
+          if(sisa.length)await tulisDokumen(sisa);
+          else{await S.db.collection('cleaning_duties').doc(form.id).delete();form.id=null}
+        }
+        form.groups.splice(gi,1);
+        if(!form.groups.length)form.groups=[{tugas:'',petugas:['']}];
+        S.dutyTaskNotice={gi:-1,text:'Tugas "'+namaTugas+'" dihapus.'};
+        render();
+      }catch(error){console.error(error);alert('Gagal menghapus tugas: '+(error.message||'periksa koneksi'))}
+    };
+    /* Konfirmasi hapus SATU tugas: pola dialog aplikasi (confirm-overlay,
+       tanpa tombol X — mengetuk bidang di luar kotak atau Batal
+       menutupnya, isi kotak tidak ikut menutup). */
+    if(S.dutyTaskConfirm&&form.groups[S.dutyTaskConfirm.gi]){
+      const gi=S.dutyTaskConfirm.gi;
+      const grup=form.groups[gi];
+      const tersimpan=!!(grup.tugasAsli||'').trim();
+      const namaTugas=(grup.tugas||'').trim()||(grup.tugasAsli||'').trim()||'Tugas '+(gi+1);
+      const tutup=()=>{S.dutyTaskConfirm=null;render()};
+      dialogTugas=h('div',{class:'confirm-overlay',onclick:tutup},
+        h('div',{class:'card confirm-card',onclick:ev=>ev.stopPropagation()},
+          h('b',{class:'confirm-title'},'Hapus Tugas Piket'),
+          h('p',{class:'confirm-text'},tersimpan
+            ?'Hapus tugas "'+namaTugas+'" dari jadwal '+dateLabel(form.tanggal)+'? Semua petugas pada tugas ini ikut terhapus dari jadwal tanggal tersebut. Tugas lain pada tanggal yang sama tidak berubah.'
+            :'Buang blok tugas "'+namaTugas+'"? Blok ini belum tersimpan, jadi isinya hanya hilang dari formulir ini.'),
+          h('div',{class:'fl confirm-actions'},
+            h('button',{class:'btn s',onclick:tutup},'Batal'),
+            h('button',{class:'btn',onclick:()=>hapusTugas(gi)},'Hapus tugas'))));
+    }
     const groupsEl=h('div',{class:'piket-form-groups'});
     const gambarGroups=()=>{
       groupsEl.replaceChildren(...form.groups.map((grup,gi)=>{
@@ -231,17 +331,22 @@ function vPiket(){
           h('div',{class:'piket-form-group-head'},
             h('span',{class:'piket-group-number'},String(gi+1)),
             h('b',{},'Tugas '+(gi+1)),
-            form.groups.length>1&&h('button',{class:'btn s piket-group-del',title:'Hapus tugas ini',onclick:()=>{form.groups.splice(gi,1);gambarGroups()}},icon('trash',14),h('span',{},'Hapus tugas'))),
+            (grup.tugasAsli||'').trim()&&h('span',{class:'piket-group-saved-tag'},'Tersimpan')),
           h('label',{class:'lb'},'Nama tugas *',inputTugas),
           h('div',{class:'piket-form-petugas-head'},h('b',{},'Petugas *'),h('small',{},'Pilih dari daftar anggota atau ketik manual')),
           petugasEl,
-          h('button',{class:'btn s piket-add-petugas',onclick:()=>{grup.petugas.push('');gambarPetugas()}},'+ Tambah petugas'));
+          h('button',{class:'btn s piket-add-petugas',onclick:()=>{grup.petugas.push('');gambarPetugas()}},'+ Tambah petugas'),
+          h('div',{class:'piket-form-group-foot'},
+            h('button',{class:'btn s piket-group-save',title:'Simpan hanya tugas ini',onclick:()=>simpanTugas(gi)},icon('check',14),h('span',{},'Simpan tugas')),
+            h('button',{class:'btn s piket-group-del',title:'Hapus tugas ini dari jadwal',onclick:()=>mintaHapusTugas(gi)},icon('trash',14),h('span',{},'Hapus tugas')),
+            (S.dutyTaskNotice&&S.dutyTaskNotice.gi===gi)&&h('span',{class:'piket-task-saved'},icon('check',13),S.dutyTaskNotice.text)));
       }));
     };
     gambarGroups();
     editor=box(h('b',{},edit?'Edit jadwal piket':'Tambah jadwal piket'),
-      h('p',{class:'piket-form-hint'},'Satu tanggal bisa berisi beberapa tugas. Tiap tugas diisi nama tugasnya, lalu petugas-petugasnya di bawahnya — satu tugas boleh banyak petugas, dan satu orang boleh mengisi beberapa tugas.'),
+      h('p',{class:'piket-form-hint'},'Satu tanggal bisa berisi beberapa tugas. Tiap tugas diisi nama tugasnya, lalu petugas-petugasnya di bawahnya — satu tugas boleh banyak petugas, dan satu orang boleh mengisi beberapa tugas. Tiap tugas juga bisa disimpan atau dihapus sendiri lewat tombol pada bloknya, tanpa menyimpan seluruh formulir.'),
       h('label',{class:'lb'},'Tanggal *',date),
+      (S.dutyTaskNotice&&S.dutyTaskNotice.gi===-1)&&h('p',{class:'piket-task-saved piket-task-saved-form'},icon('check',13),S.dutyTaskNotice.text),
       groupsEl,
       h('button',{class:'btn s piket-add-tugas',onclick:()=>{form.groups.push({tugas:'',petugas:['']});gambarGroups()}},'+ Tambah tugas'),
       h('div',{class:'fl'},
@@ -260,14 +365,15 @@ function vPiket(){
           try{
             if(form.id)await S.db.collection('cleaning_duties').doc(form.id).update(data);
             else await S.db.collection('cleaning_duties').add(data);
-            S.dutyForm=null;render();
+            S.dutyForm=null;S.dutyTaskNotice=null;S.dutyTaskConfirm=null;render();
           }catch(error){console.error(error);alert('Gagal menyimpan jadwal: '+(error.message||'periksa koneksi'))}
         }},edit?'Simpan perubahan':'Tambah jadwal'),
-        h('button',{class:'btn s',onclick:()=>{S.dutyForm=null;render()}},'Batal')));
+        h('button',{class:'btn s',onclick:()=>{S.dutyForm=null;S.dutyTaskNotice=null;S.dutyTaskConfirm=null;render()}},'Batal')));
   }
   const hasil=[h('div',{class:'duty-heading'},h('div',{},h('h1',{},'Jadwal Piket')),h('span',{class:'duty-count'},S.cleaningDuties.length+' jadwal')),
-    S.admin&&!form&&h('button',{class:'btn duty-add',onclick:()=>{S.dutyForm={tanggal:todayKey,groups:[{tugas:'',petugas:['']}]};render()}},'+ Tambah jadwal'),
+    S.admin&&!form&&h('button',{class:'btn duty-add',onclick:()=>{S.dutyForm={tanggal:todayKey,groups:[{tugas:'',petugas:['']}]};S.dutyTaskNotice=null;S.dutyTaskConfirm=null;render()}},'+ Tambah jadwal'),
     editor];
+  if(dialogTugas)hasil.push(dialogTugas);
   if(mendatang.length)hasil.push(h('div',{class:'piket-list'},...mendatang.map(kartuJadwal)));
   else if(!editor)hasil.push(h('div',{class:'duty-empty'},icon('brush',24),h('b',{},'Belum ada jadwal piket mendatang'),h('p',{},S.admin?'Tambahkan jadwal pertama untuk mulai mengatur tugas piket.':'Jadwal piket yang akan datang akan tampil di sini.')));
   if(lewat.length){
