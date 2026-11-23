@@ -1193,15 +1193,16 @@ function orgPasangSeretTekanLama(rowEl,node,nodes){
     document.addEventListener('touchmove',cegahGulir,{passive:false});
   });
 }
-/* ===== Baris dapukan: dapukan, nama, wilayah, gerigi =====
-   Isi baris: nama dapukan (teks biasa), nama pemegang, wilayah
-   pemegang (mengikuti pemegang terpilih; kosong → '—'), dan — khusus
-   Pengurus & Admin Utama — tombol GERIGI kecil di ujung kanan untuk
-   membuka panel pengaturan baris itu (orgPanelPengaturan). Nama
-   TIDAK lagi diketuk untuk mengedit: sekali ketuk pada nama PEMEGANG
-   membuka Kartu ID anggota itu untuk semua pengguna (bila dapukan
-   belum ada pemegangnya, nama tampil sebagai teks biasa dan ketukan
-   tidak membuka apa pun). */
+/* ===== Baris dapukan: blok nama bertumpuk, wilayah, gerigi =====
+   Isi baris: SATU blok nama bertumpuk — nama dapukan kecil berwarna
+   hijau lembut (#1f7a4d) DI ATAS nama pemegang yang bold hitam —
+   lalu wilayah pemegang (mengikuti pemegang terpilih; kosong → '—'),
+   dan — khusus Pengurus & Admin Utama — tombol GERIGI kecil di ujung
+   kanan untuk membuka panel pengaturan baris itu
+   (orgPanelPengaturan). Nama TIDAK lagi diketuk untuk mengedit:
+   sekali ketuk pada nama PEMEGANG membuka Kartu ID anggota itu
+   untuk semua pengguna (bila dapukan belum ada pemegangnya, nama
+   tampil sebagai teks biasa dan ketukan tidak membuka apa pun). */
 function orgRow(nodes,node){
   const member=pemegangJabatan(node);
   const depth=susunanKedalaman(nodes,node);
@@ -1216,8 +1217,9 @@ function orgRow(nodes,node){
   }
   const panelTerbuka=S.admin&&S.susunanInline&&S.susunanInline.jenis==='atur'&&S.susunanInline.id===node.id;
   const anakBaris=[
-    h('div',{class:'org-c-dapukan'},dapukanEl),
-    h('div',{class:'org-c-nama'},pemegangEl),
+    h('div',{class:'org-c-blok'},
+      h('div',{class:'org-c-dapukan'},dapukanEl),
+      h('div',{class:'org-c-nama'},pemegangEl)),
     h('div',{class:'org-c-wilayah'},
       wilayahTampil
         ?h('span',{class:'org-wilayah-badge'},h('i',{class:'org-wilayah-dot',style:'background:'+regionColor(wilayahTampil),'aria-hidden':'true'}),wilayahTampil)
@@ -1271,7 +1273,7 @@ function orgTabel(nodes){
   if(!root)return h('p',{class:'warn'},'Susunan kepengurusan belum tersedia.');
   const groups=orgKelompokTampil(nodes);
   const groupEls=groups.map((grup,gi)=>{
-    const kepalaBaris=[h('span',{},'Dapukan'),h('span',{},'Nama'),h('span',{},'Wilayah')];
+    const kepalaBaris=[h('span',{},'Dapukan / Nama'),h('span',{},'Wilayah')];
     if(S.admin)kepalaBaris.push(h('span',{class:'org-head-aksi','aria-hidden':'true'},''));
     const anakTabel=[h('div',{class:'org-row org-row-head org-row-head-v2'+(S.admin?' org-row-admin':'')},...kepalaBaris)];
     grup.items.forEach(item=>{

@@ -1171,22 +1171,24 @@ input,textarea,select{background:#f4f8fa;border-color:#bfcfdb}
    harus bisa melayang keluar dari kartu tanpa terpotong. */
 .org-table>.org-row-head{border-radius:19px 19px 0 0}
 .org-table>*:last-child{border-radius:0 0 19px 19px}
-/* Baris dapukan SEMINIMAL mungkin dan rapat: tiga kolom saja — nama
-   dapukan, nama pemegang, wilayah — tanpa foto, nomor, dan tombol.
-   Teks hitam tegas agar terbaca di semua latar pastel kelompok. */
-.org-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr) minmax(0,.9fr);grid-template-areas:'dap nama wil';gap:8px;align-items:center;padding:5px 10px;border-top:1px solid var(--line);position:relative}
-/* Baris pengelola punya kolom keempat untuk tombol gerigi di ujung kanan */
-.org-row.org-row-admin{grid-template-columns:minmax(0,1fr) minmax(0,1.15fr) minmax(0,.9fr) auto;grid-template-areas:'dap nama wil aksi'}
+/* Baris dapukan SEMINIMAL mungkin dan rapat: satu blok nama bertumpuk
+   (dapukan kecil hijau lembut di atas nama pemegang bold hitam),
+   wilayah, dan gerigi — tanpa foto dan nomor. */
+.org-row{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:'blok wil';gap:8px;align-items:center;padding:5px 10px;border-top:1px solid var(--line);position:relative}
+/* Baris pengelola punya kolom tambahan untuk tombol gerigi di ujung kanan */
+.org-row.org-row-admin{grid-template-columns:minmax(0,1fr) auto auto;grid-template-areas:'blok wil aksi'}
 .org-row:first-child{border-top:0}
 .org-row-head{background:#eef4f7;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;padding-top:4px;padding-bottom:4px}
 .org-row-head span{color:#33566e}
+.org-row-head span:nth-child(2){justify-self:end}
 .org-row-head span:last-child{justify-self:end}
 .org-row-root{background:linear-gradient(145deg,#f0f8f3,#eef5fa)}
-.org-c-dapukan{grid-area:dap;min-width:0}
-.org-c-nama{grid-area:nama;min-width:0}
+.org-c-blok{grid-area:blok;min-width:0;display:flex;flex-direction:column;gap:1px;justify-content:center}
+.org-c-dapukan{min-width:0}
+.org-c-nama{min-width:0}
 .org-c-wilayah{grid-area:wil;min-width:0;justify-self:end;text-align:right}
 .org-c-aksi{grid-area:aksi;min-width:0;justify-self:end}
-.org-dapukan-name{display:block;font-size:13.5px;font-weight:700;line-height:1.25;overflow-wrap:anywhere;color:#10222e}
+.org-dapukan-name{display:block;font-size:12.5px;font-weight:600;line-height:1.2;overflow-wrap:anywhere;color:#1f7a4d}
 .org-holder-name{display:block;font-size:14.5px;font-weight:700;line-height:1.25;overflow-wrap:anywhere;color:#10222e}
 .org-holder-empty{color:#7a5b12;font-size:13.5px}
 .org-row-vacant-row{background:#fffdf4}
@@ -1248,13 +1250,13 @@ span.org-mini{display:grid;place-items:center;font-size:14px}
 .org-avatar-ph{display:grid;place-items:center;background:linear-gradient(145deg,#dff2e7,#dceef8);color:#17384a;font-size:14px;font-weight:700}
 @media (max-width:720px){
   .org-row-head-v2{display:none}
-  /* HP: nama dapukan di kiri atas, wilayah & gerigi di kanan atas,
-     nama pemegang satu baris penuh di bawahnya. Semua membungkus di
-     batas kata, tidak ada yang meluber menyamping. */
-  .org-table .org-row-v2{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:'dap wil' 'nama nama';row-gap:2px;padding:6px 10px}
-  .org-table .org-row-v2.org-row-admin{grid-template-columns:minmax(0,1fr) auto auto;grid-template-areas:'dap wil aksi' 'nama nama nama'}
+  /* HP: blok nama bertumpuk (dapukan kecil hijau di atas nama bold)
+     di kiri, wilayah & gerigi di kanan sejajar tengah blok. Semua
+     membungkus di batas kata, tidak ada yang meluber menyamping. */
+  .org-table .org-row-v2{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:'blok wil';row-gap:2px;padding:6px 10px}
+  .org-table .org-row-v2.org-row-admin{grid-template-columns:minmax(0,1fr) auto auto;grid-template-areas:'blok wil aksi'}
   .org-group-count{display:none}
-  .org-dapukan-name{font-size:13px}
+  .org-dapukan-name{font-size:12px}
   .org-holder-name{font-size:14px}
   .org-wilayah-badge{white-space:normal;text-align:left}
 }
@@ -1301,10 +1303,11 @@ span.org-mini{display:grid;place-items:center;font-size:14px}
 .btn.s.org-panel-hapus{margin-left:auto;color:#b03a3a;border-color:#e3b7b7;background:#fdf1f1}
 .btn.s.org-panel-hapus *{color:#b03a3a}
 .btn.s.org-panel-hapus:hover{background:#fbe3e3}
-/* Desktop (≥1024px): setiap baris dapukan SATU baris penuh — nama
-   dapukan, nama pemegang, wilayah, dan gerigi sejajar sebaris; nama
-   tidak membungkus ke baris kedua (terpotong rapi bila sangat panjang,
-   nama lengkap tetap terbaca lewat title). */
+/* Desktop (≥1024px): setiap baris dapukan SATU baris penuh — blok
+   nama bertumpuk (dapukan di atas nama pemegang) tetap di dalam baris
+   yang sama bersama wilayah dan gerigi; nama tidak membungkus ke
+   baris kedua (terpotong rapi bila sangat panjang, nama lengkap tetap
+   terbaca lewat title). */
 @media (min-width:1024px){
   .org-table .org-row-v2{flex-wrap:nowrap}
   .org-dapukan-name,.org-holder-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
