@@ -2,42 +2,86 @@
 const PERAN=['Anggota','Pengurus'];
 function vMembers(){
   if(S.form)return [memberFormCard()];
-  const search=h('input',{type:'search',placeholder:'Cari nama, WhatsApp, kota, wilayah, atau nomor anggota'}),region=h('select',{});
-  const regions=wilayahEfektif().map(([name])=>name);
-  if(S.members.some(member=>memberRegion(member)==='Belum dipilih'))regions.push('Belum dipilih');
-  region.replaceChildren(h('option',{value:''},'Semua wilayah'),...regions.map(value=>h('option',{value},value)));
-  search.value=S.memberQuery||'';region.value=S.memberRegion||'';
-  const count=h('p',{class:'member-results-count'}),list=h('div',{class:'member-grid'});
+  /* Field saringan 'Semua wilayah' SUDAH DIHAPUS dari halaman ini:
+     kartu anggota kini tampil BERKELOMPOK per wilayah, jadi penyaringan
+     wilayah tidak diperlukan lagi. S.memberRegion tidak lagi dipakai
+     sebagai saringan — nilai yang dipasang kartu wilayah di Home kini
+     hanya menjadi SASARAN GULIR ke kelompok wilayah itu (lalu dibersihkan
+     di sini, supaya tidak ada saringan tersembunyi yang menjebak pengguna
+     tanpa cara mematikannya). Pencarian nama tetap bekerja lintas kelompok. */
+  const fokusWilayah=S.memberRegion?labelKelompokWilayah(S.memberRegion):'';
+  S.memberRegion='';
+  const search=h('input',{type:'search',placeholder:'Cari nama, WhatsApp, kota, wilayah, atau nomor anggota'});
+  search.value=S.memberQuery||'';
+  const count=h('p',{class:'member-results-count'}),list=h('div',{class:'member-groups'});
+  /* Label tampil sebuah wilayah pada kepala kelompok & lencana kartu:
+     anggota tanpa wilayah tampil sebagai 'Tanpa Wilayah'. */
+  function labelKelompokWilayah(area){return area==='Belum dipilih'?'Tanpa Wilayah':area}
+  /* Kartu ringkas: HANYA foto, nama, dan lencana wilayah — kota,
+     nomor telepon, dan tombol Edit/Hapus TIDAK tampil di muka kartu
+     (pengeditan & hapus tetap ada di halaman detail anggota).
+     Seluruh badan kartu bisa diklik untuk membuka kartu ID anggota. */
+  function memberTile(member){
+    const area=memberRegion(member);
+    return h('article',{class:'member-card',style:'--region-color:'+regionColor(area),title:'Lihat kartu ID '+(member.nama||'anggota'),onclick:()=>{
+        openMember(member,'members');
+      }},
+      member.foto?h('img',{class:'member-avatar',...memberMediaAttributes(member.foto,'src'),alt:'Foto '+(member.nama||'anggota')}):h('div',{class:'member-avatar member-avatar-placeholder'},(member.nama||'?').trim().slice(0,1).toUpperCase()),
+      h('b',{class:'member-tile-name'},(member.nama||'Nama belum diisi').toUpperCase()),
+      h('span',{class:'member-region-tag'},labelKelompokWilayah(area).toUpperCase()));
+  }
   function draw(){
     const query=(S.memberQuery||'').trim().toLowerCase();
     const rows=S.members.filter(member=>
-      (!query||[member.nama,member.wa,member.kota,member.wilayah,member.pref,member.kode].some(value=>String(value||'').toLowerCase().includes(query)))&&
-      (!S.memberRegion||memberRegion(member)===S.memberRegion)
+      (!query||[member.nama,member.wa,member.kota,member.wilayah,member.pref,member.kode].some(value=>String(value||'').toLowerCase().includes(query)))
     ).sort((a,b)=>(a.nama||'').localeCompare(b.nama||'','id'));
     count.textContent='Menampilkan '+rows.length+' dari '+S.members.length+' anggota';
-    list.replaceChildren(...(rows.length?rows.map(member=>{
+    if(!rows.length){
+      list.replaceChildren(h('div',{class:'member-empty'},icon(S.members.length?'search':'users',25),h('b',{},S.members.length?'Anggota tidak ditemukan':'Belum ada data anggota'),h('p',{},S.members.length?'Coba kata kunci yang lain.':'Data anggota yang ditambahkan akan tampil di sini.')));
+      return;
+    }
+    /* Kelompokkan hasil menurut wilayah. Urutan kelompok mengikuti
+       urutan daftar wilayah aplikasi (wilayahEfektif); wilayah di luar
+       daftar itu (bila ada) menyusul sesudahnya menurut abjad; kelompok
+       'Tanpa Wilayah' selalu paling akhir dan hanya tampil bila berisi.
+       Di dalam kelompok, anggota tetap urut nama A–Z (rows sudah urut). */
+    const buckets=new Map();
+    rows.forEach(member=>{
       const area=memberRegion(member);
-      /* Kartu ringkas: HANYA foto, nama, dan lencana wilayah — kota,
-         nomor telepon, dan tombol Edit/Hapus TIDAK lagi tampil di muka
-         kartu (pengeditan & hapus tetap ada di halaman detail anggota).
-         Seluruh badan kartu bisa diklik untuk membuka kartu ID anggota. */
-      return h('article',{class:'member-card',style:'--region-color:'+regionColor(area),title:'Lihat kartu ID '+(member.nama||'anggota'),onclick:()=>{
-          openMember(member,'members');
-        }},
-        member.foto?h('img',{class:'member-avatar',...memberMediaAttributes(member.foto,'src'),alt:'Foto '+(member.nama||'anggota')}):h('div',{class:'member-avatar member-avatar-placeholder'},(member.nama||'?').trim().slice(0,1).toUpperCase()),
-        h('b',{class:'member-tile-name'},(member.nama||'Nama belum diisi').toUpperCase()),
-        h('span',{class:'member-region-tag'},area.toUpperCase()))
-    }):[h('div',{class:'member-empty'},icon(S.members.length?'search':'users',25),h('b',{},S.members.length?'Anggota tidak ditemukan':'Belum ada data anggota'),h('p',{},S.members.length?'Coba kata kunci atau filter wilayah yang lain.':'Data anggota yang ditambahkan akan tampil di sini.'))]));
+      if(!buckets.has(area))buckets.set(area,[]);
+      buckets.get(area).push(member);
+    });
+    const urutanDikenal=wilayahEfektif().map(([name])=>name).filter(name=>buckets.has(name));
+    const urutanLain=[...buckets.keys()].filter(name=>name!=='Belum dipilih'&&!urutanDikenal.includes(name)).sort((a,b)=>a.localeCompare(b,'id'));
+    const urutan=[...urutanDikenal,...urutanLain];
+    if(buckets.has('Belum dipilih'))urutan.push('Belum dipilih');
+    list.replaceChildren(...urutan.map(area=>{
+      const members=buckets.get(area),label=labelKelompokWilayah(area);
+      return h('section',{class:'member-group',style:'--region-color:'+regionColor(area),'data-member-region':label},
+        h('div',{class:'member-group-head'},
+          h('span',{class:'member-group-dot','aria-hidden':'true'}),
+          h('h2',{class:'member-group-title'},label),
+          h('span',{class:'member-group-count'},members.length+' anggota')),
+        h('div',{class:'member-grid'},...members.map(memberTile)));
+    }));
   }
   search.oninput=()=>{S.memberQuery=search.value;draw()};
-  region.onchange=()=>{S.memberRegion=region.value;draw()};
   draw();
+  if(fokusWilayah){
+    /* Datang dari kartu wilayah di Home: gulir ke kelompok wilayah itu
+       (kelompoknya mungkin tidak tampil bila sedang ada pencarian —
+       dalam hal itu tidak ada yang digulir). */
+    setTimeout(()=>{
+      const target=[...list.querySelectorAll('.member-group')].find(group=>group.getAttribute('data-member-region')===fokusWilayah);
+      if(target)target.scrollIntoView({behavior:'smooth',block:'start'});
+    },120);
+  }
   return [
     h('div',{class:'member-page-heading'},h('div',{},h('p',{class:'member-eyebrow'},'KOMUNITAS SHIKOKU FAMILY'),h('h1',{},'Daftar Anggota')),
       S.admin&&h('button',{class:'btn',onclick:()=>{S.form={};S.detail=null;S.detailOrigin=null;S.detailReturnView=null;S.formPinAlamatHasil='';render()}},'+ Tambah Anggota')),
     guard(),
     S.detail&&detailCard(),
-    h('div',{class:'member-toolbar'},search,h('div',{class:'member-filters'},region)),
+    h('div',{class:'member-toolbar'},search),
     count,list
   ];
 }
@@ -385,7 +429,7 @@ function memberFormCard(){
         h('button',{class:'btn s',onclick:()=>autoFill(text.value)},'Isi Otomatis'))));
   };
   const photoBox=()=>box(h('b',{},'Foto Setengah Badan (terbaru)'),
-    f.foto&&h('img',{...memberMediaAttributes(f.foto,'src'),style:'width:88px;height:88px;border-radius:18px;object-fit:cover;display:block;margin:10px 0'}),
+    f.foto&&h('img',{...memberMediaAttributes(f.foto,'src'),style:'width:88px;height:88px;border-radius:18px;object-fit:cover;object-position:center 20%;display:block;margin:10px 0'}),
     S.memberUploadState?.form===f&&h('p',{class:'warn '+(S.memberUploadState.status==='error'?'storage-warning':'')},S.memberUploadState.message),
     h('div',{class:'fl'},pick('Ambil foto','image/jpeg,image/png,image/webp',1,file=>up(file,'foto')),pick('Pilih foto','image/jpeg,image/png,image/webp',0,file=>up(file,'foto'))),
     dropZone('Ganti foto setengah badan','image/jpeg,image/png,image/webp','foto',0))

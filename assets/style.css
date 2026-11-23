@@ -2209,3 +2209,99 @@ select.inv-in{-webkit-appearance:none;appearance:none;padding-right:14px;backgro
   .member-tile-name{font-size:11.5px;min-height:30px}
   .member-card .member-region-tag{font-size:9px;padding:2px 6px}
 }
+
+/* ===== Daftar Anggota: kelompok per wilayah =====
+   Field saringan wilayah dihapus; kartu tampil berkelompok. Tiap
+   kelompok punya kepala: titik warna wilayahnya, nama wilayah, dan
+   lencana jumlah anggota — di bawahnya grid ubin ringkas yang sama
+   seperti sebelumnya. Kepala kelompok melekat pada warna wilayah
+   yang sama dengan tepi atas kartu & pin peta (regionColor). */
+.member-groups{display:flex;flex-direction:column;gap:24px}
+.member-group{min-width:0}
+.member-group-head{display:flex;align-items:center;gap:9px;margin:0 2px 11px;padding-bottom:8px;border-bottom:2px solid color-mix(in srgb,var(--region-color,#718096) 45%,white)}
+.member-group-dot{flex:none;width:12px;height:12px;border-radius:50%;background:var(--region-color,#718096)}
+.member-group-title{margin:0;font-size:17px;line-height:1.25;font-weight:700;letter-spacing:.02em;text-transform:uppercase;color:#000;overflow-wrap:anywhere}
+.member-group-count{flex:none;margin-left:auto;padding:4px 10px;border-radius:999px;background:color-mix(in srgb,var(--region-color,#718096) 15%,white);color:#000;font-size:12px;font-weight:700;white-space:nowrap}
+@media (max-width:560px){
+  .member-groups{gap:20px}
+  .member-group-title{font-size:15.5px}
+}
+
+/* ===== Foto anggota: bingkai kepala–bahu (wajah + leher) =====
+   Foto yang diunggah di Daftar Anggota juga menjadi foto profil data
+   diri anggota. Semua bingkai potret foto anggota diatur dengan
+   object-position condong ke atas (center 20%): potongan cover
+   berpusat pada bagian atas foto tempat wajah & leher berada, jadi
+   dahi dan dagu tidak terpotong dan leher ikut tampil — pada foto
+   potret maupun foto lebar — di HP dan desktop. Ini murni pengaturan
+   tampilan: berkas foto asli dan alur unggah tidak berubah, dan foto
+   lama yang sudah tersimpan ikut terbantu. Bingkai yang dicakup:
+   ubin Daftar Anggota (.member-avatar), foto Kartu ID / halaman
+   profil (.member-id-photo, .member-detail-avatar), foto pemegang
+   dapukan & pemilih orang bergambar (.org-photo, .org-mini), chip
+   petugas piket (.piket-chip-ava), avatar percakapan dari foto
+   anggota (img.chat-avatar), foto kepala pengguna (.user-avatar),
+   dan daftar anggota wilayah di Home (.home-region-member>img).
+   Penampil foto besar (lightbox) TIDAK diubah: di sana foto tampil
+   utuh dengan object-fit:contain. */
+.member-avatar,.member-id-photo,.member-detail-avatar,.org-photo,.org-mini,.piket-chip-ava,img.chat-avatar,.user-avatar,.home-region-member>img{object-position:center 20%}
+
+/* ===== Halaman Profil/Data Diri anggota: DESKTOP satu jendela =====
+   KHUSUS desktop (≥1024px); tampilan HP tidak berubah sama sekali.
+   Mengikuti pola satu-jendela halaman Peta: selama detail anggota
+   terbuka, render() memberi body kelas 'profil-view' yang mengunci
+   gulir halaman, dan .member-profile-page (lapisan layar-penuh yang
+   memang sudah position:fixed) ditata ulang menjadi GRID LEBAR
+   PENUH: bilah tombol di baris atas selebar jendela, Kartu ID
+   (foto & ringkasan akun + QR absensi) di kolom kiri, lalu blok-blok
+   data diri (Identitas & Keanggotaan — termasuk Email, Instagram,
+   Facebook —, Kontak & Keluarga, Alamat Indonesia, Alamat &
+   Pekerjaan di Jepang, Catatan, Foto Surat Sambung) mengalir dua
+   kolom di sebelahnya, dan tombol aksi di baris bawah. Ukuran huruf
+   & jarak diringkas secukupnya (teks tetap hitam jelas) supaya
+   seluruh isi muat setinggi layar umum desktop; bila jendela sangat
+   pendek, lapisan profil menggulir DI DALAM bingkainya sendiri
+   (overflow-y:auto warisannya) — halamannya tetap tidak bergulir. */
+@media (min-width:1024px){
+  body.profil-view{height:100vh;height:100dvh;overflow:hidden}
+  .member-profile-page{display:grid;grid-template-columns:368px minmax(0,1fr) minmax(0,1fr);gap:12px;align-content:start;padding:14px 22px 16px;overflow-x:hidden}
+  .member-profile-page .member-profile-toolbar{grid-column:1/-1;position:static;margin:0;padding:0;background:transparent}
+  .member-profile-page .member-id-card{grid-column:1;grid-row:2/span 2;align-self:start;width:100%;max-width:none;margin:0}
+  .member-profile-page .member-id-banner{padding:10px 14px}
+  .member-profile-page .member-id-main{gap:13px;padding:14px 14px 12px}
+  .member-profile-page .member-id-photo{width:92px;height:112px}
+  .member-profile-page .member-id-info h1{font-size:19px;margin:4px 0}
+  .member-profile-page .member-id-barcode{padding:10px 16px 12px}
+  .member-profile-page .member-qr-code{width:124px;margin:6px auto}
+  .member-profile-page .member-detail-section{max-width:none;width:auto;margin:0;padding:13px 15px}
+  .member-profile-page .member-detail-section+.member-detail-section{margin-top:0}
+  .member-profile-page .member-detail-section h3{font-size:14px;margin-bottom:8px}
+  .member-profile-page .member-detail-grid{gap:8px 14px}
+  .member-profile-page .member-detail-item small{font-size:11px;margin-bottom:2px}
+  .member-profile-page .member-detail-item span{font-size:13.5px;line-height:1.4}
+  .member-profile-page .member-detail-actions{grid-column:1/-1;padding-top:0}
+}
+/* Layar lebar sekali: blok data diri menjadi tiga kolom di samping
+   Kartu ID, lebar jendela terpakai makin maksimal. */
+@media (min-width:1600px){
+  .member-profile-page{grid-template-columns:360px repeat(3,minmax(0,1fr));padding:16px 28px 18px}
+}
+/* Mulai 1280px kolom blok cukup lebar untuk grid isian 3 kolom di
+   dalamnya: blok panjang seperti Identitas (11 isian) menyusut dari
+   6 baris menjadi 4 baris, kunci agar total tinggi tetap di bawah
+   tinggi jendela laptop umum. Nilai panjang (email, alamat) tetap
+   membungkus rapi di selnya. */
+@media (min-width:1280px){
+  .member-profile-page .member-detail-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+/* Jendela desktop PENDEK: ringkas sekali lagi supaya tetap satu
+   jendela — QR dan foto Kartu ID mengecil, jarak antarblok menipis. */
+@media (min-width:1024px) and (max-height:760px){
+  .member-profile-page{gap:10px;padding-top:10px;padding-bottom:12px}
+  .member-profile-page .member-id-photo{width:84px;height:102px}
+  .member-profile-page .member-id-main{padding:11px 14px 9px}
+  .member-profile-page .member-qr-code{width:104px;margin:4px auto}
+  .member-profile-page .member-id-barcode{padding:8px 16px 10px}
+  .member-profile-page .member-detail-section{padding:11px 14px}
+  .member-profile-page .member-detail-grid{gap:7px 14px}
+}

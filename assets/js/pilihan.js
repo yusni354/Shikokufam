@@ -72,8 +72,8 @@ function subscribePilihan(){
   }catch(error){console.error('Daftar pilihan dropdown gagal dimuat:',error);return ()=>{}}
 }
 /* Daftar wilayah efektif: konstanta WILAYAH + dokumen 'pilihan_wilayah'.
-   Dipakai bersama oleh dropdown formulir, saringan daftar anggota, kartu
-   wilayah Home, dan absensi per wilayah. */
+   Dipakai bersama oleh dropdown formulir, pengelompokan kartu daftar
+   anggota, kartu wilayah Home, dan absensi per wilayah. */
 const WARNA_WILAYAH_TAMBAHAN=['#4f772d','#2b7a8c','#b5651d','#7d5ba6','#c04b7a','#3a7d8c','#5b8c5a','#946846'];
 function wilayahEfektif(){
   const doc=pilihanDoc('wilayah');

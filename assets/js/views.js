@@ -65,7 +65,7 @@ function renderDrawer(){
 function setAuthLocked(locked){
   document.body.classList.toggle('auth-locked',!!locked);
   /* Kunci satu-jendela halaman Peta tidak berlaku di layar terkunci */
-  if(locked)document.body.classList.remove('peta-view');
+  if(locked)document.body.classList.remove('peta-view','profil-view');
   if(locked){
     document.body.classList.remove('open');
     const qm=document.querySelector('#qm');if(qm)qm.remove();
@@ -166,6 +166,12 @@ function render(){
      di sini — sesudah pemulihan & validasi view — supaya nilainya
      selalu mengikuti view yang benar-benar digambar. */
   document.body.classList.toggle('peta-view',S.view==='peta');
+  /* Halaman Profil/Data Diri anggota (detail anggota terbuka) = SATU
+     JENDELA di desktop: kelas 'profil-view' mengunci gulir halaman
+     (CSS ≥1024px di style.css menata ulang .member-profile-page
+     menjadi grid lebar penuh setinggi layar). Di HP kelas ini tidak
+     berpengaruh sama sekali. */
+  document.body.classList.toggle('profil-view',S.view==='members'&&!!S.detail&&!S.form);
   const content=[];
   const storageErrors=Object.values(S.storageErrors||{});
   if(storageErrors.length)content.push(h('p',{class:'warn storage-warning'},'Database bersama tidak dapat dibaca: '+storageErrors.join(' · ')+' Jalankan pembaruan skema Supabase, lalu muat ulang aplikasi.'));
