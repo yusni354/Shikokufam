@@ -68,7 +68,7 @@ function renderDrawer(){
           if(!aktif)anak.push(h('span',{class:'menu-off-tag'},'Nonaktif'));
           anak.push(h('button',{type:'button',class:'menu-switch'+(aktif?' on':''),role:'switch','aria-checked':String(aktif),'aria-label':'Tampilkan menu '+x[1],title:aktif?'Sembunyikan menu ini dari semua pengguna':'Tampilkan menu ini untuk semua pengguna',onclick:ev=>{ev.preventDefault();ev.stopPropagation();aturMenuAktif(x[0],!aktif)}},h('span',{class:'menu-switch-knob'})));
         }
-        const tautan=h('a',{class:(S.view===x[0]?'on':'')+(S.mainAdmin&&!aktif?' menu-off':''),href:'#',onclick:navTo(x[0]),'data-menu-view':x[0],...(x[0]==='pesan'?{'data-message-nav':'true'}:{}),...(S.mainAdmin&&x[0]!=='landing'?{title:'Tekan lama lalu seret untuk mengubah urutan menu'}:{})},...anak);
+        const tautan=h('a',{class:(S.view===x[0]?'on':'')+(S.mainAdmin&&!aktif?' menu-off':''),href:'#',onclick:navTo(x[0]),'data-menu-view':x[0],...(x[0]==='pesan'?{'data-message-nav':'true'}:{}),...(S.mainAdmin&&x[0]!=='landing'?{title:'Tekan lama lalu seret untuk mengubah urutan menu',draggable:'false'}:{})},...anak);
         /* Geser posisi menu dengan tekan lama + seret: HANYA admin
            utama, dan Home tidak ikut bergeser (pasangSeretMenu di
            shell.js; Pengurus & Anggota tidak mendapat pendengar). */

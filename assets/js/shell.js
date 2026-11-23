@@ -119,7 +119,21 @@ async function simpanMenuUrutan(urutanBaru){
    yang mengikuti lepasnya seret DITELAN satu kali (penjaga
    menuSeretSelesaiPada di bawah) supaya item tidak ikut membuka
    halamannya. Pengurus & Anggota tidak mendapat pendengar ini sama
-   sekali: renderDrawer hanya memasangnya untuk admin utama. */
+   sekali: renderDrawer hanya memasangnya untuk admin utama.
+   PERBAIKAN (tekan lama drawer dilaporkan tidak pernah bekerja):
+   item menu adalah TAUTAN <a href="#">, dan peramban mengambil alih
+   gestur tekan lama pada tautan SEBELUM timer 450 ms matang —
+   di Android Chrome & Safari iOS muncul menu konteks / callout
+   tautan (memicu pointercancel, mode seret batal diam-diam), dan
+   dengan mouse gerakan pertama memulai seret tautan bawaan
+   (dragstart). Baris Kepengurusan tidak terkena karena barisnya
+   <div> dengan -webkit-touch-callout:none. Jadi di sini: atribut
+   draggable=false dipasang renderDrawer, dragstart selalu dicegah,
+   menu konteks dicegah selama ada tekanan yang berlangsung, label
+   item tidak bisa diseleksi / dipanggil callout-nya (CSS #dr a),
+   dan saat mode seret matang item menangkap pointer
+   (setPointerCapture) supaya pointermove/up tetap sampai walau
+   jari atau kursor bergerak cepat keluar dari item. */
 let menuSeretSelesaiPada=0;
 document.addEventListener('click',e=>{
   if(menuSeretSelesaiPada&&Date.now()-menuSeretSelesaiPada<600){
@@ -133,6 +147,13 @@ document.addEventListener('click',e=>{
   }
 },true);
 function pasangSeretMenu(el){
+  /* Penjaga gestur bawaan tautan (lihat catatan PERBAIKAN di atas):
+     seret tautan bawaan selalu dimatikan pada item ini, dan menu
+     konteks tekan lama dicegah selama ada tekanan yang berlangsung
+     pada item — keduanya adalah pembatal diam-diam mode seret. */
+  let tekanBerlangsung=false;
+  el.addEventListener('dragstart',e=>e.preventDefault());
+  el.addEventListener('contextmenu',e=>{if(tekanBerlangsung)e.preventDefault()});
   el.addEventListener('pointerdown',ev=>{
     if(!S.mainAdmin)return;
     if(ev.button!=null&&ev.button>0)return;
@@ -143,6 +164,7 @@ function pasangSeretMenu(el){
     if(items.length<2)return;
     const startIdx=items.indexOf(el);
     if(startIdx<0)return;
+    tekanBerlangsung=true;
     const pid=ev.pointerId;
     const startX=ev.clientX,startY=ev.clientY;
     const rects=items.map(r=>r.getBoundingClientRect());
@@ -156,6 +178,7 @@ function pasangSeretMenu(el){
     };
     const cegahGulir=e=>{if(aktif)e.preventDefault()};
     const lepas=()=>{
+      tekanBerlangsung=false;
       if(timer){clearTimeout(timer);timer=null}
       document.removeEventListener('pointermove',onMove);
       document.removeEventListener('pointerup',onUp);
@@ -215,6 +238,10 @@ function pasangSeretMenu(el){
       if(selesai)return;
       aktif=true;
       el.classList.add('menu-dragging');
+      /* Tangkap pointer pada item ini: sesudah ditangkap, browser
+         tidak lagi mengambil alih sisa gestur untuk menggulir dan
+         pointermove/up tetap terkirim walau jari keluar item. */
+      try{el.setPointerCapture(pid)}catch(_){}
       if(navigator.vibrate){try{navigator.vibrate(15)}catch(_){}}
     },450);
     document.addEventListener('pointermove',onMove);

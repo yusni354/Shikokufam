@@ -1792,6 +1792,11 @@ header .logo{border-radius:13px}
 .menu-switch.on .menu-switch-knob{transform:translateX(18px)}
 #dr a.menu-off{opacity:.55}
 #dr a.menu-off:hover{opacity:.8}
+/* Item menu adalah tautan: matikan callout tekan lama (Safari iOS) dan
+   seleksi teks labelnya — keduanya mengambil alih gestur tekan lama
+   admin utama untuk menyeret urutan menu sebelum mode seret matang
+   (pola yang sama seperti baris Kepengurusan .org-row-v2). */
+#dr a{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 /* Item menu yang sedang diseret admin utama (tekan lama + seret untuk
    mengubah urutan drawer): terangkat jelas di atas item lain dengan
    bayangan dan bingkai teal; item tujuan ditandai garis sisip teal di
