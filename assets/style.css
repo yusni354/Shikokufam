@@ -2070,24 +2070,47 @@ span.piket-chip-ava{display:grid;place-items:center;font-size:12px;font-weight:7
 .inv-toolbar>.btn{flex:none}
 .inv-filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
 .inv-filters select{flex:1 1 30%;min-width:110px;margin:0}
-.inv-list{display:grid;gap:10px}
-.inv-row{display:flex;align-items:center;gap:12px;padding:12px 13px;background:var(--card);border:1px solid var(--line);border-radius:17px;box-shadow:5px 7px 16px rgba(70,95,115,.09);cursor:pointer;transition:border-color .15s ease}
-.inv-row:hover{border-color:#a9c6d6}
-.inv-thumb{width:60px;height:60px;flex:none;border-radius:13px;object-fit:cover;background:var(--line)}
-.inv-thumb-empty{display:grid;place-items:center;color:var(--mut)}
-.inv-info{flex:1;min-width:0}
-.inv-info>b{display:block;font-size:15px;overflow-wrap:anywhere}
-.inv-info>small{display:block;color:var(--mut);font-size:12px;margin-top:2px;overflow-wrap:anywhere}
 .inv-badges{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:6px}
 .inv-badge{font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;white-space:nowrap}
 .inv-badge-ok{background:#dff4e8;color:#146c43}
 .inv-badge-warn{background:#fdeeda;color:#8a5a00}
 .inv-badge-bad{background:#fbe0e0;color:#a52a2a}
 .inv-badge-cat{background:#e3edf3;color:#2b5876}
-.inv-borrower{color:var(--mut);font-size:12px}
-.inv-side{flex:none;text-align:right}
-.inv-amount{display:block;color:#1d5c4e;font-size:15px;white-space:nowrap;font-variant-numeric:tabular-nums}
-.inv-side small{color:var(--mut);font-size:11px}
+.inv-borrower{color:var(--mut);font-size:12px;margin-top:3px;line-height:1.3}
+/* Tabel barang bergaya spreadsheet (Excel): satu tabel dengan kepala
+   kolom slate seperti tabel laporan, baris zebra, garis antar sel
+   jelas, angka rata kanan tabular. Wadahnya (.inv-wrap) bisa digeser
+   mendatar di dalam dirinya sendiri — halaman tidak meluber — dan
+   ikut mekanisme seret + Shift-roda tabel lebar di shell.js (lewat
+   kelas .laporan-wrap pendamping + .inv-wrap pada pemilihnya). */
+.inv-table-meta{display:flex;align-items:baseline;justify-content:space-between;gap:8px 14px;flex-wrap:wrap;margin-bottom:8px;font-size:12.5px;color:var(--mut)}
+.inv-table-meta span:first-child{font-weight:700;color:var(--ink)}
+.inv-wrap{overflow-x:auto;overflow-y:hidden;max-width:100%;border:1px solid var(--line);border-radius:12px;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;background:var(--card);box-shadow:5px 7px 16px rgba(70,95,115,.09)}
+.inv-wrap.bisa-seret{cursor:grab}
+.inv-wrap.menyeret{cursor:grabbing;user-select:none;-webkit-user-select:none}
+.inv-wrap.menyeret *{cursor:grabbing!important}
+.inv-table{border-collapse:separate;border-spacing:0;width:100%;min-width:1120px;font-size:12.5px;background:var(--card)}
+.inv-table th,.inv-table td{padding:7px 9px;border-bottom:1px solid var(--line);border-right:1px solid var(--line);text-align:left;vertical-align:middle;color:#17222b}
+.inv-table th:last-child,.inv-table td:last-child{border-right:0}
+.inv-table thead th{background:#2c4a5e;color:#fff;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.02em;white-space:nowrap}
+.inv-table thead th *{color:#fff}
+.inv-table tbody td{background:var(--card)}
+.inv-table tbody tr:nth-child(even) td{background:#f2f6f3}
+.inv-table tbody tr:hover td{background:#e9f3ee}
+.inv-table tbody tr:last-child td{border-bottom:0}
+.inv-table tfoot td{background:#e7efe9;font-weight:700}
+.inv-table tfoot tr:last-child td{border-bottom:0}
+.inv-tr{cursor:pointer}
+.inv-table .inv-num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.inv-table td.inv-total{color:#1d5c4e}
+.inv-table .inv-center{text-align:center}
+.inv-table .inv-c-no{text-align:center;width:42px;white-space:nowrap}
+.inv-table .inv-c-foto{text-align:center;width:56px}
+.inv-table td.inv-c-nama{min-width:150px;font-weight:700;line-height:1.35;overflow-wrap:anywhere}
+.inv-thumb-sm{width:40px;height:40px;border-radius:8px;object-fit:cover;background:var(--line);display:block;margin:0 auto}
+.inv-thumb-sm.inv-thumb-empty{display:grid;place-items:center;color:var(--mut)}
+.inv-table .inv-c-status{min-width:118px}
+.inv-actions{display:flex;flex-wrap:wrap;gap:5px;min-width:176px}
 .inv-form-2col{display:flex;gap:10px}
 .inv-form-2col>.lb{flex:1;min-width:0}
 .inv-pinjam-fields{margin-top:2px}
@@ -2102,10 +2125,10 @@ span.piket-chip-ava{display:grid;place-items:center;font-size:12px;font-weight:7
 .inv-pinjam-box .lb:first-child{margin-top:0}
 @media (min-width:1024px){
   .inv-stats{grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
-  .inv-list{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:start}
 }
 @media (max-width:430px){
   .inv-stat b{font-size:17px}
-  .inv-row{align-items:flex-start}
+  .inv-table{font-size:12px}
+  .inv-actions{min-width:158px}
   .inv-filters select{flex:1 1 45%}
 }

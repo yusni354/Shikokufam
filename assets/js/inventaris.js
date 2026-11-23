@@ -287,24 +287,65 @@ function vInventaris(){
       &&(!fKon||invKondisi(item)===fKon)
       &&(!fStatus||invStatus(item)===fStatus);
   };
-  const kartu=item=>h('article',{class:'inv-row',onclick:()=>{S.inventarisDetail=item.id;S.inventarisPinjam=null;render()}},
-    item.foto
-      ?h('img',{class:'inv-thumb',...memberMediaAttributes(item.foto,'src'),alt:'Foto '+(item.nama||'barang')})
-      :h('div',{class:'inv-thumb inv-thumb-empty'},icon('box',26)),
-    h('div',{class:'inv-info'},
-      h('b',{},item.nama||'Barang'),
-      h('small',{},(item.kategori||'Lainnya')+' · '+invJumlah(item)+' '+(item.satuan||'unit')+(item.lokasi?' · '+item.lokasi:'')),
-      h('div',{class:'inv-badges'},invBadgeKondisi(item),invBadgeStatus(item),
-        invStatus(item)==='dipinjam'&&item.peminjam_nama?h('small',{class:'inv-borrower'},'oleh '+item.peminjam_nama):null)),
-    h('div',{class:'inv-side'},
-      h('b',{class:'inv-amount'},formatYen(invNilai(item))),
-      h('small',{},'nilai beli')));
+  /* Daftar barang tampil sebagai SATU TABEL bergaya spreadsheet
+     (Excel): kepala kolom slate, baris zebra, garis antar sel jelas,
+     angka rata kanan tabular. Ketuk baris (di luar tombol Aksi)
+     membuka panel detail seperti sebelumnya; tombol Aksi di kolom
+     terakhir hanya untuk Pengurus & Admin Utama. */
+  const barisTabel=(item,idx)=>{
+    const dipinjam=invStatus(item)==='dipinjam';
+    const sel=[
+      h('td',{class:'inv-c-no'},String(idx+1)),
+      h('td',{class:'inv-c-foto'},
+        item.foto
+          ?h('img',{class:'inv-thumb-sm',...memberMediaAttributes(item.foto,'src'),alt:'Foto '+(item.nama||'barang')})
+          :h('div',{class:'inv-thumb-sm inv-thumb-empty'},icon('box',18))),
+      h('td',{class:'inv-c-nama'},item.nama||'Barang'),
+      h('td',{},item.kategori||'Lainnya'),
+      h('td',{class:'inv-num'},String(invJumlah(item))),
+      h('td',{},item.satuan||'unit'),
+      h('td',{class:'inv-center'},invBadgeKondisi(item)),
+      h('td',{},item.lokasi||'—'),
+      h('td',{class:'inv-num'},formatYen(item.harga)),
+      h('td',{class:'inv-num inv-total'},formatYen(invNilai(item))),
+      h('td',{class:'inv-c-status'},invBadgeStatus(item),
+        dipinjam&&item.peminjam_nama?h('div',{class:'inv-borrower'},'oleh '+item.peminjam_nama):null,
+        dipinjam&&item.tanggal_pinjam?h('div',{class:'inv-borrower'},invTanggalLabel(item.tanggal_pinjam)):null)
+    ];
+    if(kelola){
+      sel.push(h('td',{class:'inv-c-aksi',onclick:ev=>ev.stopPropagation()},
+        h('div',{class:'inv-actions'},
+          h('button',{class:'btn s btn-eh',onclick:ev=>{ev.stopPropagation();S.inventarisForm={...item};S.inventarisPhotoState=null;S.inventarisDetail=null;S.inventarisPinjam=null;render()}},icon('edit',14),h('span',{},'Ubah')),
+          dipinjam
+            ?h('button',{class:'btn s btn-eh',onclick:async ev=>{ev.stopPropagation();try{await S.db.collection('inventaris').doc(item.id).update({status:'tersedia',peminjam_uid:'',peminjam_nama:'',tanggal_pinjam:'',diubah_oleh:S.name||S.email||'Pengurus'});render()}catch(error){console.error(error);alert('Gagal mengembalikan barang: '+(error.message||'periksa koneksi'))}}},'Kembalikan')
+            :h('button',{class:'btn s btn-eh',onclick:ev=>{ev.stopPropagation();S.inventarisDetail=item.id;S.inventarisPinjam=item.id;render()}},'Pinjamkan'),
+          h('button',{class:'btn s fin-delete btn-eh',onclick:ev=>{ev.stopPropagation();S.inventarisConfirm=item;render()}},'Hapus'))));
+    }
+    return h('tr',{class:'inv-tr',onclick:()=>{S.inventarisDetail=item.id;S.inventarisPinjam=null;render()}},...sel);
+  };
   const listWrap=h('div',{});
   const gambarDaftar=()=>{
     const filtered=all.filter(cocok);
-    listWrap.replaceChildren(...(filtered.length
-      ?[h('div',{class:'inv-list'},...filtered.map(kartu))]
-      :[h('div',{class:'duty-empty'},icon('search',24),h('b',{},'Tidak ada barang yang cocok'),h('p',{},'Coba kata kunci atau saringan yang lain.'))]));
+    if(!filtered.length){
+      listWrap.replaceChildren(h('div',{class:'duty-empty'},icon('search',24),h('b',{},'Tidak ada barang yang cocok'),h('p',{},'Coba kata kunci atau saringan yang lain.')));
+      return;
+    }
+    const kepala=[['No','inv-c-no'],['Foto','inv-c-foto'],['Nama Barang','inv-c-nama'],['Kategori',''],['Jumlah','inv-num'],['Satuan',''],['Kondisi','inv-center'],['Lokasi',''],['Harga Beli','inv-num'],['Total Nilai','inv-num'],['Status','']];
+    if(kelola)kepala.push(['Aksi','inv-center']);
+    const totalUnitTampil=filtered.reduce((n,item)=>n+invJumlah(item),0);
+    const totalNilaiTampil=filtered.reduce((n,item)=>n+invNilai(item),0);
+    const tabel=h('table',{class:'inv-table','aria-label':'Daftar barang Inventari Benda SB'},
+      h('thead',{},h('tr',{},...kepala.map(([label,cls])=>h('th',{class:cls},label)))),
+      h('tbody',{},...filtered.map(barisTabel)),
+      h('tfoot',{},h('tr',{class:'inv-total-row'},
+        h('td',{colspan:'4'},'Total '+filtered.length+' barang yang tampil'),
+        h('td',{class:'inv-num'},String(totalUnitTampil)),
+        h('td',{colspan:'4'},''),
+        h('td',{class:'inv-num inv-total'},formatYen(totalNilaiTampil)),
+        h('td',{colspan:kelola?'2':'1'},''))));
+    listWrap.replaceChildren(
+      h('div',{class:'inv-table-meta'},h('span',{},'Menampilkan '+filtered.length+' dari '+all.length+' barang'),h('span',{},'Ketuk baris untuk melihat detail')),
+      h('div',{class:'inv-wrap laporan-wrap'},tabel));
     if(typeof hydrateMemberMedia==='function')hydrateMemberMedia();
   };
   const cari=h('input',{type:'search',placeholder:'Cari nama barang atau lokasi…','aria-label':'Cari barang'});

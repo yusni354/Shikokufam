@@ -101,7 +101,8 @@ if(brandTitleEl){
 
 /* ===== Geser mendatar tabel lebar: seret mouse & Shift + roda =====
    Aturan umum untuk wadah gulir mendatar tabel laporan (.rekap-wrap
-   pada tabel rekap absensi dan .laporan-wrap pada tabel laporan lain):
+   pada tabel rekap absensi, .laporan-wrap pada tabel laporan lain,
+   dan .inv-wrap pada tabel Inventari Benda SB):
    1) SERET: menekan tombol kiri mouse lalu menyeret kanan/kiri
       menggeser guliran mendatar wadah mengikuti seretan, seperti
       menggeser kertas. Hanya penunjuk mouse — di layar sentuh usapan
@@ -117,7 +118,7 @@ if(brandTitleEl){
    seperti sebelumnya. Semua pendengar didelegasikan ke document
    supaya tetap berlaku sesudah halaman digambar ulang. */
 (function(){
-  const SELEKTOR_WADAH='.rekap-wrap,.laporan-wrap';
+  const SELEKTOR_WADAH='.rekap-wrap,.laporan-wrap,.inv-wrap';
   const cariWadah=target=>(target&&target.closest)?target.closest(SELEKTOR_WADAH):null;
   const bisaGeser=w=>w.scrollWidth>w.clientWidth+1;
   let suppressClickUntil=0,suppressWrap=null;
