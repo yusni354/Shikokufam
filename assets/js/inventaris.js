@@ -289,9 +289,12 @@ function vInventaris(){
   };
   /* Daftar barang tampil sebagai SATU TABEL bergaya spreadsheet
      (Excel): kepala kolom slate, baris zebra, garis antar sel jelas,
-     angka rata kanan tabular. Ketuk baris (di luar tombol Aksi)
-     membuka panel detail seperti sebelumnya; tombol Aksi di kolom
-     terakhir hanya untuk Pengurus & Admin Utama. */
+     angka rata kanan tabular. Seluruh kolom MUAT dalam lebar wadah
+     (table-layout fixed di style.css) — tidak ada gulir kanan-kiri
+     di desktop maupun HP; Jumlah dan Satuan digabung dalam satu sel
+     ("2 unit") supaya lebarnya cukup. Ketuk baris (di luar tombol
+     Aksi) membuka panel detail seperti sebelumnya; tombol Aksi di
+     kolom terakhir hanya untuk Pengurus & Admin Utama. */
   const barisTabel=(item,idx)=>{
     const dipinjam=invStatus(item)==='dipinjam';
     const sel=[
@@ -299,13 +302,12 @@ function vInventaris(){
       h('td',{class:'inv-c-foto'},
         item.foto
           ?h('img',{class:'inv-thumb-sm',...memberMediaAttributes(item.foto,'src'),alt:'Foto '+(item.nama||'barang')})
-          :h('div',{class:'inv-thumb-sm inv-thumb-empty'},icon('box',18))),
+          :h('div',{class:'inv-thumb-sm inv-thumb-empty'},icon('box',14))),
       h('td',{class:'inv-c-nama'},item.nama||'Barang'),
-      h('td',{},item.kategori||'Lainnya'),
-      h('td',{class:'inv-num'},String(invJumlah(item))),
-      h('td',{},item.satuan||'unit'),
+      h('td',{class:'inv-c-kat'},item.kategori||'Lainnya'),
+      h('td',{class:'inv-num inv-c-jumlah'},invJumlah(item)+' '+(item.satuan||'unit')),
       h('td',{class:'inv-center'},invBadgeKondisi(item)),
-      h('td',{},item.lokasi||'—'),
+      h('td',{class:'inv-c-lokasi'},item.lokasi||'—'),
       h('td',{class:'inv-num'},formatYen(item.harga)),
       h('td',{class:'inv-num inv-total'},formatYen(invNilai(item))),
       h('td',{class:'inv-c-status'},invBadgeStatus(item),
@@ -324,28 +326,107 @@ function vInventaris(){
     return h('tr',{class:'inv-tr',onclick:()=>{S.inventarisDetail=item.id;S.inventarisPinjam=null;render()}},...sel);
   };
   const listWrap=h('div',{});
+  /* Baris TAMBAH langsung di kaki tabel (khusus Pengurus & Admin
+     Utama): pengelola mengetik langsung ke sel-selnya seperti Excel
+     lalu menekan Simpan pada baris itu — barang baru tersimpan
+     dengan status awal Tersedia tanpa membuka formulir terpisah.
+     Tanggal beli ditaruh pada baris kedua baris tambah (satu sel
+     melebar) karena pemilih tanggal butuh ruang lebih lebar dari
+     kolom sempit mana pun. Foto & keterangan dilengkapi sesudahnya
+     lewat Ubah / panel detail seperti biasa. Sesudah tersimpan,
+     halaman digambar ulang: baris isian kembali kosong dan siap
+     untuk barang berikutnya, angka ringkasan & total ikut berubah. */
+  const buatBarisTambah=colCount=>{
+    const inNama=h('input',{class:'inv-in',placeholder:'Nama barang','aria-label':'Nama barang baru',maxlength:'120'});
+    const inKat=h('select',{class:'inv-in','aria-label':'Kategori barang baru'},
+      h('option',{value:''},'Kategori'),
+      ...kategoriBarang().map(k=>h('option',{value:k},k)));
+    const inJml=h('input',{class:'inv-in',type:'number',inputmode:'numeric',min:'1',step:'1',placeholder:'Jml','aria-label':'Jumlah barang baru'});
+    const inSat=h('input',{class:'inv-in',placeholder:'unit',value:'unit',maxlength:'20','aria-label':'Satuan barang baru'});
+    const inKon=h('select',{class:'inv-in','aria-label':'Kondisi barang baru'},...KONDISI_BARANG.map(k=>h('option',{value:k},k)));
+    inKon.value='Baik';
+    const inLok=h('input',{class:'inv-in',placeholder:'Lokasi',maxlength:'120','aria-label':'Lokasi barang baru'});
+    const inHarga=h('input',{class:'inv-in',type:'number',inputmode:'numeric',min:'0',step:'1',placeholder:'¥','aria-label':'Harga beli barang baru'});
+    const inTgl=h('input',{class:'inv-in inv-in-date',type:'date','aria-label':'Tanggal beli barang baru'});
+    const simpan=async()=>{
+      const namaBarang=inNama.value.trim();
+      const kategori=inKat.value.trim();
+      const total=parseInt(String(inJml.value||'').replace(/[^\d]/g,''),10);
+      if(!namaBarang){alert('Isi nama barang terlebih dahulu.');inNama.focus();return}
+      if(!kategori){alert('Pilih kategori barang terlebih dahulu.');inKat.focus();return}
+      if(!total||total<=0){alert('Isi jumlah barang (minimal 1).');inJml.focus();return}
+      const data={
+        nama:namaBarang,
+        kategori,
+        jumlah:total,
+        satuan:inSat.value.trim()||'unit',
+        kondisi:KONDISI_BARANG.includes(inKon.value)?inKon.value:'Baik',
+        lokasi:inLok.value.trim(),
+        tanggal_beli:inTgl.value||'',
+        harga:parseInt(String(inHarga.value||'').replace(/[^\d]/g,''),10)||0,
+        foto:'',
+        keterangan:'',
+        status:'tersedia',
+        peminjam_uid:'',
+        peminjam_nama:'',
+        tanggal_pinjam:'',
+        at:Date.now(),
+        dicatat_oleh:S.name||S.email||'Pengurus',
+        diubah_oleh:S.name||S.email||'Pengurus'
+      };
+      try{
+        await S.db.collection('inventaris').add(data);
+        try{await tambahPilihan('kategori_barang',KATEGORI_BARANG_AWAL,kategori)}catch(error){console.error('Kategori barang gagal disimpan:',error)}
+        render();
+      }catch(error){console.error(error);alert('Gagal menyimpan barang: '+(error.message||'periksa koneksi'))}
+    };
+    const barisUtama=h('tr',{class:'inv-add-row'},
+      h('td',{class:'inv-c-no inv-add-plus'},'+'),
+      h('td',{class:'inv-c-foto'},h('div',{class:'inv-thumb-sm inv-thumb-empty'},icon('box',14))),
+      h('td',{},inNama),
+      h('td',{},inKat),
+      h('td',{},h('div',{class:'inv-in-stack'},inJml,inSat)),
+      h('td',{},inKon),
+      h('td',{},inLok),
+      h('td',{},inHarga),
+      h('td',{class:'inv-num'},'—'),
+      h('td',{class:'inv-c-status'},h('span',{class:'inv-badge inv-badge-ok'},'Tersedia')),
+      h('td',{class:'inv-c-aksi'},h('button',{class:'btn inv-save-btn',onclick:ev=>{ev.stopPropagation();void simpan()}},'Simpan')));
+    const barisTanggal=h('tr',{class:'inv-add-row inv-add-row2'},
+      h('td',{colspan:String(colCount)},
+        h('div',{class:'inv-add-date'},
+          h('span',{},'Tanggal beli:'),
+          inTgl,
+          h('span',{class:'inv-add-hint'},'Foto & keterangan bisa dilengkapi lewat tombol Ubah sesudah barang tersimpan.'))));
+    return [barisUtama,barisTanggal];
+  };
   const gambarDaftar=()=>{
     const filtered=all.filter(cocok);
-    if(!filtered.length){
-      listWrap.replaceChildren(h('div',{class:'duty-empty'},icon('search',24),h('b',{},'Tidak ada barang yang cocok'),h('p',{},'Coba kata kunci atau saringan yang lain.')));
-      return;
-    }
-    const kepala=[['No','inv-c-no'],['Foto','inv-c-foto'],['Nama Barang','inv-c-nama'],['Kategori',''],['Jumlah','inv-num'],['Satuan',''],['Kondisi','inv-center'],['Lokasi',''],['Harga Beli','inv-num'],['Total Nilai','inv-num'],['Status','']];
-    if(kelola)kepala.push(['Aksi','inv-center']);
+    const kepala=[['No','inv-c-no'],['Foto','inv-c-foto'],['Nama Barang','inv-c-nama'],['Kategori','inv-c-kat'],['Jumlah','inv-num inv-w-jumlah'],['Kondisi','inv-center inv-w-kondisi'],['Lokasi','inv-c-lokasi'],['Harga Beli','inv-num inv-w-harga'],['Total Nilai','inv-num inv-w-total'],['Status','inv-w-status']];
+    if(kelola)kepala.push(['Aksi','inv-center inv-w-aksi']);
+    const colCount=kepala.length;
     const totalUnitTampil=filtered.reduce((n,item)=>n+invJumlah(item),0);
     const totalNilaiTampil=filtered.reduce((n,item)=>n+invNilai(item),0);
-    const tabel=h('table',{class:'inv-table','aria-label':'Daftar barang Inventari Benda SB'},
+    const barisIsi=filtered.map(barisTabel);
+    if(!barisIsi.length){
+      barisIsi.push(h('tr',{},h('td',{colspan:String(colCount),class:'inv-empty-cell'},
+        all.length?'Tidak ada barang yang cocok — coba kata kunci atau saringan yang lain.':'Belum ada barang tercatat.'+(kelola?' Isi baris tambah di bawah untuk barang pertama.':''))));
+    }
+    const barisKaki=[];
+    if(kelola)barisKaki.push(...buatBarisTambah(colCount));
+    barisKaki.push(h('tr',{class:'inv-total-row'},
+      h('td',{colspan:'4'},'Total '+filtered.length+' barang yang tampil'),
+      h('td',{class:'inv-num'},String(totalUnitTampil)),
+      h('td',{colspan:'3'},''),
+      h('td',{class:'inv-num inv-total'},formatYen(totalNilaiTampil)),
+      h('td',{colspan:kelola?'2':'1'},'')));
+    const tabel=h('table',{class:'inv-table'+(kelola?' inv-table-kelola':''),'aria-label':'Daftar barang Inventari Benda SB'},
       h('thead',{},h('tr',{},...kepala.map(([label,cls])=>h('th',{class:cls},label)))),
-      h('tbody',{},...filtered.map(barisTabel)),
-      h('tfoot',{},h('tr',{class:'inv-total-row'},
-        h('td',{colspan:'4'},'Total '+filtered.length+' barang yang tampil'),
-        h('td',{class:'inv-num'},String(totalUnitTampil)),
-        h('td',{colspan:'4'},''),
-        h('td',{class:'inv-num inv-total'},formatYen(totalNilaiTampil)),
-        h('td',{colspan:kelola?'2':'1'},''))));
+      h('tbody',{},...barisIsi),
+      h('tfoot',{},...barisKaki));
     listWrap.replaceChildren(
       h('div',{class:'inv-table-meta'},h('span',{},'Menampilkan '+filtered.length+' dari '+all.length+' barang'),h('span',{},'Ketuk baris untuk melihat detail')),
-      h('div',{class:'inv-wrap laporan-wrap'},tabel));
+      h('div',{class:'inv-wrap'},tabel));
     if(typeof hydrateMemberMedia==='function')hydrateMemberMedia();
   };
   const cari=h('input',{type:'search',placeholder:'Cari nama barang atau lokasi…','aria-label':'Cari barang'});
@@ -375,7 +456,7 @@ function vInventaris(){
       kelola&&!S.inventarisForm&&h('button',{class:'btn',onclick:()=>{S.inventarisForm={jumlah:1,satuan:'unit',kondisi:'Baik',status:'tersedia'};S.inventarisPhotoState=null;render()}},'+ Tambah Barang')),
     h('div',{class:'inv-filters'},selKat,selKon,selStatus),
     S.inventarisForm&&kelola&&inventarisEditor(),
-    all.length?listWrap:h('div',{class:'duty-empty'},icon('box',24),h('b',{},'Belum ada barang tercatat'),h('p',{},kelola?'Barang milik bersama yang dibeli untuk keperluan komunitas akan tercatat di sini. Tambahkan barang pertama lewat tombol Tambah Barang.':'Barang milik bersama komunitas akan tampil di sini setelah dicatat pengurus.'))
+    (all.length||kelola)?listWrap:h('div',{class:'duty-empty'},icon('box',24),h('b',{},'Belum ada barang tercatat'),h('p',{},'Barang milik bersama komunitas akan tampil di sini setelah dicatat pengurus.'))
   ];
   const detailItem=S.inventarisDetail?(S.inventaris||[]).find(item=>item.id===S.inventarisDetail):null;
   if(detailItem)hasil.push(invDetailOverlay(detailItem));

@@ -2079,21 +2079,44 @@ span.piket-chip-ava{display:grid;place-items:center;font-size:12px;font-weight:7
 .inv-borrower{color:var(--mut);font-size:12px;margin-top:3px;line-height:1.3}
 /* Tabel barang bergaya spreadsheet (Excel): satu tabel dengan kepala
    kolom slate seperti tabel laporan, baris zebra, garis antar sel
-   jelas, angka rata kanan tabular. Wadahnya (.inv-wrap) bisa digeser
-   mendatar di dalam dirinya sendiri — halaman tidak meluber — dan
-   ikut mekanisme seret + Shift-roda tabel lebar di shell.js (lewat
-   kelas .laporan-wrap pendamping + .inv-wrap pada pemilihnya). */
+   jelas, angka rata kanan tabular. SELURUH kolom selalu muat dalam
+   lebar wadah — table-layout fixed dengan lebar kolom proporsional
+   pada kepala tabel, huruf sedikit lebih kecil, padding sel ramping,
+   teks nama/kategori/lokasi membungkus ke baris bawah — jadi TIDAK
+   ada gulir kanan-kiri untuk tabel ini di desktop maupun HP
+   (±360px); wadahnya tidak lagi bisa digeser mendatar. */
 .inv-table-meta{display:flex;align-items:baseline;justify-content:space-between;gap:8px 14px;flex-wrap:wrap;margin-bottom:8px;font-size:12.5px;color:var(--mut)}
 .inv-table-meta span:first-child{font-weight:700;color:var(--ink)}
-.inv-wrap{overflow-x:auto;overflow-y:hidden;max-width:100%;border:1px solid var(--line);border-radius:12px;-webkit-overflow-scrolling:touch;overscroll-behavior-x:contain;background:var(--card);box-shadow:5px 7px 16px rgba(70,95,115,.09)}
-.inv-wrap.bisa-seret{cursor:grab}
-.inv-wrap.menyeret{cursor:grabbing;user-select:none;-webkit-user-select:none}
-.inv-wrap.menyeret *{cursor:grabbing!important}
-.inv-table{border-collapse:separate;border-spacing:0;width:100%;min-width:1120px;font-size:12.5px;background:var(--card)}
-.inv-table th,.inv-table td{padding:7px 9px;border-bottom:1px solid var(--line);border-right:1px solid var(--line);text-align:left;vertical-align:middle;color:#17222b}
+.inv-wrap{overflow-x:hidden;overflow-y:hidden;max-width:100%;border:1px solid var(--line);border-radius:12px;background:var(--card);box-shadow:5px 7px 16px rgba(70,95,115,.09)}
+.inv-table{border-collapse:separate;border-spacing:0;table-layout:fixed;width:100%;font-size:11px;background:var(--card)}
+.inv-table th,.inv-table td{padding:5px 4px;border-bottom:1px solid var(--line);border-right:1px solid var(--line);text-align:left;vertical-align:middle;color:#000;overflow-wrap:break-word;word-break:normal}
 .inv-table th:last-child,.inv-table td:last-child{border-right:0}
-.inv-table thead th{background:#2c4a5e;color:#fff;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.02em;white-space:nowrap}
+.inv-table thead th{background:#2c4a5e;color:#fff;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.01em;line-height:1.25}
 .inv-table thead th *{color:#fff}
+/* Lebar kolom proporsional (dari kepala tabel, layout fixed).
+   Tanpa kolom Aksi (anggota biasa): total 100%. */
+.inv-table thead th.inv-c-no{width:6%}
+.inv-table thead th.inv-c-foto{width:8.5%}
+.inv-table thead th.inv-c-nama{width:15%}
+.inv-table thead th.inv-c-kat{width:10.5%}
+.inv-table thead th.inv-w-jumlah{width:10%}
+.inv-table thead th.inv-w-kondisi{width:10.5%}
+.inv-table thead th.inv-c-lokasi{width:10.5%}
+.inv-table thead th.inv-w-harga{width:9.5%}
+.inv-table thead th.inv-w-total{width:9.5%}
+.inv-table thead th.inv-w-status{width:10%}
+/* Dengan kolom Aksi (Pengurus & Admin Utama): total tetap 100%. */
+.inv-table-kelola thead th.inv-c-no{width:5%}
+.inv-table-kelola thead th.inv-c-foto{width:7.5%}
+.inv-table-kelola thead th.inv-c-nama{width:13.5%}
+.inv-table-kelola thead th.inv-c-kat{width:9.5%}
+.inv-table-kelola thead th.inv-w-jumlah{width:9%}
+.inv-table-kelola thead th.inv-w-kondisi{width:9.5%}
+.inv-table-kelola thead th.inv-c-lokasi{width:9.5%}
+.inv-table-kelola thead th.inv-w-harga{width:8.5%}
+.inv-table-kelola thead th.inv-w-total{width:8.5%}
+.inv-table-kelola thead th.inv-w-status{width:9%}
+.inv-table-kelola thead th.inv-w-aksi{width:10.5%}
 .inv-table tbody td{background:var(--card)}
 .inv-table tbody tr:nth-child(even) td{background:#f2f6f3}
 .inv-table tbody tr:hover td{background:#e9f3ee}
@@ -2101,16 +2124,35 @@ span.piket-chip-ava{display:grid;place-items:center;font-size:12px;font-weight:7
 .inv-table tfoot td{background:#e7efe9;font-weight:700}
 .inv-table tfoot tr:last-child td{border-bottom:0}
 .inv-tr{cursor:pointer}
-.inv-table .inv-num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+.inv-table .inv-num{text-align:right;font-variant-numeric:tabular-nums}
 .inv-table td.inv-total{color:#1d5c4e}
 .inv-table .inv-center{text-align:center}
-.inv-table .inv-c-no{text-align:center;width:42px;white-space:nowrap}
-.inv-table .inv-c-foto{text-align:center;width:56px}
-.inv-table td.inv-c-nama{min-width:150px;font-weight:700;line-height:1.35;overflow-wrap:anywhere}
-.inv-thumb-sm{width:40px;height:40px;border-radius:8px;object-fit:cover;background:var(--line);display:block;margin:0 auto}
+.inv-table .inv-c-no{text-align:center}
+.inv-table .inv-c-foto{text-align:center}
+.inv-table td.inv-c-nama{font-weight:700;line-height:1.3}
+.inv-table td.inv-c-jumlah{line-height:1.3}
+.inv-thumb-sm{width:24px;height:24px;border-radius:6px;object-fit:cover;background:var(--line);display:block;margin:0 auto}
 .inv-thumb-sm.inv-thumb-empty{display:grid;place-items:center;color:var(--mut)}
-.inv-table .inv-c-status{min-width:118px}
-.inv-actions{display:flex;flex-wrap:wrap;gap:5px;min-width:176px}
+.inv-table .inv-badge{font-size:9px;padding:1px 5px;white-space:normal;line-height:1.3;text-align:center}
+.inv-borrower{font-size:10px;overflow-wrap:break-word}
+.inv-empty-cell{text-align:center;color:var(--mut);font-weight:400;padding:14px 8px!important;line-height:1.45}
+.inv-actions{display:flex;flex-direction:column;gap:4px}
+.inv-actions .btn.s{padding:3px 4px;font-size:10px;line-height:1.25;border-radius:8px;white-space:normal;text-align:center}
+/* Baris tambah langsung di kaki tabel: isian mengetik di dalam sel
+   seperti Excel. Field ramping mengikuti lebar kolomnya; baris kedua
+   menampung tanggal beli dalam satu sel melebar. */
+.inv-table tfoot tr.inv-add-row td{background:#fff8e6;font-weight:400;vertical-align:top}
+.inv-table tfoot tr.inv-add-row2 td{background:#fff8e6;font-weight:400}
+.inv-add-plus{font-size:15px;font-weight:700;color:#1d5c4e}
+.inv-in{display:block;width:100%;min-width:0;margin:0;padding:4px 4px;border:1.5px solid #cbd8ce;border-radius:6px;background:#fff;color:#000;font-size:11px;line-height:1.3}
+.inv-in:focus{outline:none;border-color:var(--acc);box-shadow:0 0 0 2px rgba(47,143,193,.18)}
+select.inv-in{-webkit-appearance:none;appearance:none;padding-right:14px;background-image:url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2210%22 height=%227%22 viewBox=%220 0 14 9%22%3E%3Cpath d=%22M1 1l6 6 6-6%22 fill=%22none%22 stroke=%22%232b7a8c%22 stroke-width=%222.5%22 stroke-linecap=%22round%22/%3E%3C/svg%3E');background-repeat:no-repeat;background-position:right 4px center}
+.inv-in-stack{display:flex;flex-direction:column;gap:3px}
+.inv-save-btn{padding:5px 6px;font-size:10.5px;width:100%;white-space:normal;line-height:1.25}
+.inv-add-date{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:11px}
+.inv-add-date>span:first-child{font-weight:700;flex:none}
+.inv-add-date .inv-in-date{width:auto;flex:0 1 170px}
+.inv-add-hint{color:var(--mut);font-size:10.5px;line-height:1.35}
 .inv-form-2col{display:flex;gap:10px}
 .inv-form-2col>.lb{flex:1;min-width:0}
 .inv-pinjam-fields{margin-top:2px}
@@ -2128,7 +2170,7 @@ span.piket-chip-ava{display:grid;place-items:center;font-size:12px;font-weight:7
 }
 @media (max-width:430px){
   .inv-stat b{font-size:17px}
-  .inv-table{font-size:12px}
-  .inv-actions{min-width:158px}
+  .inv-table{font-size:10.5px}
+  .inv-table th,.inv-table td{padding:4px 3px}
   .inv-filters select{flex:1 1 45%}
 }
