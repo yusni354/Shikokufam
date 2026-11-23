@@ -2057,3 +2057,55 @@ span.piket-chip-ava{display:grid;place-items:center;font-size:12px;font-weight:7
   .piket-actions{width:100%;padding-left:64px;justify-content:flex-start}
   .piket-card{padding:13px 13px 14px}
 }
+
+/* ===== Inventari Benda SB ===== */
+.inv-stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.inv-stat{padding:14px 16px;background:linear-gradient(115deg,#f8fbfc,#e9f4f1);border:1px solid #cfe0da;border-radius:19px;box-shadow:6px 8px 18px rgba(70,95,115,.1)}
+.inv-stat small{display:block;color:var(--mut);font-size:12px;font-weight:600;margin-bottom:4px}
+.inv-stat b{font-size:20px;color:#1d5c4e;font-variant-numeric:tabular-nums}
+.inv-toolbar{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.inv-search{flex:1;min-width:0;display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:0 14px;color:var(--mut)}
+.inv-search input{flex:1;min-width:0;border:0;background:transparent;padding:11px 0;color:var(--ink)}
+.inv-search input:focus{outline:none}
+.inv-toolbar>.btn{flex:none}
+.inv-filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.inv-filters select{flex:1 1 30%;min-width:110px;margin:0}
+.inv-list{display:grid;gap:10px}
+.inv-row{display:flex;align-items:center;gap:12px;padding:12px 13px;background:var(--card);border:1px solid var(--line);border-radius:17px;box-shadow:5px 7px 16px rgba(70,95,115,.09);cursor:pointer;transition:border-color .15s ease}
+.inv-row:hover{border-color:#a9c6d6}
+.inv-thumb{width:60px;height:60px;flex:none;border-radius:13px;object-fit:cover;background:var(--line)}
+.inv-thumb-empty{display:grid;place-items:center;color:var(--mut)}
+.inv-info{flex:1;min-width:0}
+.inv-info>b{display:block;font-size:15px;overflow-wrap:anywhere}
+.inv-info>small{display:block;color:var(--mut);font-size:12px;margin-top:2px;overflow-wrap:anywhere}
+.inv-badges{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:6px}
+.inv-badge{font-size:11px;font-weight:700;padding:2px 9px;border-radius:999px;white-space:nowrap}
+.inv-badge-ok{background:#dff4e8;color:#146c43}
+.inv-badge-warn{background:#fdeeda;color:#8a5a00}
+.inv-badge-bad{background:#fbe0e0;color:#a52a2a}
+.inv-badge-cat{background:#e3edf3;color:#2b5876}
+.inv-borrower{color:var(--mut);font-size:12px}
+.inv-side{flex:none;text-align:right}
+.inv-amount{display:block;color:#1d5c4e;font-size:15px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.inv-side small{color:var(--mut);font-size:11px}
+.inv-form-2col{display:flex;gap:10px}
+.inv-form-2col>.lb{flex:1;min-width:0}
+.inv-pinjam-fields{margin-top:2px}
+.inv-detail-card{max-width:520px;max-height:88vh;overflow-y:auto}
+.inv-detail-photo{width:100%;max-height:240px;object-fit:cover;border-radius:14px;cursor:pointer;background:var(--line)}
+.inv-detail-name{font-size:18px;overflow-wrap:anywhere}
+.inv-detail-row{display:flex;align-items:baseline;justify-content:space-between;gap:14px;padding:8px 0;border-top:1px solid var(--line)}
+.inv-detail-row span{color:var(--mut);font-size:13px;flex:none}
+.inv-detail-row b{text-align:right;overflow-wrap:anywhere;font-size:14px}
+.inv-detail-actions{margin-top:14px}
+.inv-pinjam-box{margin-top:10px;padding:12px;background:#eef4f7;border:1px solid var(--line);border-radius:16px}
+.inv-pinjam-box .lb:first-child{margin-top:0}
+@media (min-width:1024px){
+  .inv-stats{grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+  .inv-list{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:start}
+}
+@media (max-width:430px){
+  .inv-stat b{font-size:17px}
+  .inv-row{align-items:flex-start}
+  .inv-filters select{flex:1 1 45%}
+}

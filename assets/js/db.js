@@ -30,7 +30,7 @@ function createLocalDb(){
   });
   return {collection};
 }
-const APP_DATA_COLLECTIONS=new Set(['members','events','topics','cleaning_duties','pin','musyawarah','pengaturan','keuangan']);
+const APP_DATA_COLLECTIONS=new Set(['members','events','topics','cleaning_duties','pin','musyawarah','pengaturan','keuangan','inventaris']);
 function createSupabaseDb(client){
   const collection=name=>{
     if(!APP_DATA_COLLECTIONS.has(name))throw new Error('Koleksi aplikasi tidak dikenal: '+name);

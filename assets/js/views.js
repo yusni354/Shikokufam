@@ -11,6 +11,7 @@ const V={
   pesan:vPesan,
   musyawarah:musyawarahView,
   keuangan:vKeuangan,
+  inventaris:vInventaris,
   susunan:vSusunan,
   pengaturan:vPengaturan,
   approvals:vApprovals
@@ -227,6 +228,7 @@ function startDataSubscriptions(){
   add(()=>sub('pin','pins'));
   add(()=>sub('musyawarah','musyawarah'));
   add(()=>sub('keuangan','keuangan'));
+  add(()=>sub('inventaris','inventaris'));
   add(()=>subscribePilihan());
   if(!S.supabase)add(()=>sub('pengaturan','pengaturan'));
   add(()=>subscribeSambutan());

@@ -43,6 +43,7 @@ const ICON_PATHS={
   meeting:['M3 10h18v8H3z','M5 4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v2H5z','M7 12v2','M17 12v2'],
   wallet:['M21 12V7H5a2 2 0 0 1 0-4h14v4','M3 5v14a2 2 0 0 0 2 2h16a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1H5a2 2 0 0 1-2-2','M16.5 14h.01'],
   team:['M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2','M11 14a2 2 0 1 0-4 0 2 2 0 0 0 4 0Z','M19 14a2 2 0 1 0-4 0 2 2 0 0 0 4 0Z'],
+  box:['M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z','M3.3 7 12 12l8.7-5','M12 22V12'],
 };
 function icon(name,size=20){
   const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');

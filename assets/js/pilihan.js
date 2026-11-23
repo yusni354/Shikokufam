@@ -66,7 +66,7 @@ function subscribePilihan(){
       }
       if(JSON.stringify(next)!==JSON.stringify(S.pilihan||{})){
         S.pilihan=next;
-        if(S.view==='keuangan'||S.view==='landing'||S.view==='kegiatan'||(S.view==='members'&&!S.form))renderDariData();
+        if(S.view==='keuangan'||S.view==='inventaris'||S.view==='landing'||S.view==='kegiatan'||(S.view==='members'&&!S.form))renderDariData();
       }
     },error=>{console.error('Daftar pilihan dropdown gagal dimuat:',error)});
   }catch(error){console.error('Daftar pilihan dropdown gagal dimuat:',error);return ()=>{}}

@@ -483,7 +483,7 @@ create policy "Message participants can delete replies"
 -- Shared application data for members, events, forum topics, duties, and map pins.
 create table if not exists public.app_data (
   collection text not null
-    check (collection in ('members', 'events', 'topics', 'cleaning_duties', 'pin', 'musyawarah', 'pengaturan', 'keuangan')),
+    check (collection in ('members', 'events', 'topics', 'cleaning_duties', 'pin', 'musyawarah', 'pengaturan', 'keuangan', 'inventaris')),
   id text not null,
   data jsonb not null
     check (jsonb_typeof(data) = 'object'),
@@ -500,7 +500,7 @@ create index if not exists app_data_collection_updated_at_idx
 alter table public.app_data drop constraint if exists app_data_collection_check;
 alter table public.app_data
   add constraint app_data_collection_check
-  check (collection in ('members', 'events', 'topics', 'cleaning_duties', 'pin', 'musyawarah', 'pengaturan', 'keuangan'));
+  check (collection in ('members', 'events', 'topics', 'cleaning_duties', 'pin', 'musyawarah', 'pengaturan', 'keuangan', 'inventaris'));
 
 alter table public.app_data enable row level security;
 alter table public.app_data replica identity full;
