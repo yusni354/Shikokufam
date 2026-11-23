@@ -50,7 +50,7 @@ function renderDrawer(){
     );
     return;
   }
-  d.replaceChildren(h('p',{class:'sub',style:'padding:0 14px'},h('b',{style:'color:var(--ink)'},'KOMUNITAS ID-JP')),
+  d.replaceChildren(
     /* Urutan tampil mengikuti urutan tersimpan hasil pengaturan admin
        utama (urutkanMenu di shell.js); bawaan = urutan ALL. */
     ...urutkanMenu(ALL).filter(x=>!x[2]||(x[3]?S.mainAdmin:S.admin))
