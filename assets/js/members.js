@@ -16,25 +16,17 @@ function vMembers(){
     ).sort((a,b)=>(a.nama||'').localeCompare(b.nama||'','id'));
     count.textContent='Menampilkan '+rows.length+' dari '+S.members.length+' anggota';
     list.replaceChildren(...(rows.length?rows.map(member=>{
-      const area=memberRegion(member),location=[member.kota,member.pref].filter(Boolean).join(', ');
-      /* Seluruh badan kartu bisa diklik untuk membuka kartu ID anggota
-         (pengganti tombol 'Lihat kartu ID' yang sudah dihapus). Klik
-         yang berasal dari tombol/tautan di dalam kartu (Edit, Hapus,
-         dan aksi lain) TIDAK ikut membuka kartu ID. */
-      return h('article',{class:'member-card',style:'--region-color:'+regionColor(area),title:'Lihat kartu ID '+(member.nama||'anggota'),onclick:ev=>{
-          if(ev.target&&ev.target.closest&&ev.target.closest('button,a,input,select,textarea'))return;
+      const area=memberRegion(member);
+      /* Kartu ringkas: HANYA foto, nama, dan lencana wilayah — kota,
+         nomor telepon, dan tombol Edit/Hapus TIDAK lagi tampil di muka
+         kartu (pengeditan & hapus tetap ada di halaman detail anggota).
+         Seluruh badan kartu bisa diklik untuk membuka kartu ID anggota. */
+      return h('article',{class:'member-card',style:'--region-color:'+regionColor(area),title:'Lihat kartu ID '+(member.nama||'anggota'),onclick:()=>{
           openMember(member,'members');
         }},
         member.foto?h('img',{class:'member-avatar',...memberMediaAttributes(member.foto,'src'),alt:'Foto '+(member.nama||'anggota')}):h('div',{class:'member-avatar member-avatar-placeholder'},(member.nama||'?').trim().slice(0,1).toUpperCase()),
-        h('div',{class:'member-card-info'},h('div',{class:'member-name-line'},h('b',{},(member.nama||'Nama belum diisi').toUpperCase()),h('span',{class:'member-region-tag'},area.toUpperCase())),
-          location&&h('small',{},location.toUpperCase()),
-          h('small',{},member.wa?memberValue('wa',member.wa):member.email||'Kontak belum diisi')),
-        h('div',{class:'member-card-actions'},
-          S.admin&&h('button',{class:'btn s btn-eh',onclick:()=>{S.form={...member};S.detail=null;S.detailOrigin=null;S.detailReturnView=null;S.formPinAlamatHasil='';render()}},icon('edit',15),h('span',{},'Edit')),
-          S.admin&&h('button',{class:'btn s member-delete btn-eh',onclick:async()=>{
-            if(!confirm('Hapus data anggota '+(member.nama||'ini')+'?'))return;
-            try{await S.db.collection('members').doc(member.id).delete()}catch(error){console.error(error);alert('Gagal menghapus data anggota: '+(error.message||'periksa koneksi'))}
-          }},'Hapus')))
+        h('b',{class:'member-tile-name'},(member.nama||'Nama belum diisi').toUpperCase()),
+        h('span',{class:'member-region-tag'},area.toUpperCase()))
     }):[h('div',{class:'member-empty'},icon(S.members.length?'search':'users',25),h('b',{},S.members.length?'Anggota tidak ditemukan':'Belum ada data anggota'),h('p',{},S.members.length?'Coba kata kunci atau filter wilayah yang lain.':'Data anggota yang ditambahkan akan tampil di sini.'))]));
   }
   search.oninput=()=>{S.memberQuery=search.value;draw()};
