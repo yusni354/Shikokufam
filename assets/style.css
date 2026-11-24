@@ -2379,3 +2379,16 @@ select.inv-in{-webkit-appearance:none;appearance:none;padding-right:14px;backgro
   .member-profile-page .member-detail-section{padding:11px 14px}
   .member-profile-page .member-detail-grid{gap:7px 14px}
 }
+
+/* ===== Bingkai wajah OTOMATIS pada Kartu ID (deteksi wajah) =====
+   Bila FaceDetector peramban menemukan wajah pada foto Kartu ID, JS
+   (hydrateMemberIdFaceFraming di media.js) menandai img dengan kelas
+   'face-framed' dan memasang geometri sebaris (posisi mutlak +
+   lebar/tinggi/geseran persentase) agar wilayah wajah + leher
+   mengisi bingkai PERSIS — menggantikan zoom tetap 1,55x di atas
+   untuk foto itu. Foto tanpa wajah terdeteksi / peramban tanpa
+   FaceDetector tidak mendapat kelas ini dan tetap memakai zoom
+   bawaan. Bingkai tetap overflow:hidden, jadi foto yang dibingkai
+   ulang tidak pernah keluar bingkai. Penampil foto besar dan semua
+   bingkai foto lain tidak terpengaruh. */
+.member-id-photo-frame .member-id-photo.face-framed{position:absolute;max-width:none;max-height:none}

@@ -208,6 +208,11 @@ function render(){
   $('#app').replaceChildren(...content);
   hydrateMemberQrCodes();
   hydrateMemberMedia();
+  /* Bingkai wajah otomatis KHUSUS foto Kartu ID: foto lama yang wajahnya
+     kecil di dalam bingkai dibingkai ulang ke wajah + leher dari hasil
+     deteksi wajah (tersimpan di cache per foto); tanpa dukungan deteksi
+     bingkai zoom bawaan CSS tetap dipakai. */
+  if(typeof hydrateMemberIdFaceFraming==='function')hydrateMemberIdFaceFraming();
   /* Halaman Peta: bangun peta Leaflet sesudah DOM terpasang (dijaga di
      dalam initPetaMap sendiri supaya kegagalan peta tidak merusak render) */
   if(typeof initPetaMap==='function')initPetaMap();

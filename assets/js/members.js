@@ -148,7 +148,7 @@ function detailCard(){
     h('article',{class:'member-id-card'},
       h('div',{class:'member-id-banner'},h('span',{},'SHIKOKU FAMILY'),h('span',{class:'member-region-tag'},area)),
       h('div',{class:'member-id-main'},
-        member.foto?h('div',{class:'member-id-photo-frame',title:'Klik untuk memperbesar foto',onclick:()=>{S.idPhoto=member.foto;render()}},h('img',{class:'member-id-photo member-id-photo-zoom',...memberMediaAttributes(member.foto,'src'),alt:'Foto '+(member.nama||'anggota')})):h('div',{class:'member-id-photo member-avatar-placeholder'},(member.nama||'?').trim().slice(0,1).toUpperCase()),
+        member.foto?h('div',{class:'member-id-photo-frame',title:'Klik untuk memperbesar foto',onclick:()=>{S.idPhoto=member.foto;render()}},h('img',{class:'member-id-photo member-id-photo-zoom','data-face-frame':'1',...(typeof kunciWajahDariNilai==='function'&&kunciWajahDariNilai(member.foto)?{'data-face-key':kunciWajahDariNilai(member.foto)}:{}),...memberMediaAttributes(member.foto,'src'),alt:'Foto '+(member.nama||'anggota')})):h('div',{class:'member-id-photo member-avatar-placeholder'},(member.nama||'?').trim().slice(0,1).toUpperCase()),
         h('div',{class:'member-id-info'},h('small',{},'KARTU ANGGOTA'),h('h1',{},(member.nama||'Nama belum diisi').toUpperCase()),member.wa&&h('p',{class:'member-id-phone'},icon('phone',14),h('span',{},member.wa)),h('b',{},code.toUpperCase()),h('p',{},[member.kota,member.pref].filter(Boolean).join(' · ').toUpperCase()||area.toUpperCase()))),
       h('div',{class:'member-id-barcode'},h('b',{class:'member-barcode-label'},'QR CODE ABSENSI'),qrValue?h('img',{class:'member-qr-code','data-member-qr':qrValue,alt:'QR code untuk ID anggota'}):h('p',{class:'member-barcode-help'},'ID anggota belum tersedia.'),h('small',{class:'member-barcode-help','data-member-qr-status':'true'},qrValue?'Membuat QR code...':'QR code akan tersedia setelah ID anggota tersimpan.'))),
     ...sections.filter(([,rows])=>rows.some(([,value])=>value)).map(([title,rows])=>h('section',{class:'member-detail-section'},h('h3',{},title.toUpperCase()),h('div',{class:'member-detail-grid'},...rows.filter(([,value])=>value).map(([label,value])=>h('div',{class:'member-detail-item'},h('small',{},label.toUpperCase()),h('span',{},label==='Posisi pin di peta'?value:memberValue(label==='Nomor HP / WhatsApp'?'wa':label==='Nomor HP pengurus daerah'?'hp_pengurus':label==='Nomor HP orang tua'?'hp_ortu':label.toLowerCase(),value))))))),
@@ -345,7 +345,15 @@ async function up(file,key,multi){
   S.memberUploadState={form:targetForm,status:'uploading',message:S.supabase?'Mengunggah file ke penyimpanan bersama...':'Menyiapkan file di perangkat ini...'};
   render();
   try{
-    const id=S.supabase?await uploadPrivateMemberMedia(file):await readLocalImageDataUrl(file);
+    /* Foto anggota (bukan dokumen surat): bila peramban mendukung
+       pendeteksian wajah, foto dipotong otomatis ke area wajah + leher
+       SEBELUM disimpan, supaya wajah tampil besar & jelas di kartu.
+       Deteksi tidak tersedia/gagal -> berkas asal dipakai apa adanya. */
+    let berkas=file;
+    if(key==='foto'&&!multi&&typeof siapkanFotoAnggotaOtomatis==='function'){
+      try{berkas=await siapkanFotoAnggotaOtomatis(file)}catch(e){berkas=file}
+    }
+    const id=S.supabase?await uploadPrivateMemberMedia(berkas):await readLocalImageDataUrl(berkas);
     targetForm[key]=multi?[...(targetForm[key]||[]),id]:id;
     S.memberUploadState={form:targetForm,status:'success',message:'File berhasil diunggah. Simpan profil untuk menyimpan perubahan.'};
     render();
