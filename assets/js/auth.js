@@ -5,10 +5,10 @@ const LOCAL_USERS_KEY='shikoku-family:users';
 const LOCAL_SESSION_KEY='shikoku-family:session';
 /* Cermin akun lokal di ingatan: di pratinjau artefak (iframe sandbox)
    localStorage bisa terblokir total — aksesnya melempar error. Tanpa
-   cermin ini, menyimpan akun lokal ikut melempar error dan jalan pintas
-   ketuk 3x berhenti diam-diam sebelum sempat masuk. Dengan cermin, akun
-   tetap hidup selama sesi berjalan walau penyimpanan perangkat terblokir;
-   di peramban biasa localStorage tetap dipakai seperti sebelumnya. */
+   cermin ini, menyimpan akun lokal ikut melempar error. Dengan cermin,
+   akun tetap hidup selama sesi berjalan walau penyimpanan perangkat
+   terblokir; di peramban biasa localStorage tetap dipakai seperti
+   sebelumnya. */
 let memoryLocalUsers=null;
 function localUsers(){
   /* Cermin ingatan didahulukan: ia selalu berisi salinan TERBARU hasil
@@ -31,17 +31,64 @@ function saveLocalUsers(users){
   try{localStorage.setItem(LOCAL_USERS_KEY,JSON.stringify(users))}catch(e){/* penyimpanan terblokir: akun tetap tersimpan di ingatan untuk sesi ini */}
 }
 function localPasswordHash(password,salt){let hash=5381;const text=String(salt)+':'+String(password);for(let i=0;i<text.length;i++)hash=((hash<<5)+hash+text.charCodeAt(i))>>>0;return 'h'+hash.toString(36)}
+/* ===== Hash kata sandi KUAT (WebCrypto PBKDF2) =====
+   Kata sandi akun lokal BARU tidak lagi memakai hash djb2 di atas —
+   djb2 32-bit bisa dibobol dalam hitungan detik. Kata sandi kini
+   disimpan sebagai
+   PBKDF2-SHA256 (150.000 putaran, salt acak 16 byte per kata sandi)
+   lewat WebCrypto, dalam format teks 'pbkdf2$<putaran>$<salt>$<hash>'
+   (salt & hash base64). localPasswordHash lama HANYA dipertahankan
+   untuk MEMERIKSA akun lokal lama yang terlanjur tersimpan dengan
+   format lama, supaya pemilik akun lama tetap bisa masuk seperti
+   biasa; tidak ada kata sandi baru yang disimpan dengannya. */
+const PBKDF2_PUTARAN=150000;
+function b64DariBytes(bytes){let s='';bytes.forEach(b=>{s+=String.fromCharCode(b)});return btoa(s)}
+function bytesDariB64(teks){const bin=atob(String(teks||''));const out=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)out[i]=bin.charCodeAt(i);return out}
+async function pbkdf2Turunkan(password,saltBytes,putaran){
+  if(!window.crypto||!crypto.subtle)throw new Error('Peramban ini tidak mendukung penyimpanan kata sandi yang aman (WebCrypto tidak tersedia).');
+  const bahan=await crypto.subtle.importKey('raw',new TextEncoder().encode(String(password)),'PBKDF2',false,['deriveBits']);
+  const bit=await crypto.subtle.deriveBits({name:'PBKDF2',salt:saltBytes,iterations:putaran,hash:'SHA-256'},bahan,256);
+  return new Uint8Array(bit);
+}
+async function hashKataSandiKuat(password){
+  const salt=crypto.getRandomValues(new Uint8Array(16));
+  const hasil=await pbkdf2Turunkan(password,salt,PBKDF2_PUTARAN);
+  return 'pbkdf2$'+PBKDF2_PUTARAN+'$'+b64DariBytes(salt)+'$'+b64DariBytes(hasil);
+}
+async function cocokKataSandiKuat(password,tersimpan){
+  try{
+    const bagian=String(tersimpan||'').split('$');
+    if(bagian.length!==4||bagian[0]!=='pbkdf2')return false;
+    const putaran=parseInt(bagian[1],10);
+    if(!(putaran>=1000&&putaran<=2000000))return false;
+    const hasil=await pbkdf2Turunkan(password,bytesDariB64(bagian[2]),putaran);
+    const target=bytesDariB64(bagian[3]);
+    if(hasil.length!==target.length)return false;
+    let beda=0;
+    for(let i=0;i<hasil.length;i++)beda|=hasil[i]^target[i];
+    return beda===0;
+  }catch(e){return false}
+}
+/* Periksa kata sandi akun lokal: format kuat PBKDF2 diperiksa lewat
+   WebCrypto; akun lama berformat djb2 diperiksa dengan cara lamanya
+   (satu-satunya sisa pemakaian hash lama, hanya untuk membaca). */
+async function verifikasiKataSandiLokal(user,password){
+  if(!user)return false;
+  if(String(user.password_hash||'').startsWith('pbkdf2$'))return cocokKataSandiKuat(password,user.password_hash);
+  return user.password_hash===localPasswordHash(password,user.salt);
+}
 function applyLocalUser(user){
   S.uid=user.id;S.email=user.email||'';S.name=user.name||user.email||'';
   S.admin=user.role==='admin';S.mainAdmin=S.admin&&user.is_main_admin===true;
   S.approvalStatus=user.approval_status||'pending';S.authLoading=false;
 }
-/* Mode lokal TIDAK punya pintu masuk yang terlihat: tidak ada panel,
-   tombol, atau petunjuk apa pun di halaman masuk. Satu-satunya jalan masuk
-   adalah ketukan 3x pada gambar gembok / tulisan SHIKOKU FAMILY (lihat
-   bagian bawah berkas ini). Sesudah masuk, id sesi lokal disimpan
-   (simpanSesiLokal) supaya muat ulang halaman memulihkan sesi dan halaman
-   terakhir — bukan kembali ke pintu masuk; tombol Keluar menghapusnya.
+/* Akun lokal hanya dipakai pada jalur TANPA Supabase (mode uji coba di
+   perangkat ini): masuk lewat formulir masuk biasa dengan alur
+   persetujuan yang sama. Sesudah masuk, id sesi lokal disimpan
+   (simpanSesiLokal); sesi itu hanya dipulihkan pada jalur TANPA
+   Supabase. Pada jalur online, sesi Supabase yang sah SELALU didahulukan
+   dan sesi lokal tidak pernah dipulihkan mendahului sesi Supabase
+   (lihat main.js); tombol Keluar menghapus sesi lokal seperti biasa.
    Flag lama 'shikoku-family:force-local' yang mungkin tertinggal di
    peramban tetap dibersihkan saat aplikasi dimuat (lihat main.js) dan
    selalu diabaikan, supaya tidak ada peramban yang terjebak di data lokal. */
@@ -94,10 +141,10 @@ async function signOut(){
       /* Memicu pendengar sesi di main.js: ia menggambar halaman masuk online */
       try{await online.auth.signOut()}catch(e){console.error('Gagal keluar dari sesi online:',e)}
     }else{
-      /* Sesi lokal ini dipulihkan saat aplikasi dimuat (bukan dari ketukan
-         3x sesi ini), jadi tidak ada klien online yang disimpan di ingatan:
-         muat ulang aplikasi supaya pintu masuk online tampil lagi. Id sesi
-         lokal sudah dihapus di atas, jadi muat ulang tidak memulihkannya. */
+      /* Sesi lokal ini dipulihkan saat aplikasi dimuat, jadi tidak ada
+         klien online yang disimpan di ingatan: muat ulang aplikasi
+         supaya pintu masuk online tampil lagi. Id sesi lokal sudah
+         dihapus di atas, jadi muat ulang tidak memulihkannya. */
       location.reload();
       return;
     }
@@ -225,8 +272,10 @@ function accountForm(){
   let signup=authDraft.signup===true;
   const titleText=h('span',{},'Masuk ke Shikoku Family');
   const submitLabel=h('span',{},'Masuk');
-  const lockTap=h('button',{type:'button',id:'login-lock',class:'login-lock-tap','aria-label':'Masuk ke Shikoku Family'},icon('lock',20));
-  const title=h('b',{},lockTap,titleText);
+  /* Ikon gembok judul kartu masuk: elemen tampil biasa (bukan tombol,
+     tanpa penangan ketuk apa pun) — sekadar penanda judul formulir. */
+  const lockIcon=h('span',{class:'auth-lock-icon','aria-hidden':'true'},icon('lock',20));
+  const title=h('b',{},lockIcon,titleText);
   const forgot=h('button',{type:'button',class:'btn s',onclick:async()=>{
     const emailValue=email.value.trim();
     if(!emailValue){notice.textContent='Masukkan email terlebih dahulu untuk menerima tautan reset password.';email.focus();return}
@@ -297,7 +346,12 @@ function accountForm(){
         }
         const first=users.length===0;
         const salt='u'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
-        const newUser={id:'local-user-'+salt,name:name.value.trim(),email:emailValue,password_hash:localPasswordHash(password.value,salt),salt,role:first?'admin':'member',is_main_admin:first,approval_status:first?'approved':'pending',created_at:new Date().toISOString()};
+        /* Kata sandi akun lokal baru disimpan dengan hash kuat PBKDF2
+           (bukan djb2); kolom salt lama dikosongkan karena salt kini
+           menyatu di dalam nilai hash-nya. */
+        let kuatHash='';
+        try{kuatHash=await hashKataSandiKuat(password.value)}catch(e){notice.className='warn auth-error';notice.textContent=e.message;return}
+        const newUser={id:'local-user-'+salt,name:name.value.trim(),email:emailValue,password_hash:kuatHash,salt:'',role:first?'admin':'member',is_main_admin:first,approval_status:first?'approved':'pending',created_at:new Date().toISOString()};
         users.push(newUser);
         try{saveLocalUsers(users)}catch(e){notice.className='warn auth-error';notice.textContent=e.message;return}
         if(first){
@@ -318,7 +372,9 @@ function accountForm(){
         return;
       }
       const user=users.find(item=>(item.email||'').toLowerCase()===emailKey);
-      if(!user||user.password_hash!==localPasswordHash(password.value,user.salt)){
+      /* Akun baru diperiksa dengan PBKDF2; akun lama berformat djb2
+         tetap diperiksa dengan cara lamanya (lihat verifikasiKataSandiLokal). */
+      if(!user||!(await verifikasiKataSandiLokal(user,password.value))){
         notice.className='warn auth-error';
         notice.textContent='Email atau password salah. Silakan coba lagi.';
         return;
@@ -413,153 +469,47 @@ function accountForm(){
     forgotWrap,notice,submitButton);
   return h('div',{class:'card auth-card'},title,h('div',{class:'auth-tabs'},loginTab,signupTab),form,google);
 }
-/* Jalan pintas ketuk 3x pada tulisan SHIKOKU FAMILY (header & hero halaman
-   masuk): mengetuknya 3 kali berturut-turut dengan jeda singkat langsung
-   masuk sebagai ADMIN UTAMA MODE LOKAL tanpa formulir. Tidak ada petunjuk
-   tertulis tentang jalan pintas ini di mana pun. Id sesi lokal disimpan di
-   perangkat, jadi muat ulang halaman memulihkan sesi dan halaman terakhir;
-   sesudah Keluar pengguna mengetuk 3x lagi bila ingin masuk lokal.
-   Jalan pintas ini hanya membuka data lokal perangkat — ia TIDAK membuat
-   atau memalsukan sesi Supabase. */
-const LOCAL_ADMIN_EMAIL='putro@shikoku.local';
-function ensureLocalMainAdmin(){
-  const users=localUsers();
-  let user=users.find(item=>(item.email||'').toLowerCase()===LOCAL_ADMIN_EMAIL);
-  if(!user){
-    const salt='u'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
-    user={id:'local-user-'+salt,name:'Putro',email:LOCAL_ADMIN_EMAIL,password_hash:localPasswordHash('putro-local',salt),salt,role:'admin',is_main_admin:true,approval_status:'approved',created_at:new Date().toISOString()};
-    users.push(user);
-    saveLocalUsers(users);
-    return user;
-  }
-  /* Akun lokal Putro sudah ada: pastikan tetap admin utama yang disetujui */
-  if(user.role!=='admin'||user.is_main_admin!==true||user.approval_status!=='approved'){
-    user.role='admin';user.is_main_admin=true;user.approval_status='approved';
-    if(!user.name)user.name='Putro';
-    saveLocalUsers(users);
-  }
-  return user;
-}
-let localEntryBusy=false;
-async function enterLocalMainAdmin(){
-  if(localEntryBusy)return;
-  if(S.localMode&&S.mainAdmin&&S.uid)return;
-  localEntryBusy=true;
+/* ===== Pembersihan sisa pintu masuk lokal lama (sekali jalan) =====
+   Pintu masuk lokal lama — jalan pintas ketuk berulang pada halaman
+   masuk yang membuka panel kata sandi khusus dan masuk sebagai admin
+   utama lokal — sudah DIHAPUS seluruhnya dari aplikasi: tidak ada
+   pemicu ketukan, tidak ada panel, dan tidak ada akun khusus pintu itu.
+   Yang tertinggal hanya pembersihan sekali jalan di bawah ini,
+   dipanggil main.js saat aplikasi dimuat sebelum sesi apa pun dibaca:
+   1) id sesi lokal yang tersimpan dibuang, supaya tidak ada perangkat
+      yang tertinggal masuk memakai sesi lokal lama (sesi Supabase
+      tidak disentuh dan tetap selalu didahulukan);
+   2) catatan kata sandi pintu lama di penyimpanan perangkat dihapus;
+   3) akun lokal khusus pintu lama (email pintu lama, bertanda khusus,
+      atau ber-id awalan 'local-emergency-') dihapus dari daftar akun
+      lokal, jadi akun itu tidak bisa dipakai masuk lewat jalur mana pun.
+   Akun lokal biasa (mode tanpa Supabase) dan akun online tidak
+   disentuh, dan pengguna tetap bisa masuk seperti biasa sesudahnya —
+   tidak ada perangkat yang terkunci oleh pembersihan ini.
+   Penanda selesai disimpan di perangkat; pembersihan berjalan tepat
+   satu kali per perangkat (cermin ingatan menjaga lingkungan dengan
+   penyimpanan terblokir tetap satu kali per sesi). Kunci penanda baru
+   dipakai supaya perangkat yang sudah menjalankan pembersihan versi
+   sebelumnya tetap menjalankan pembersihan ini satu kali. */
+const PINTU_LAMA_CLEANUP_KEY='shikoku-family:hapus-pintu-lama-v2';
+const PINTU_LAMA_EMAIL='putro@shikoku.local';
+const PINTU_LAMA_KUNCI_CATATAN='shikoku-family:emergency-admin';
+let pintuLamaCleanupDone=false;
+function bersihkanWarisanPintuLama(){
+  if(pintuLamaCleanupDone)return;
+  pintuLamaCleanupDone=true;
+  try{if(localStorage.getItem(PINTU_LAMA_CLEANUP_KEY)==='1')return}catch(e){}
+  hapusSesiLokal();
+  try{localStorage.removeItem(PINTU_LAMA_KUNCI_CATATAN)}catch(e){}
+  try{sessionStorage.removeItem(PINTU_LAMA_KUNCI_CATATAN)}catch(e){}
   try{
-    const user=ensureLocalMainAdmin();
-    /* Simpan klien online HANYA di ingatan, untuk dipulihkan saat Keluar */
-    if(S.supabase&&!S._onlineClient)S._onlineClient=S.supabase;
-    if(S.messageChannel&&S._onlineClient){
-      try{await S._onlineClient.removeChannel(S.messageChannel)}catch(e){}
-      S.messageChannel=null;
-    }
-    if(typeof stopDataSubscriptions==='function')stopDataSubscriptions();
-    S.localMode=true;
-    /* S.supabase dikosongkan selama sesi lokal: seluruh kode yang bercabang
-       pada S.supabase otomatis memakai jalur lokal, dan tidak ada sesi
-       Supabase yang dibuat atau dipalsukan. */
-    S.supabase=null;
-    S.db=createLocalDb();
-    /* Bersihkan data online agar tidak tercampur dengan data lokal */
-    S.members=[];S.events=[];S.topics=[];S.cleaningDuties=[];S.pins=[];
-    S.keuangan=[];S.kategoriCustom=[];S.financeForm=null;S.financePhoto=null;
-    S.tanya=[];S.replies=[];S.messageSignature='';S.unreadMessages=0;S.openConversation=null;S.pendingUsers=[];
-    S.pengaturan=[];S.sambutan='';S.menuAktif={};S.menuUrutan=[];S.susunanPemegang={};S.susunanSimpul=null;S.susunanInline=null;S.susunanKelompok=[];S.susunanLabelPuncak='';S.susunanLabelEdit=null;S.storageErrors={};
-    if(S.memberMediaUrls)S.memberMediaUrls.clear();
-    if(S.memberMediaPending)S.memberMediaPending.clear();
-    if(S.memberMediaFailed)S.memberMediaFailed.clear();
-    S.view='landing';S.adminMenuOpen=false;document.body.classList.remove('open');
-    /* Id sesi lokal DISIMPAN: muat ulang halaman memulihkan sesi lokal ini
-       beserta halaman terakhir yang dibuka (lihat main.js), bukan kembali
-       ke pintu masuk — sesuai permintaan pemilik aplikasi. Tombol Keluar
-       tetap menghapusnya dan mengembalikan aplikasi ke pintu masuk online. */
-    simpanSesiLokal(user.id);
-    applyLocalUser(user);
-    S.authLoading=false;
-    document.body.classList.remove('auth-locked','bottom-nav-hidden');
-    if(typeof startDataSubscriptions==='function')startDataSubscriptions();
-    /* Kegagalan memuat daftar sampingan tidak boleh membatalkan masuk:
-       Home tetap digambar apa pun hasil kedua pemuatan ini. */
-    try{await loadPendingUsers()}catch(e){console.error('Daftar persetujuan lokal gagal dimuat:',e)}
-    try{await loadMessages()}catch(e){console.error('Pesan lokal gagal dimuat:',e)}
-    render();
-  }catch(e){
-    console.error('Gagal masuk sebagai admin utama lokal:',e);
-    /* Jalan terakhir: tetap masuk memakai akun admin utama di ingatan saja,
-       supaya ketukan 3x tidak pernah berhenti tanpa hasil yang terlihat. */
-    try{
-      S.localMode=true;S.supabase=null;S.db=createLocalDb();
-      S.view='landing';S.adminMenuOpen=false;document.body.classList.remove('open');
-      applyLocalUser({id:'local-user-memory',name:'Putro',email:LOCAL_ADMIN_EMAIL,role:'admin',is_main_admin:true,approval_status:'approved'});
-      S.authLoading=false;
-      document.body.classList.remove('auth-locked','bottom-nav-hidden');
-      if(typeof startDataSubscriptions==='function')startDataSubscriptions();
-      render();
-    }catch(e2){console.error('Masuk lokal cadangan juga gagal:',e2)}
-  }finally{
-    localEntryBusy=false;
-  }
+    const users=localUsers();
+    const bersih=users.filter(item=>{
+      const email=(item&&item.email||'').toLowerCase();
+      const id=String((item&&item.id)||'');
+      return !(email===PINTU_LAMA_EMAIL||(item&&item.emergency===true)||id.indexOf('local-emergency-')===0);
+    });
+    if(bersih.length!==users.length)saveLocalUsers(bersih);
+  }catch(e){console.error('Pembersihan akun pintu lama gagal (diabaikan):',e)}
+  try{localStorage.setItem(PINTU_LAMA_CLEANUP_KEY,'1')}catch(e){/* terblokir: cermin ingatan di atas tetap menjaga satu kali per sesi */}
 }
-/* Penghitung ketukan: 3 ketukan dengan jeda masing-masing <= 1,2 detik */
-let brandTapCount=0,brandTapLast=0;
-function handleBrandTap(){
-  const now=Date.now();
-  if(now-brandTapLast>1200)brandTapCount=0;
-  brandTapLast=now;
-  brandTapCount+=1;
-  if(brandTapCount>=3){
-    brandTapCount=0;brandTapLast=0;
-    enterLocalMainAdmin();
-  }
-}
-/* Pasang penghitung pada tulisan SHIKOKU FAMILY di HEADER — elemen
-   #brand-title, yaitu tulisan persis di samping tombol hamburger (tombol
-   3 baris), yang selalu tampil di layar masuk maupun sesudah masuk.
-   Penangan dipasang di dokumen pada fase capture dan dicocokkan lewat
-   closest('#brand-title'), jadi ketukan pada tulisan itu pasti tertangkap:
-   tidak tergantung kapan elemen header digambar, dan tidak bisa terhalang
-   penangan klik lain. Isyarat yang didengar adalah 'pointerdown' — isyarat
-   ketuk paling awal dan paling andal di webview/pratinjau artefak, tempat
-   'click' hasil ketukan cepat kadang tertahan atau tidak terkirim; di
-   peramban tanpa PointerEvent, cadangannya 'click'. Ketukan di elemen
-   lain — termasuk tulisan besar di hero halaman masuk, yang punya
-   penangannya sendiri — tidak ikut terhitung di sini. Tanpa teks
-   petunjuk, tanpa perubahan tampilan. */
-const brandTapEventName=window.PointerEvent?'pointerdown':'click';
-document.addEventListener(brandTapEventName,event=>{
-  const target=event.target;
-  if(target&&typeof target.closest==='function'&&target.closest('#brand-title'))handleBrandTap();
-},true);
-/* Sasaran ketuk 3x UTAMA: gambar gembok di judul kartu masuk
-   ("Masuk ke Shikoku Family"). Elemennya tombol sungguhan (#login-lock,
-   .login-lock-tap) berukuran area ketuk 44px — mudah kena jari di HP dan
-   mudah diketuk alat uji — tapi tampilannya persis ikon gembok semula:
-   tanpa latar, tanpa teks tambahan, tanpa petunjuk apa pun.
-   1-2 ketukan tidak melakukan apa-apa; ketukan ke-3 dalam jendela
-   1,2 detik antar-ketukan memanggil jalur masuk yang SAMA dengan ketuk
-   3x tulisan (enterLocalMainAdmin): admin utama lokal perangkat ini.
-   Didengar dua isyarat sekaligus — 'pointerdown' (paling awal & andal
-   di webview HP) dan 'click' (cadangan bila hanya klik yang terkirim,
-   mis. ketuk via .click()) — dengan penjaga anti-ganda: klik yang
-   datang <700ms sesudah pointerdown pada ketukan yang sama diabaikan,
-   jadi satu ketukan fisik selalu terhitung satu. */
-let lockTapCount=0,lockTapLast=0,lockTapPointerAt=0;
-function handleLockTap(eventType){
-  const now=Date.now();
-  if(eventType==='click'&&now-lockTapPointerAt<700)return;
-  if(eventType==='pointerdown')lockTapPointerAt=now;
-  if(now-lockTapLast>1200)lockTapCount=0;
-  lockTapLast=now;
-  lockTapCount+=1;
-  if(lockTapCount>=3){
-    lockTapCount=0;lockTapLast=0;lockTapPointerAt=0;
-    enterLocalMainAdmin();
-  }
-}
-function lockTapTarget(event){
-  const target=event&&event.target;
-  if(!target||typeof target.closest!=='function')return null;
-  return target.closest('#login-lock,.login-lock-tap');
-}
-document.addEventListener('pointerdown',event=>{if(lockTapTarget(event))handleLockTap('pointerdown')},true);
-document.addEventListener('click',event=>{if(lockTapTarget(event))handleLockTap('click')},true);

@@ -44,12 +44,16 @@ function subscribeMenuAktif(){
       const doc=(snap.docs||[]).find(d=>d.id==='menu_aktif');
       const data=doc&&typeof doc.data==='function'?doc.data():null;
       const next={};
-      if(data)Object.keys(data).forEach(k=>{if(typeof data[k]==='boolean')next[k]=data[k]});
+      /* Hanya id menu yang masih ada di ALL yang disimpan: id menu
+         yang fiturnya sudah dihapus (entri hantu di dokumen lama)
+         dibuang di sini supaya tidak merusak daftar menu. */
+      const idMenuDikenal=new Set(ALL.map(x=>x[0]));
+      if(data)Object.keys(data).forEach(k=>{if(typeof data[k]==='boolean'&&idMenuDikenal.has(k))next[k]=data[k]});
       /* Dokumen tetangga 'menu_urutan' dibaca dari potret yang sama:
          urutan menu hasil seretan admin utama (lihat urutkanMenu). */
       const docU=(snap.docs||[]).find(d=>d.id==='menu_urutan');
       const dataU=docU&&typeof docU.data==='function'?docU.data():null;
-      const urutanBaru=Array.isArray(dataU&&dataU.urutan)?dataU.urutan.filter(v=>typeof v==='string'):[];
+      const urutanBaru=Array.isArray(dataU&&dataU.urutan)?dataU.urutan.filter(v=>typeof v==='string'&&idMenuDikenal.has(v)):[];
       let berubah=false;
       if(JSON.stringify(next)!==JSON.stringify(S.menuAktif||{})){S.menuAktif=next;berubah=true}
       if(JSON.stringify(urutanBaru)!==JSON.stringify(S.menuUrutan||[])){S.menuUrutan=urutanBaru;berubah=true}
@@ -250,7 +254,7 @@ function pasangSeretMenu(el){
     document.addEventListener('touchmove',cegahGulir,{passive:false});
   });
 }
-function go(v){/* Halaman Pengaturan khusus ADMIN UTAMA: admin biasa yang somehow memanggilnya diarahkan ke Home, bukan sekadar menunya disembunyikan. */if(v==='pengaturan'&&!S.mainAdmin)v='landing';/* Menu yang dimatikan admin utama tidak bisa dibuka pengguna lain: navigasi langsung ke halamannya terpental ke Home. */if(v!=='landing'&&!S.mainAdmin&&!menuAktifUntuk(v))v='landing';if(v==='kegiatan'){bawaanArsipKegiatan();/* Masuk halaman Kegiatan dari menu selalu menuju DAFTAR: detail kegiatan adalah sub-tampilan yang hanya dibuka dari kartu dan ditutup lewat tombol Kembali di dalamnya, jadi keadaan detail & absensi dibersihkan di sini (bukan saat kembali dari detail). */S.activityDetail=null;S.absensiEvent=null;S.absensiRegion=null;S.absensiDraft=null;try{sessionStorage.removeItem('shikoku-family:kegiatan-detail')}catch(e){/* storage terblokir: abaikan */}}if(v==='ringkasan')bawaanArsipRingkasan();S.view=v;simpanViewTerakhir(v);S.adminMenuOpen=false;S.chatDialog=null;S.inboxDialog=null;S.form=S.detail=S.dutyForm=null;S.financeForm=null;S.financePhoto=null;S.meetingForm=null;S.meetingConfirm=null;S.meetingRoom=null;S.inventarisForm=null;S.inventarisPhoto=null;S.inventarisDetail=null;S.inventarisConfirm=null;S.inventarisPinjam=null;S.idPhoto=null;S.detailOrigin=null;S.detailReturnView=null;if(v==='pesan'){/* Masuk menu Pesan selalu menuju KOTAK MASUK (daftar percakapan pribadi pengguna yang masuk) untuk semua peran; percakapan hanya ditandai terbaca saat dibuka, bukan saat daftar ditampilkan. Direktori pengguna dimuat untuk nama/foto lawan bicara dan pemilih Pesan Baru. */S.openConversation=null;S.newChat=null;if(S.uid&&typeof loadUserDirectory==='function')loadUserDirectory().then(()=>{if(S.view==='pesan')renderDariData()})}document.body.classList.remove('open');syncAdminTheme();render()}
+function go(v){/* Halaman Pengaturan khusus ADMIN UTAMA: admin biasa yang somehow memanggilnya diarahkan ke Home, bukan sekadar menunya disembunyikan. */if(v==='pengaturan'&&!S.mainAdmin)v='landing';/* Menu yang dimatikan admin utama tidak bisa dibuka pengguna lain: navigasi langsung ke halamannya terpental ke Home. */if(v!=='landing'&&!S.mainAdmin&&!menuAktifUntuk(v))v='landing';if(v==='kegiatan'){bawaanArsipKegiatan();/* Masuk halaman Kegiatan dari menu selalu menuju DAFTAR: detail kegiatan adalah sub-tampilan yang hanya dibuka dari kartu dan ditutup lewat tombol Kembali di dalamnya, jadi keadaan detail & absensi dibersihkan di sini (bukan saat kembali dari detail). */S.activityDetail=null;S.absensiEvent=null;S.absensiRegion=null;S.absensiDraft=null;try{sessionStorage.removeItem('shikoku-family:kegiatan-detail')}catch(e){/* storage terblokir: abaikan */}}if(v==='ringkasan')bawaanArsipRingkasan();S.view=v;simpanViewTerakhir(v);S.adminMenuOpen=false;S.chatDialog=null;S.inboxDialog=null;S.form=S.detail=S.dutyForm=null;S.financeForm=null;S.financePhoto=null;S.inventarisForm=null;S.inventarisPhoto=null;S.inventarisDetail=null;S.inventarisConfirm=null;S.inventarisPinjam=null;S.idPhoto=null;S.detailOrigin=null;S.detailReturnView=null;if(v==='pesan'){/* Masuk menu Pesan selalu menuju KOTAK MASUK (daftar percakapan pribadi pengguna yang masuk) untuk semua peran; percakapan hanya ditandai terbaca saat dibuka, bukan saat daftar ditampilkan. Direktori pengguna dimuat untuk nama/foto lawan bicara dan pemilih Pesan Baru. */S.openConversation=null;S.newChat=null;if(S.uid&&typeof loadUserDirectory==='function')loadUserDirectory().then(()=>{if(S.view==='pesan')renderDariData()})}document.body.classList.remove('open');syncAdminTheme();render()}
 $('#mn').onclick=()=>document.body.classList.add('open');
 $('#mn').replaceChildren(icon('menu',21));
 $('#st').replaceChildren(icon('settings',19));
@@ -317,9 +321,7 @@ function pulihkanViewTerakhir(){
 }
 /* Klik tulisan merek 'SHIKOKU FAMILY' di header -> kembali ke Home;
    go('landing') sekaligus menjadikan Home halaman tersimpan. Kursor
-   penunjuknya sudah diatur CSS #brand-title. Ketuk 3x rahasia pada
-   elemen yang sama mendengar 'pointerdown' (auth.js), jadi klik ini
-   tidak mengganggunya. */
+   penunjuknya sudah diatur CSS #brand-title. */
 const brandTitleEl=$('#brand-title');
 if(brandTitleEl){
   brandTitleEl.setAttribute('title','Kembali ke Home');
@@ -511,12 +513,6 @@ function aksiUsapKembali(){
   }
   /* Formulir Jadwal Piket: sama seperti tombol Batalnya. */
   if(S.view==='piket'&&S.dutyForm){S.dutyForm=null;S.dutyTaskNotice=null;S.dutyTaskConfirm=null;render();return}
-  /* Ruang rapat Meeting Video: usap kembali keluar dari ruang rapat
-     menuju daftar rapat — sama seperti tombol 'Kembali ke daftar'
-     (video Jitsi dibersihkan oleh meetKeluarRuang). */
-  if(S.view==='meeting'&&S.meetingRoom){if(typeof meetKeluarRuang==='function')meetKeluarRuang();else{S.meetingRoom=null;render()}return}
-  /* Formulir Meeting Video: sama seperti tombol Batalnya. */
-  if(S.view==='meeting'&&S.meetingForm){S.meetingForm=null;render();return}
   /* Halaman tanpa alur kembali khusus → Home. Di Home diam saja. */
   if(S.view!=='landing')go('landing');
 }

@@ -11,25 +11,17 @@ render();
   // mungkin tertinggal di peramban selalu dibersihkan dan diabaikan.
   // Selama konfigurasi Supabase ada, aplikasi SELALU memakai jalur online.
   try { localStorage.removeItem('shikoku-family:force-local'); } catch (e) {}
+  // Bersihkan sisa pintu masuk lokal lama SEKALI per perangkat — id
+  // sesi lokal tersimpan dibuang, catatan kata sandi pintu lama dan
+  // akun khusus pintu itu dihapus (lihat auth.js). Sesudah ini tidak
+  // ada sesi lokal lama yang bisa mendahului sesi Supabase.
+  try { bersihkanWarisanPintuLama(); } catch (e) { console.error('Pembersihan warisan pintu lama gagal (diabaikan):', e); }
   const supabaseReady = Boolean(window.supabase && window.SUPABASE_CONFIG?.url && window.SUPABASE_CONFIG?.anonKey);
   const hasSupabase = supabaseReady;
-  // Sesi lokal (jalan pintas admin utama perangkat ini) yang masih tersimpan
-  // dipulihkan lebih dulu, sebelum jalur online disiapkan: muat ulang
-  // halaman TIDAK mengembalikan pengguna ke pintu masuk, dan render()
-  // membuka lagi halaman terakhir yang tersimpan. Tanpa pemulihan ini,
-  // sesi lokal hanya hidup di ingatan sehingga setiap muat ulang selalu
-  // berakhir di halaman masuk. Sesi Supabase tidak disentuh jalur ini —
-  // ia hanya berjalan bila id sesi lokal memang ada di perangkat.
-  if (restoreLocalSession()) {
-    S.localMode = true;
-    S.db = createLocalDb();
-    S.authLoading = false;
-    startDataSubscriptions();
-    try { await loadPendingUsers(); } catch (e) { console.error('Daftar persetujuan lokal gagal dimuat:', e); }
-    try { await loadMessages(); } catch (e) { console.error('Pesan lokal gagal dimuat:', e); }
-    render();
-    return;
-  }
+  // SESI SUPABASE SELALU DIDAHULUKAN: sesi lokal TIDAK dipulihkan di
+  // awal pada jalur online — pemulihan sesi lokal hanya terjadi pada
+  // jalur TANPA Supabase di bawah, tidak pernah mendahului sesi
+  // Supabase yang sah.
   if (!hasSupabase) {
     // Tanpa Supabase: pakai penyimpanan lokal di perangkat (mode uji coba),
     // dengan sesi akun lokal agar alur masuk/persetujuan tetap berjalan penuh
@@ -83,7 +75,6 @@ render();
           S.members = []; S.events = []; S.topics = []; S.cleaningDuties = []; S.pins = [];
           S.keuangan = []; S.kategoriCustom = []; S.financeForm = null; S.financePhoto = null;
           S.inventaris = []; S.inventarisForm = null; S.inventarisPhoto = null; S.inventarisDetail = null; S.inventarisConfirm = null;
-          S.meeting = []; S.meetingForm = null; S.meetingConfirm = null; S.meetingRoom = null;
           S.tanya = []; S.replies = []; S.messageSignature = ''; S.unreadMessages = 0;
           S.openConversation = null; S.newChat = null; S.userDirectory = []; S.directoryLoaded = false;
           S.storageErrors = {}; S.memberMediaUrls.clear(); S.memberMediaPending.clear();

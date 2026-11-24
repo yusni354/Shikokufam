@@ -593,6 +593,69 @@ function dialogPercakapan(){
       h('button',{class:'btn chat-delete-option',onclick:()=>{S.inboxDialog={...d,tahap:'yakin'};render()}},icon('trash',17),h('span',{},'Hapus'))));
 }
 
+/* ===== Lampiran pesan PRIVAT (Pengerasan Prioritas 1) =====
+   Bucket 'message-attachments' kini PRIVAT (lihat supabase/schema.sql):
+   lampiran tidak lagi dibuka siapa pun lewat URL publik. Yang disimpan
+   pada baris pesan adalah JALUR storage-nya ('<uid>/<uuid>-<nama>');
+   saat tampil, jalur itu ditukar menjadi URL bertanda tangan berumur
+   1 jam lewat createSignedUrl — pola yang sama seperti foto anggota
+   privat di media.js, lengkap dengan cache dan penanda pending/gagal.
+   MIGRASI LAMPIRAN LAMA: baris pesan lama menyimpan URL publik lama
+   ('.../storage/v1/object/public/message-attachments/<jalur>').
+   attachmentStoragePath mengenali URL lama itu (dan URL bertanda
+   tangan lama), mengekstrak jalurnya, lalu jalur itu ditandatangani
+   dengan cara yang sama — lampiran lama tetap tampil walau bucket-nya
+   sudah privat, tanpa mengubah data pesan lama. */
+const MSG_ATTACHMENT_BUCKET='message-attachments';
+const msgAttachmentSignedUrls=new Map(),msgAttachmentSignedPending=new Set(),msgAttachmentSignedFailed=new Set();
+function attachmentStoragePath(value){
+  const raw=String(value||'').trim();
+  if(!raw)return null;
+  if(!/^https?:\/\//i.test(raw)){
+    /* Nilai baru: jalur storage polos. Data URL (mode lokal) bukan jalur. */
+    if(raw.startsWith('data:'))return null;
+    const bersih=raw.replace(/^\/+/,'');
+    if(!bersih||bersih.includes('..')||bersih.includes('\\'))return null;
+    return bersih;
+  }
+  try{
+    const url=new URL(raw);
+    const hostSah=window.SUPABASE_CONFIG&&window.SUPABASE_CONFIG.url?new URL(window.SUPABASE_CONFIG.url).hostname:'';
+    if(url.protocol!=='https:'||!hostSah||url.hostname!==hostSah)return null;
+    const penanda='/storage/v1/object/';
+    const idx=url.pathname.indexOf(penanda);
+    if(idx<0)return null;
+    const sisa=url.pathname.slice(idx+penanda.length).replace(/^(public|sign|authenticated)\//,'');
+    if(!sisa.startsWith(MSG_ATTACHMENT_BUCKET+'/'))return null;
+    let jalur=sisa.slice(MSG_ATTACHMENT_BUCKET.length+1);
+    try{jalur=decodeURIComponent(jalur)}catch(e){/* jalur apa adanya */}
+    return jalur||null;
+  }catch(e){return null}
+}
+function hydrateMessageAttachments(){
+  if(!S.supabase)return;
+  document.querySelectorAll('[data-msg-attachment]').forEach(el=>{
+    const path=el.getAttribute('data-msg-attachment');
+    if(!path)return;
+    const attr=el.tagName==='A'?'href':'src';
+    const cache=msgAttachmentSignedUrls.get(path);
+    if(cache&&cache.expiresAt>Date.now()+30000){el.setAttribute(attr,cache.url);return}
+    if(el.getAttribute(attr))return;
+    if(msgAttachmentSignedPending.has(path)||msgAttachmentSignedFailed.has(path))return;
+    msgAttachmentSignedPending.add(path);
+    S.supabase.storage.from(MSG_ATTACHMENT_BUCKET).createSignedUrl(path,3600).then(({data,error})=>{
+      if(error)throw error;
+      if(!data||!data.signedUrl)throw new Error('URL bertanda tangan tidak tersedia');
+      msgAttachmentSignedUrls.set(path,{url:data.signedUrl,expiresAt:Date.now()+3600000});
+      document.querySelectorAll('[data-msg-attachment]').forEach(current=>{
+        if(current.getAttribute('data-msg-attachment')===path)current.setAttribute(current.tagName==='A'?'href':'src',data.signedUrl);
+      });
+    }).catch(error=>{
+      msgAttachmentSignedFailed.add(path);
+      console.error('Lampiran pesan privat gagal dimuat:',error);
+    }).finally(()=>{msgAttachmentSignedPending.delete(path)});
+  });
+}
 async function uploadMessageFiles(files){
   if(!files.length)return [];
   if(!S.supabase){
@@ -610,8 +673,11 @@ async function uploadMessageFiles(files){
     const path=S.uid+'/'+crypto.randomUUID()+'-'+safeName;
     const {error}=await S.supabase.storage.from('message-attachments').upload(path,file,{contentType:file.type||'application/octet-stream'});
     if(error)throw error;
-    const {data}=S.supabase.storage.from('message-attachments').getPublicUrl(path);
-    uploaded.push({url:data.publicUrl,name:file.name,type:file.type||'application/octet-stream'});
+    /* Yang disimpan BUKAN URL publik (bucket kini privat, Prioritas 1):
+       cukup JALUR storage-nya di field url. Saat tampil, jalur ini
+       ditukar URL bertanda tangan oleh attachmentView +
+       hydrateMessageAttachments — konsisten untuk semua pembaca. */
+    uploaded.push({url:path,name:file.name,type:file.type||'application/octet-stream'});
   }
   return uploaded;
 }
@@ -627,7 +693,36 @@ function safeAttachmentUrl(value){
   }catch(error){return ''}
 }
 function attachmentView(attachment){
-  const url=safeAttachmentUrl(attachment?.url);
+  if(!attachment)return null;
+  const mentah=String(attachment.url||attachment.path||'');
+  /* Jalur utama (Prioritas 1): lampiran milik bucket pesan — nilai baru
+     berupa jalur polos maupun URL publik lama — ditampilkan lewat URL
+     bertanda tangan. Elemen membawa data-msg-attachment=<jalur>; alamat
+     siap pakai diisi dari cache bila sudah ada, selain itu diisi oleh
+     hydrateMessageAttachments() sesudah elemen terpasang (pola yang
+     sama seperti media privat anggota di media.js). */
+  const path=S.supabase?attachmentStoragePath(mentah):null;
+  if(path){
+    const cache=msgAttachmentSignedUrls.get(path);
+    const siap=cache&&cache.expiresAt>Date.now()+30000?cache.url:'';
+    if(attachment.type&&attachment.type.startsWith('image/')){
+      const imgAttrs={'data-msg-attachment':path,alt:attachment.name||'Gambar lampiran',class:'chat-image'};
+      const aAttrs={'data-msg-attachment':path,target:'_blank',rel:'noopener noreferrer'};
+      if(siap){imgAttrs.src=siap;aAttrs.href=siap}
+      return h('a',aAttrs,h('img',imgAttrs));
+    }
+    if(attachment.type&&attachment.type.startsWith('audio/')){
+      const auAttrs={controls:true,'data-msg-attachment':path};
+      if(siap)auAttrs.src=siap;
+      return h('audio',auAttrs);
+    }
+    const fAttrs={'data-msg-attachment':path,target:'_blank',rel:'noopener noreferrer',class:'chat-file'};
+    if(siap)fAttrs.href=siap;
+    return h('a',fAttrs,icon('attachment',16),h('span',{},attachment.name||'Buka lampiran'));
+  }
+  /* Cadangan: lampiran tertanam mode lokal (data URL) dan nilai lama
+     yang bukan jalur bucket ini — tetap lewat penjaga safeAttachmentUrl. */
+  const url=safeAttachmentUrl(mentah);
   if(!url)return null;
   if(attachment.type?.startsWith('image/'))return h('a',{href:url,target:'_blank',rel:'noopener noreferrer'},h('img',{src:url,alt:attachment.name||'Gambar lampiran',class:'chat-image'}));
   if(attachment.type?.startsWith('audio/'))return h('audio',{controls:true,src:url});

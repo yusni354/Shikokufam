@@ -2,6 +2,13 @@
 <html lang="id">
 <head>
 <meta charset="utf-8">
+<!-- Keamanan dari pihak luar (CSP): hanya asal yang benar-benar dipakai
+     aplikasi yang diizinkan — skrip hanya dari berkas sendiri dan jsDelivr
+     (pustaka terkunci SRI); data hanya
+     ke/dari Supabase proyek ini, ubin peta Esri/GSI/OSM, geocoding
+     Nominatim/GSI/HeartRails, dan font Google.
+     Skrip & gaya sebaris dari luar daftar ini ditolak peramban. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https://*.supabase.co https://*.arcgisonline.com https://cyberjapandata.gsi.go.jp https://tile.openstreetmap.org https://*.googleusercontent.com; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' data: blob: https://*.supabase.co wss://*.supabase.co https://nominatim.openstreetmap.org https://msearch.gsi.go.jp https://geoapi.heartrails.com; media-src 'self' data: blob: https://*.supabase.co; frame-src 'self'; worker-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="description" content="Shikoku Family adalah komunitas Indonesia di Shikoku, Jepang untuk saling terhubung, berbagi informasi, dan bertumbuh bersama.">
 <meta name="theme-color" content="#2f86b8">
@@ -19,7 +26,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://uwshronrpfkypkjqewgw.supabase.co">
 <link href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css?v=20270502">
+<link rel="stylesheet" href="assets/style.css?v=20270506">
 </head>
 <body class="auth-locked">
 <div id="ov"></div>
@@ -28,12 +35,15 @@
 <main id="app"></main>
 <noscript><p style="padding:24px;text-align:center">Aplikasi ini memerlukan JavaScript. Aktifkan JavaScript di browser Anda.</p></noscript>
 
-<!-- Library (versi dikunci supaya tidak berubah sendiri) -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
+<!-- Library (versi dikunci supaya tidak berubah sendiri). Atribut
+     integrity (SRI, SHA-384 dari berkas versi yang persis ini) membuat
+     peramban MENOLAK skrip CDN yang isinya berubah/dipalsukan. -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js" integrity="sha384-0w2KAL2YHP6wKOkUDzkCDGgVvfmHnj02DHeQ6XcHOgTfFsGyonKOpShMH1x6nk9o" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js" integrity="sha384-8FWZA6BGMXhsfO+BLtrJK0We6gg5o1JyO8xQm6peWDEUs17ACA5ziE/NIAkl9z2k" crossorigin="anonymous"></script>
 <!-- Cadangan lokal pustaka QR yang sama (1.4.4): hanya disuntikkan bila
-     CDN di atas gagal, supaya muatan awal tidak selalu memikulnya -->
-<script>if(!window.qrcode){var s=document.createElement('script');s.src='assets/js/qrcode-fallback.js';document.head.appendChild(s)}</script>
+     CDN di atas gagal, supaya muatan awal tidak selalu memikulnya.
+     Logikanya di berkas terpisah agar CSP melarang skrip sebaris. -->
+<script src="assets/js/qrcode-fallback-loader.js?v=20270505"></script>
 <!-- Leaflet untuk halaman Peta & Wilayah TIDAK dimuat di sini: berkas
      lokalnya disuntikkan malas oleh petaMuatLeaflet() di assets/js/map.js
      saat halaman Peta / panel pin formulir pertama kali dibuka -->
@@ -42,28 +52,27 @@
 <script src="assets/config.js"></script>
 
 <!-- Kode aplikasi: URUTAN PENTING, jangan ditukar -->
-<script src="assets/js/state.js?v=20270502"></script>
-<script src="assets/js/dom.js?v=20270502"></script>
-<script src="assets/js/constants.js?v=20270502"></script>
+<script src="assets/js/state.js?v=20270506"></script>
+<script src="assets/js/dom.js?v=20270506"></script>
+<script src="assets/js/constants.js?v=20270506"></script>
 <script src="assets/js/pilihan.js?v=20261223"></script>
-<script src="assets/js/shell.js?v=20270502"></script>
+<script src="assets/js/shell.js?v=20270506"></script>
 <script src="assets/js/member-utils.js?v=20270328"></script>
 <script src="assets/js/db.js?v=20270502"></script>
 <script src="assets/js/media.js?v=20270202"></script>
-<script src="assets/js/messages.js?v=20270403"></script>
-<script src="assets/js/auth.js?v=20270421"></script>
+<script src="assets/js/messages.js?v=20270503"></script>
+<script src="assets/js/auth.js?v=20270504"></script>
 <script src="assets/js/activities.js?v=20270406"></script>
 <script src="assets/js/home.js?v=20270329"></script>
 <script src="assets/js/members.js?v=20270428"></script>
 <script src="assets/js/finance.js?v=20261219"></script>
 <script src="assets/js/inventaris.js?v=20261125"></script>
-<script src="assets/js/meeting.js?v=20270502"></script>
 <script src="assets/js/duties-forum.js?v=20261124"></script>
 <script src="assets/js/map.js?v=20270429"></script>
 <script src="assets/js/musyawarah.js?v=20261218"></script>
-<script src="assets/js/views.js?v=20270502"></script>
+<script src="assets/js/views.js?v=20270506"></script>
 <script src="assets/js/mascot.js?v=20270120"></script>
 <script src="assets/js/install.js?v=20261221"></script>
-<script src="assets/js/main.js?v=20270502"></script>
+<script src="assets/js/main.js?v=20270506"></script>
 </body>
 </html>

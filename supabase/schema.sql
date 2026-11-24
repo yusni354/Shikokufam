@@ -146,7 +146,9 @@ as $$
 $$;
 
 revoke all on function public.is_admin() from public;
-grant execute on function public.is_admin() to anon, authenticated;
+-- Pengerasan pihak luar: fungsi pemeriksa peran TIDAK dibuka untuk
+-- anon — orang tanpa akun tidak perlu bisa memanggilnya sama sekali.
+grant execute on function public.is_admin() to authenticated;
 
 create or replace function public.is_main_admin()
 returns boolean
@@ -165,7 +167,7 @@ as $$
 $$;
 
 revoke all on function public.is_main_admin() from public;
-grant execute on function public.is_main_admin() to anon, authenticated;
+grant execute on function public.is_main_admin() to authenticated;
 
 create or replace function public.handle_new_user()
 returns trigger
@@ -240,10 +242,15 @@ create table if not exists public.map_settings (
 
 alter table public.map_settings enable row level security;
 
+-- Pengerasan pihak luar: pengaturan peta TIDAK lagi bisa dibaca anon.
+-- Aplikasi hanya membacanya sesudah pengguna masuk, jadi bacanya khusus
+-- pengguna terautentikasi (akses authenticated tidak diubah dari
+-- sebelumnya — yang dicabut hanya anon).
 drop policy if exists "Anyone can read map settings" on public.map_settings;
-create policy "Anyone can read map settings"
+drop policy if exists "Authenticated users can read map settings" on public.map_settings;
+create policy "Authenticated users can read map settings"
   on public.map_settings for select
-  to anon, authenticated
+  to authenticated
   using (true);
 
 drop policy if exists "Admins can create map settings" on public.map_settings;
@@ -341,7 +348,11 @@ create policy "Message participants can delete messages"
   );
 
 grant usage on schema public to anon, authenticated;
-grant select on public.map_settings to anon, authenticated;
+-- Izin baca tabel untuk anon dicabut (lihat kebijakan map_settings di
+-- atas); revoke eksplisit di bagian PERBAIKAN KEAMANAN menutup sisa
+-- izin lama pada database yang sudah berjalan.
+grant select on public.map_settings to authenticated;
+revoke select on public.map_settings from anon;
 grant insert, update, delete on public.map_settings to authenticated;
 grant insert on public.messages to authenticated;
 revoke insert on public.messages from anon;
@@ -353,9 +364,15 @@ grant select, insert, update, delete on public.message_replies to authenticated;
 
 alter table public.message_replies enable row level security;
 
+-- PENGERASAN PRIORITAS 1: bucket lampiran pesan kini PRIVAT (public=false).
+-- Dulu bucket ini publik dan bisa dibaca anonim oleh siapa pun yang
+-- memegang tautannya. Sekarang lampiran hanya tampil lewat URL bertanda
+-- tangan (createSignedUrl di aplikasi, pola yang sama seperti bucket
+-- member-files). Menjalankan ulang berkas ini di proyek yang bucket-nya
+-- terlanjur publik akan memprivatkannya (on conflict set public=false).
 insert into storage.buckets (id, name, public)
-values ('message-attachments', 'message-attachments', true)
-on conflict (id) do update set public = true;
+values ('message-attachments', 'message-attachments', false)
+on conflict (id) do update set public = false;
 
 drop policy if exists "Message participants can upload attachments" on storage.objects;
 create policy "Message participants can upload attachments"
@@ -366,11 +383,12 @@ create policy "Message participants can upload attachments"
     and (storage.foldername(name))[1] = (select auth.uid())::text
   );
 
+-- Kebijakan baca ANONIM lama dicabut di sini. Kebijakan baca penggantinya
+-- ("Approved members can read message attachments", khusus pengguna masuk
+-- yang disetujui — pola member-files) dibuat di bagian PERBAIKAN
+-- KEAMANAN di bawah, karena ia memakai public.is_approved_member() yang
+-- baru didefinisikan sesudah bagian ini.
 drop policy if exists "Anyone can read message attachments" on storage.objects;
-create policy "Anyone can read message attachments"
-  on storage.objects for select
-  to anon, authenticated
-  using (bucket_id = 'message-attachments');
 
 drop policy if exists "Owners can delete message attachments" on storage.objects;
 create policy "Owners can delete message attachments"
@@ -678,6 +696,33 @@ create policy "Approved members can read the user directory"
 drop policy if exists "Members can upload their own photo" on storage.objects;
 drop policy if exists "Anyone can read member files" on storage.objects;
 drop policy if exists "Owners can delete their member files" on storage.objects;
+
+-- PENGERASAN PRIORITAS 1: baca lampiran pesan hanya untuk pengguna yang
+-- MASUK dan sudah DISETUJUI — pola yang sama persis seperti bucket
+-- member-files di atas. Tidak ada lagi akses anon ke lampiran pesan;
+-- aplikasi menampilkannya lewat URL bertanda tangan (createSignedUrl).
+drop policy if exists "Anyone can read message attachments" on storage.objects;
+drop policy if exists "Approved members can read message attachments" on storage.objects;
+create policy "Approved members can read message attachments"
+  on storage.objects for select
+  to authenticated
+  using (
+    bucket_id = 'message-attachments'
+    and public.is_approved_member()
+  );
+
+-- PENGERASAN PIHAK LUAR (keputusan pemilik: aplikasi hanya untuk tim;
+-- keterbukaan ANTAR anggota yang disetujui dibiarkan seperti sekarang —
+-- yang ditutup hanya akses orang TANPA akun disetujui / anonim):
+-- cabut sisa izin peran anon yang mungkin masih ada pada database yang
+-- sudah berjalan dari skema versi lama. Sesudah bagian ini, anon tidak
+-- memegang izin atas tabel, storage, maupun fungsi pemeriksa peran apa
+-- pun; kedua bucket storage privat (public=false, lihat di atas) dan
+-- semua kebijakan tabel/storage hanya untuk authenticated. Izin
+-- authenticated TIDAK diubah sama sekali oleh bagian ini.
+revoke select on public.map_settings from anon;
+revoke execute on function public.is_admin() from anon;
+revoke execute on function public.is_main_admin() from anon;
 
 -- Tabel kunjungan situs dari versi lama tidak dipakai lagi oleh aplikasi.
 -- Datanya TIDAK dihapus otomatis. Bila yakin tidak perlu, jalankan manual:

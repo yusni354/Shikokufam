@@ -12,7 +12,6 @@ const V={
   musyawarah:musyawarahView,
   keuangan:vKeuangan,
   inventaris:vInventaris,
-  meeting:vMeeting,
   susunan:vSusunan,
   pengaturan:vPengaturan,
   approvals:vApprovals
@@ -93,7 +92,7 @@ function renderDrawer(){
 function setAuthLocked(locked){
   document.body.classList.toggle('auth-locked',!!locked);
   /* Kunci satu-jendela halaman Peta tidak berlaku di layar terkunci */
-  if(locked)document.body.classList.remove('peta-view','profil-view','meeting-room-view');
+  if(locked)document.body.classList.remove('peta-view','profil-view');
   if(locked){
     document.body.classList.remove('open');
     const qm=document.querySelector('#qm');if(qm)qm.remove();
@@ -154,7 +153,7 @@ function render(){
     setAuthLocked(true);
     $('#dr').replaceChildren();
     $('#app').replaceChildren(h('div',{class:'landing'},h('section',{class:'hero'},
-      h('p',{style:'font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-bottom:10px',onclick:()=>handleBrandTap()},'SHIKOKU FAMILY'),
+      h('p',{style:'font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-bottom:10px'},'SHIKOKU FAMILY'),
       h('h1',{},'Selamat datang!'),
       accountForm()
     )));
@@ -200,10 +199,6 @@ function render(){
      menjadi grid lebar penuh setinggi layar). Di HP kelas ini tidak
      berpengaruh sama sekali. */
   document.body.classList.toggle('profil-view',S.view==='members'&&!!S.detail&&!S.form);
-  /* Ruang rapat Meeting Video = SATU JENDELA: kelas 'meeting-room-view'
-     mengunci tinggi halaman setinggi layar supaya video Jitsi mengisi
-     area utama di bawah header tanpa terpotong (lihat style.css). */
-  document.body.classList.toggle('meeting-room-view',S.view==='meeting'&&!!S.meetingRoom);
   const content=[];
   const storageErrors=Object.values(S.storageErrors||{});
   if(storageErrors.length)content.push(h('p',{class:'warn storage-warning'},'Database bersama tidak dapat dibaca: '+storageErrors.join(' · ')+' Jalankan pembaruan skema Supabase, lalu muat ulang aplikasi.'));
@@ -213,6 +208,9 @@ function render(){
   $('#app').replaceChildren(...content);
   hydrateMemberQrCodes();
   hydrateMemberMedia();
+  /* Lampiran pesan privat (Prioritas 1): isi alamat bertanda tangan pada
+     elemen lampiran yang baru digambar (messages.js). */
+  if(typeof hydrateMessageAttachments==='function')hydrateMessageAttachments();
   /* Bingkai wajah otomatis KHUSUS foto Kartu ID: foto lama yang wajahnya
      kecil di dalam bingkai dibingkai ulang ke wajah + leher dari hasil
      deteksi wajah (tersimpan di cache per foto); tanpa dukungan deteksi
@@ -224,9 +222,6 @@ function render(){
   /* Panel 'Letakkan Pin di Peta' di formulir anggota: bangun petanya
      sesudah DOM formulir terpasang, bersihkan bila panel ditutup. */
   if(typeof initFormPinMap==='function')initFormPinMap();
-  /* Ruang rapat Meeting Video: pasang video Jitsi sesudah DOM ruang
-     rapat terpasang; bersihkan bila ruang ditutup (meeting.js). */
-  if(typeof initMeetingRoom==='function')initMeetingRoom();
 }
 function sub(name,key){
   return S.db.collection(name).onSnapshot(s=>{
@@ -242,12 +237,6 @@ function sub(name,key){
       /* Buku catatan Musyawarah mengelola tampilannya sendiri saat terbuka:
          data baru digabungkan tanpa menggambar ulang editor yang sedang dipakai. */
       if(key==='musyawarah'&&window.__musyAlive&&typeof window.__musyOnRemote==='function')window.__musyOnRemote();
-      /* Di dalam ruang rapat Meeting Video, data 'meeting' tetap
-         diperbarui di S.meeting tetapi tampilan TIDAK digambar ulang:
-         menggambar ulang akan menghancurkan iframe Jitsi dan memutus
-         video yang sedang berjalan. Status terbaru tampil saat
-         pengguna kembali ke daftar rapat. */
-      else if(key==='meeting'&&S.view==='meeting'&&S.meetingRoom){/* video sedang berjalan: jangan gambar ulang */}
       else renderDariData();
     }
   },error=>{
@@ -281,7 +270,6 @@ function startDataSubscriptions(){
   add(()=>sub('musyawarah','musyawarah'));
   add(()=>sub('keuangan','keuangan'));
   add(()=>sub('inventaris','inventaris'));
-  add(()=>sub('meeting','meeting'));
   add(()=>subscribePilihan());
   if(!S.supabase)add(()=>sub('pengaturan','pengaturan'));
   add(()=>subscribeSambutan());
