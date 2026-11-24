@@ -2391,3 +2391,13 @@ select.inv-in{-webkit-appearance:none;appearance:none;padding-right:14px;backgro
    bingkai foto lain tidak terpengaruh. */
 .member-id-photo-frame .member-id-photo.face-framed{position:absolute;max-width:none;max-height:none}
 
+
+/* ===== Kata judul animasi (GSAP, assets/js/animasi.js) =====
+   Span per kata hasil pemecahan judul: tampil sebaris mengikuti teks
+   aslinya. TIDAK ada keadaan awal tersembunyi di sini — keadaan awal
+   (opacity/geser) selalu dipasang GSAP lewat JS, jadi tanpa JS
+   animasi judul tampil utuh seperti biasa. */
+.anim-kata{display:inline-block;will-change:transform,opacity}
+@media (prefers-reduced-motion: reduce){
+  .anim-kata{will-change:auto}
+}

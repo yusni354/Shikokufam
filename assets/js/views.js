@@ -216,6 +216,11 @@ function render(){
      deteksi wajah (tersimpan di cache per foto); tanpa dukungan deteksi
      bingkai zoom bawaan CSS tetap dipakai. */
   if(typeof hydrateMemberIdFaceFraming==='function')hydrateMemberIdFaceFraming();
+  /* Animasi hidup (GSAP judul per kata, Motion kartu, Lenis desktop):
+     dipicu sesudah DOM halaman terpasang; modulnya memuat pustakanya
+     sendiri secara malas dan diam sepenuhnya bila pustaka gagal atau
+     pengguna memilih gerak dikurangi (lihat assets/js/animasi.js). */
+  if(typeof animasikanHalaman==='function')animasikanHalaman();
   /* Halaman Peta: bangun peta Leaflet sesudah DOM terpasang (dijaga di
      dalam initPetaMap sendiri supaya kegagalan peta tidak merusak render) */
   if(typeof initPetaMap==='function')initPetaMap();
