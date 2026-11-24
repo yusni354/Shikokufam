@@ -1327,7 +1327,8 @@ function vPeta(){
      MELAYANG di sudut kanan atas peta; pemberitahuan sesaat (mode
      Perbaiki, progres geocoding, peta cadangan) melayang di sudut
      kiri bawah peta — tidak ada baris teks yang menyisakan celah.
-     Atribusi tetap tampil menyatu di dalam peta (kontrol Leaflet). */
+     Kontrol atribusi Leaflet dimatikan (attributionControl:false +
+     CSS) atas permintaan pengguna, jadi pojok peta bersih. */
   const styleItem=key=>{const st=PETA_STYLES[key];return h('button',{type:'button',class:'peta-style-item'+(PM.style===key?' on':''),'data-style':key,role:'menuitemradio','aria-checked':PM.style===key?'true':'false'},
     h('span',{class:'peta-style-item-main'},h('b',{},st.label),h('small',{},st.desc)),
     h('span',{class:'peta-style-check','aria-hidden':'true'},icon('check',14)))};
@@ -1414,7 +1415,7 @@ function initPetaMap(){
       });
       return;
     }
-    PM.map=L.map(el,{scrollWheelZoom:true}).setView([33.9,133.7],window.innerWidth<640?7:8);
+    PM.map=L.map(el,{scrollWheelZoom:true,attributionControl:false}).setView([33.9,133.7],window.innerWidth<640?7:8);
     PM.layer=L.layerGroup().addTo(PM.map);
     PM.spiderLayer=L.layerGroup().addTo(PM.map);
     PM.map.on('zoomstart',()=>petaSpiderCollapse());
@@ -1527,7 +1528,7 @@ function initFormPinMap(){
     /* Titik mulai panel: pilihan sementara sesi ini (bila panel dibuka
        lagi tanpa menyimpan) didahulukan, lalu titik awal terbaik. */
     const mulai=(Array.isArray(S.formPinTemp)&&S.formPinTemp.length===2)?S.formPinTemp:(pinManualCoords(f)||awal.coords);
-    FP.map=L.map(el,{scrollWheelZoom:true}).setView(awal.coords,awal.zoom);
+    FP.map=L.map(el,{scrollWheelZoom:true,attributionControl:false}).setView(awal.coords,awal.zoom);
     formPinTryBasemap(0);
     FP.map.on('click',ev=>{formPinSetMarker([ev.latlng.lat,ev.latlng.lng])});
     const punyaTitik=!!(pinManualCoords(f)||(Array.isArray(S.formPinTemp)&&S.formPinTemp.length===2)||formPinTitikAwal(f).zoom>8);
