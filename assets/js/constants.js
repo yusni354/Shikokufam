@@ -1,6 +1,6 @@
 /* Daftar wilayah, menu, prefektur, provinsi, dan aturan pengenal lokasi Jepang */
 const WILAYAH=[['Tokushima','#d95763'],['Takamatsu','#3985c6'],['Marugame','#e28b36'],['Zentsuji / Takuma','#8e68b5'],['Kochi','#24947e'],['Matsuyama','#d45e9f'],['Ehime','#6f9e3b'],['Niihama','#6073c4'],['Imazo','#4f772d']];
-const ALL=[['landing','Home','','','home'],['members','Daftar Anggota','','','users'],['kegiatan','Kegiatan','','','calendar'],['ringkasan','Ringkasan & Laporan','','','chart'],['piket','Jadwal Piket','','','brush'],['peta','Peta & Wilayah','','','map'],['musyawarah','Musyawarah','','','meeting'],['keuangan','Laporan Keuangan','','','wallet'],['inventaris','Inventari Benda SB','','','box'],['susunan','Kepengurusan','','','team'],['pesan','Pesan Masuk','','','inbox']];
+const ALL=[['landing','Home','','','home'],['members','Daftar Anggota','','','users'],['kegiatan','Kegiatan','','','calendar'],['ringkasan','Ringkasan & Laporan','','','chart'],['piket','Jadwal Piket','','','brush'],['peta','Peta & Wilayah','','','map'],['musyawarah','Musyawarah','','','meeting'],['keuangan','Laporan Keuangan','','','wallet'],['inventaris','Inventari Benda SB','','','box'],['meeting','Meeting Video','','','video'],['susunan','Kepengurusan','','','team'],['pesan','Pesan Masuk','','','inbox']];
 const ADMIN_MENU=[['pengaturan','Pengaturan','settings'],['approvals','Persetujuan Akun','users']];
 
 const PREF=['Tokushima','Kagawa','Ehime','Kochi','Okayama'];
