@@ -810,24 +810,41 @@ function petaInisial(nama){const p=String(nama||'?').trim().split(/\s+/);return 
    mengembalikan ubin placeholder bertuliskan "API KEY REQUIRED"
    dengan status HTTP sukses, jadi ubin watermark itu lolos deteksi
    tileerror/timeout dan peta tampil coretan.
+   SEMUA LABEL ROMAJI: atas permintaan pengguna, tidak ada gaya yang
+   menampilkan aksara Jepang (kanji/kana) pada label tempatnya —
+   jadi sumber yang hanya berlabel Jepang diganti padanan Latin
+   terdekat: 'Terang' yang dulu OpenStreetMap standar (label bahasa
+   setempat = Jepang di Jepang) kini Esri Light Gray Canvas;
+   'Jepang Detail' memakai GSI edisi Inggris (english) yang resmi —
+   terverifikasi memuat label romaji ("Takamatsu", "Megijima Is."),
+   dengan batas jujur ubin aslinya hanya sampai zoom 11
+   (maxNativeZoom 11; zoom lebih besar memperbesar ubin zoom 11);
+   'Topografi' yang dulu OpenTopoMap (label setempat) kini Esri
+   World Topo Map; 'Kereta' yang dulu GSI Pale + OpenRailwayMap
+   (keduanya berlabel Jepang) kini dasar pucat Esri Light Gray +
+   lapisan referensi transportasi & tempat Esri yang romaji.
    url+opts = lapisan dasar gaya itu (dipakai juga oleh peta kecil
    formulir pin); overlays = lapisan transparan tambahan di atasnya
    (label satelit / jalur kereta). Catatan jujur: lapisan referensi
    Esri untuk wilayah Jepang hanya berisi sampai zoom ±12, jadi pada
-   'Satelit + Label' lapisannya dipasang maxNativeZoom 12 — label
-   tetap tampil saat peta diperbesar, digambar dari ubin zoom 12. */
+   'Satelit + Label' dan 'Kereta' lapisannya dipasang maxNativeZoom
+   12 — label tetap tampil saat peta diperbesar, digambar dari ubin
+   zoom 12. */
 const PETA_STYLES={
   jalan:{label:'Jalan',desc:'Peta jalan umum',name:'Esri World Street Map',url:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',opts:{maxZoom:19,attribution:'Tiles &copy; Esri'},overlays:[]},
-  terang:{label:'Terang',desc:'OpenStreetMap — stasiun, toko & fasilitas lengkap',name:'OpenStreetMap',url:'https://tile.openstreetmap.org/{z}/{x}/{y}.png',opts:{maxZoom:19,attribution:'&copy; OpenStreetMap contributors'},overlays:[]},
-  jepang:{label:'Jepang Detail',desc:'GSI Jepang — kereta, stasiun & nama tempat paling rinci',name:'Peta GSI Jepang',url:'https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png',opts:{maxZoom:19,maxNativeZoom:18,attribution:'&copy; GSI — Geospatial Information Authority of Japan'},overlays:[]},
+  terang:{label:'Terang',desc:'Peta terang minimalis — label huruf romaji',name:'Esri Light Gray Canvas',url:'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',opts:{maxZoom:19,attribution:'Tiles &copy; Esri'},overlays:[
+    {url:'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}',opts:{maxZoom:19,attribution:'Tiles &copy; Esri'}}
+  ]},
+  jepang:{label:'Jepang Detail',desc:'GSI Jepang edisi Inggris — nama tempat rinci huruf romaji',name:'GSI English (Jepang edisi Inggris)',url:'https://cyberjapandata.gsi.go.jp/xyz/english/{z}/{x}/{y}.png',opts:{maxZoom:19,maxNativeZoom:11,attribution:'&copy; GSI — Geospatial Information Authority of Japan'},overlays:[]},
   satelit:{label:'Satelit',desc:'Citra satelit / foto udara',name:'Esri World Imagery',url:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',opts:{maxZoom:19,attribution:'Tiles &copy; Esri — Source: Esri, Maxar, Earthstar Geographics'},overlays:[]},
   satelitlabel:{label:'Satelit + Label',desc:'Satelit dengan nama tempat, jalan & jalur kereta',name:'Esri World Imagery + Label',url:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',opts:{maxZoom:19,attribution:'Tiles &copy; Esri — Source: Esri, Maxar, Earthstar Geographics'},overlays:[
     {url:'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}',opts:{maxZoom:19,maxNativeZoom:12,attribution:'Tiles &copy; Esri'}},
     {url:'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',opts:{maxZoom:19,maxNativeZoom:12,attribution:'Tiles &copy; Esri'}}
   ]},
-  topo:{label:'Topografi',desc:'Kontur, jalur kereta & stasiun',name:'OpenTopoMap',url:'https://a.tile.opentopomap.org/{z}/{x}/{y}.png',opts:{maxZoom:19,maxNativeZoom:17,attribution:'&copy; OpenStreetMap contributors, SRTM | style: &copy; OpenTopoMap (CC-BY-SA)'},overlays:[]},
-  kereta:{label:'Kereta',desc:'Jalur kereta & stasiun menonjol di atas peta pucat',name:'GSI Pale + OpenRailwayMap',url:'https://cyberjapandata.gsi.go.jp/xyz/pale/{z}/{x}/{y}.png',opts:{maxZoom:19,maxNativeZoom:18,attribution:'&copy; GSI — Geospatial Information Authority of Japan'},overlays:[
-    {url:'https://tiles.openrailwaymap.org/standard/{z}/{x}/{y}.png',opts:{maxZoom:19,attribution:'&copy; OpenStreetMap contributors | &copy; OpenRailwayMap'}}
+  topo:{label:'Topografi',desc:'Kontur, jalur kereta & stasiun — label romaji',name:'Esri World Topo Map',url:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',opts:{maxZoom:19,attribution:'Tiles &copy; Esri'},overlays:[]},
+  kereta:{label:'Kereta',desc:'Jalur kereta & stasiun menonjol di atas peta pucat — label romaji',name:'Esri Light Gray + Transportasi',url:'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',opts:{maxZoom:19,attribution:'Tiles &copy; Esri'},overlays:[
+    {url:'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}',opts:{maxZoom:19,maxNativeZoom:12,attribution:'Tiles &copy; Esri'}},
+    {url:'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',opts:{maxZoom:19,maxNativeZoom:12,attribution:'Tiles &copy; Esri'}}
   ]}
 };
 /* Urutan tampil di menu dropdown: dari yang umum ke yang khusus. */
@@ -942,30 +959,38 @@ function petaIcon(en,selected){
   const c=regionColor(en.region);
   return L.divIcon({className:'peta-pin-wrap'+(selected?' peta-pin-selected':''),html:'<div class="peta-pin"><div class="peta-pin-body" style="background:'+c+'"></div></div>',iconSize:[30,38],iconAnchor:[15,36],popupAnchor:[0,-34]});
 }
-/* Isi popup pin sebagai elemen DOM (bukan teks HTML) supaya tombol
-   admin di dalamnya — Perbaiki Posisi & Kembalikan Otomatis — bisa
-   diberi penangan ketuk langsung. Popup menampilkan keterangan sumber
-   posisi: 'Posisi manual' atau 'Otomatis dari alamat'. */
+/* Isi popup pin: KARTU ANGGOTA RINGKAS yang melayang tepat di atas
+   pin — popup Leaflet terikat pada penanda, jadi kartu tetap
+   menempel di atas pinnya saat peta digeser/di-zoom — sama di HP
+   dan desktop (menggantikan popup keterangan lama). Isinya: foto
+   anggota, nama, lencana wilayah berwarna, dan kota/alamat
+   ringkas. Mengetuk kartu (atau Enter/Spasi saat kartunya
+   terfokus) membuka detail/Kartu ID anggota itu, sama seperti
+   membuka anggota dari daftar. Tanpa tombol X: kartu tertutup
+   saat pin lain diketuk (kartu berpindah ke pin itu), saat area
+   peta kosong diketuk, atau saat detail anggota dibuka. Tombol
+   admin lama di popup (Perbaiki Posisi / Kembalikan Otomatis)
+   tidak lagi di sini: mode Perbaiki Posisi Pin tetap masuk dari
+   tombol di bilah bawah, dan selama mode itu aktif kartu ini
+   tidak dibuka sama sekali (lihat petaShowDetail). */
 function petaPopupContent(en){
   const m=en.m;
-  const anak=[
-    h('div',{class:'peta-pop-name'},m.nama||'Tanpa nama'),
-    h('span',{class:'peta-pop-badge',style:'background:'+regionColor(en.region)},en.region),
-    h('div',{class:'peta-pop-addr'},
-      [m.kota,m.pref].filter(Boolean).join(', '),
-      h('br'),alamatJp(m,false),
-      m.stasiun?h('span',{},h('br'),'Stasiun terdekat: '+m.stasiun):null,
-      h('br'),'Sumber posisi: ',h('b',{},petaSumberLabel(en)),
-      en.manual?h('span',{},h('br'),'Koordinat: '+en.coords[0].toFixed(5)+', '+en.coords[1].toFixed(5)):h('span',{},h('br'),'Ketepatan pin: '+(en.lvl||'Kode pos')))
-  ];
-  if(S.admin){
-    const tombol=[
-      h('button',{type:'button',class:'btn s',onclick:ev=>{ev.stopPropagation();petaMulaiPerbaiki(en)}},S.petaFixMode?'Geser pin ini di peta':'Perbaiki Posisi')
-    ];
-    if(en.manual)tombol.push(h('button',{type:'button',class:'btn s',onclick:ev=>{ev.stopPropagation();petaKembalikanOtomatis(en)}},'Kembalikan Otomatis'));
-    anak.push(h('div',{class:'peta-pop-actions'},...tombol));
-  }
-  return h('div',{class:'peta-pop'},...anak);
+  const foto=m.foto
+    ?h('img',{class:'peta-card-foto',alt:'Foto '+(m.nama||'anggota'),...memberMediaAttributes(m.foto,'src')})
+    :h('span',{class:'peta-card-foto peta-card-inisial','aria-hidden':'true',style:'background:'+regionColor(en.region)},petaInisial(m.nama));
+  const kartu=h('div',{class:'peta-pin-card',role:'button',tabindex:'0',title:'Lihat kartu anggota '+(m.nama||''),'aria-label':'Lihat kartu anggota '+(m.nama||'anggota')},
+    foto,
+    h('div',{class:'peta-card-isi'},
+      h('div',{class:'peta-card-nama'},m.nama||'Tanpa nama'),
+      h('span',{class:'peta-pop-badge',style:'background:'+regionColor(en.region)},en.region),
+      h('div',{class:'peta-card-alamat'},alamatJp(m,false))));
+  const bukaDetail=()=>{
+    if(PM.map&&PM.map.closePopup)PM.map.closePopup();
+    if(typeof openMember==='function')openMember(m);
+  };
+  kartu.addEventListener('click',bukaDetail);
+  kartu.addEventListener('keydown',ev=>{if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();bukaDetail()}});
+  return kartu;
 }
 /* Aktifkan mode Perbaiki Posisi Pin dan arahkan ke pin anggota ini. */
 function petaMulaiPerbaiki(en){
@@ -1163,40 +1188,67 @@ function petaSpiderExpand(cl){
     mk.addTo(PM.spiderLayer);
   });
 }
-/* Daftar nama di halaman peta: NAMA SAJA (tanpa alamat/keterangan)
-   dalam chip rapat banyak-kolom supaya muat banyak dalam ruang kecil.
-   Titik warna di kiri nama = warna wilayahnya. Ketuk nama tetap
-   memusatkan peta ke pin & membuka detail seperti sebelumnya.
-   Anggota yang BELUM terpetakan (tanpa pin) tetap ikut tampil di
-   bagian akhir daftar yang sama dengan penanda titik berongga +
-   kelas 'unmapped', supaya tetap terjangkau dalam tata letak satu
-   jendela; ketuk namanya membuka kartu detail dengan keterangan
-   belum terpetakan (tanpa memindahkan peta, karena belum ada pin). */
+/* Daftar nama di halaman peta: BERKELOMPOK PER WILAYAH seperti
+   Daftar Anggota utama. Tiap kelompok berkepala nama wilayah
+   (titik warna wilayahnya + jumlah anggota kelompok itu yang
+   tampil di peta), di bawahnya nama-nama anggota kelompok itu —
+   tetap NAMA SAJA + titik warna dalam chip rapat banyak-kolom
+   supaya muat banyak dalam ruang kecil. Urutan kelompok mengikuti
+   daftar wilayah aplikasi; wilayah di luar daftar itu sesudahnya
+   menurut abjad, 'Belum dipilih' paling akhir. Ketuk nama tetap
+   menerbangkan kamera ke pin & membuka kartu di atas pinnya.
+   Anggota yang BELUM terpetakan (tanpa pin) tampil di bagian
+   AKHIR kelompok wilayahnya dengan penanda titik berongga + kelas
+   'unmapped'; ketuk namanya membuka keterangan belum terpetakan
+   (tanpa memindahkan peta, karena belum ada pin). Pencarian
+   menyaring nama lintas kelompok; kelompok yang tidak punya nama
+   tampil tidak digambar sama sekali. */
 function petaRenderList(){
   const ul=document.getElementById('peta-list');if(!ul)return;
-  const list=petaFiltered().slice().sort((a,b)=>a.region.localeCompare(b.region)||String(a.m.nama||'').localeCompare(String(b.m.nama||'')));
+  const list=petaFiltered().slice().sort((a,b)=>String(a.m.nama||'').localeCompare(String(b.m.nama||'')));
   const q=String(S.petaSearch||'').toLowerCase();
   const belumList=(PM.belumList||[]).filter(m=>{
     if(S.petaFilter&&memberRegion(m)!==S.petaFilter)return false;
     if(q&&!String(m.nama||'').toLowerCase().includes(q))return false;
     return true;
-  }).slice().sort((a,b)=>memberRegion(a).localeCompare(memberRegion(b))||String(a.nama||'').localeCompare(String(b.nama||'')));
+  }).slice().sort((a,b)=>String(a.nama||'').localeCompare(String(b.nama||'')));
   const empty=document.getElementById('peta-empty');if(empty)empty.style.display=(list.length||belumList.length)?'none':'block';
-  const anak=list.map(en=>{
-    const m=en.m,c=regionColor(en.region);
-    return h('li',{},h('button',{type:'button',class:'peta-name-item'+(String(S.petaSelected)===en.key?' on':''),title:(m.nama||'Tanpa nama')+' — '+en.region,onclick:()=>petaSelect(en,{fly:true,popup:true})},
-      h('span',{class:'peta-name-dot',style:'background:'+c}),
-      h('span',{class:'peta-name-text'},m.nama||'Tanpa nama')));
-  });
-  belumList.forEach((m,i)=>{
-    const key='belum-'+String(m.id||('idx'+i));
-    anak.push(h('li',{},h('button',{type:'button',class:'peta-name-item unmapped'+(String(S.petaSelected)===key?' on':''),title:(m.nama||'Tanpa nama')+' — belum terpetakan',onclick:()=>{
-        S.petaSelected=key;
-        petaShowDetail({m,region:memberRegion(m),coords:null,manual:false,belum:true,key,lvl:''});
-        petaRenderList();
-      }},
-      h('span',{class:'peta-name-dot peta-name-dot-empty'}),
-      h('span',{class:'peta-name-text'},m.nama||'Tanpa nama'))));
+  /* Ember per wilayah: yang terpetakan menurut en.region, yang
+     belum terpetakan menurut wilayah anggotanya (kuncinya disimpan
+     apa adanya supaya pilihan 'belum-…' tetap cocok dengan
+     S.petaSelected seperti sebelumnya). */
+  const ember=new Map(),emberBelum=new Map();
+  list.forEach(en=>{if(!ember.has(en.region))ember.set(en.region,[]);ember.get(en.region).push(en)});
+  belumList.forEach((m,i)=>{const r=memberRegion(m);if(!emberBelum.has(r))emberBelum.set(r,[]);emberBelum.get(r).push({m,key:'belum-'+String(m.id||('idx'+i))})});
+  const dikenal=wilayahEfektif().map(x=>x[0]);
+  const semuaNama=[...new Set([...ember.keys(),...emberBelum.keys()])];
+  const urutan=[...dikenal.filter(n=>semuaNama.includes(n)),...semuaNama.filter(n=>n!=='Belum dipilih'&&!dikenal.includes(n)).sort((a,b)=>a.localeCompare(b,'id'))];
+  if(semuaNama.includes('Belum dipilih'))urutan.push('Belum dipilih');
+  const anak=[];
+  urutan.forEach(region=>{
+    const grupMap=ember.get(region)||[];
+    const grupBelum=emberBelum.get(region)||[];
+    if(!grupMap.length&&!grupBelum.length)return;
+    const c=regionColor(region);
+    anak.push(h('li',{class:'peta-group-head',style:'--region-color:'+c},
+      h('span',{class:'peta-group-dot','aria-hidden':'true'}),
+      h('span',{class:'peta-group-name'},region),
+      h('span',{class:'peta-group-count'},grupMap.length+' di peta')));
+    grupMap.forEach(en=>{
+      const m=en.m;
+      anak.push(h('li',{},h('button',{type:'button',class:'peta-name-item'+(String(S.petaSelected)===en.key?' on':''),title:(m.nama||'Tanpa nama')+' — '+en.region,onclick:()=>petaSelect(en,{fly:true,popup:true})},
+        h('span',{class:'peta-name-dot',style:'background:'+c}),
+        h('span',{class:'peta-name-text'},m.nama||'Tanpa nama'))));
+    });
+    grupBelum.forEach(({m,key})=>{
+      anak.push(h('li',{},h('button',{type:'button',class:'peta-name-item unmapped'+(String(S.petaSelected)===key?' on':''),title:(m.nama||'Tanpa nama')+' — belum terpetakan',onclick:()=>{
+          S.petaSelected=key;
+          petaShowDetail({m,region:memberRegion(m),coords:null,manual:false,belum:true,key,lvl:''});
+          petaRenderList();
+        }},
+        h('span',{class:'peta-name-dot peta-name-dot-empty'}),
+        h('span',{class:'peta-name-text'},m.nama||'Tanpa nama'))));
+    });
   });
   ul.replaceChildren(...anak);
 }
@@ -1221,16 +1273,33 @@ function petaFrameFiltered(){
   if(list.length===1){PM.map.flyTo(list[0].coords,Math.max(PM.map.getZoom(),12),{duration:.7});return}
   PM.map.flyToBounds(L.latLngBounds(list.map(en=>en.coords)),{padding:[36,36],maxZoom:13,duration:.7});
 }
-/* ===== Desktop (≥1024px): TANPA kartu detail anggota terpilih =====
-   Di layar lebar, mengklik nama di daftar atau pin TIDAK memunculkan
-   kartu detail melayang — kartu itu besar dan menutupi peta. Klik
-   cukup memusatkan peta ke pin anggota itu dan memberi penekanan
-   visual pada pin (ikon terpilih) serta namanya di daftar (kelas
-   'on'). Perbaikan posisi di desktop tetap lewat mode 'Perbaiki
-   Posisi Pin' di bilah alat. Di bawah 1024px (HP/tablet kecil)
-   panel detail tetap muncul seperti sebelumnya. */
 function petaLayarDesktop(){return typeof window!=='undefined'&&window.innerWidth>=1024}
+/* ===== Kartu anggota melayang DI ATAS PIN (semua ukuran layar) =====
+   Mengetuk pin anggota (atau namanya di daftar) membuka kartu
+   ringkasnya TEPAT di atas pin itu — popup Leaflet dari
+   petaPopupContent, terikat pada penanda sehingga tetap menempel
+   mengikuti pin saat peta digeser/di-zoom — sama di HP dan
+   desktop, menggantikan lembar bawah khusus HP dan keadaan tanpa
+   kartu di desktop sebelumnya. Dua pengecualian:
+   - Mode Perbaiki Posisi Pin aktif: menekan pin adalah untuk
+     MENYERET, jadi kartu tidak dibuka sama sekali.
+   - Anggota BELUM terpetakan tidak punya pin untuk ditempeli
+     kartu: keterangannya tetap tampil seperti sebelumnya (lembar
+     bawah di bawah ini untuk HP, tanpa kartu di desktop). */
 function petaShowDetail(en){
+  if(!en.belum){
+    if(S.admin&&S.petaFixMode){petaHideDetail();return}
+    petaHideDetail();
+    const mk=PM.markers&&PM.markers[en.key];
+    if(mk&&PM.map){
+      mk.openPopup();
+      /* Foto privat anggota mungkin belum terurai URL bertandanya
+         saat isi kartu dibuat; jalankan hidrasi media sekali lagi
+         supaya foto pada kartu yang sedang terbuka ikut terisi. */
+      setTimeout(()=>{if(typeof hydrateMemberMedia==='function')hydrateMemberMedia()},0);
+    }
+    return;
+  }
   if(petaLayarDesktop()){petaHideDetail();return}
   const card=document.getElementById('peta-detail');if(!card)return;
   const m=en.m,c=regionColor(en.region);
@@ -1263,20 +1332,27 @@ function petaShowDetail(en){
   card.replaceChildren(...anak);
   card.style.display='block';
 }
-function petaHideDetail(){const card=document.getElementById('peta-detail');if(card){card.style.display='none';card.replaceChildren()}}
+/* Sembunyikan lembar keterangan lama (anggota belum terpetakan)
+   DAN tutup kartu melayang di atas pin bila sedang terbuka. */
+function petaHideDetail(){const card=document.getElementById('peta-detail');if(card){card.style.display='none';card.replaceChildren()}if(PM.map&&PM.map.closePopup)PM.map.closePopup()}
 function petaSelect(en,opts){
   opts=opts||{};S.petaSelected=en.key;
-  const desktop=petaLayarDesktop();
-  /* Desktop: TANPA kartu detail dan TANPA popup — klik cukup
-     memusatkan peta ke pin ini dan menandai pin + nama terpilih
-     (umpan balik visual), supaya peta tidak tertutup apa pun.
-     HP: kartu detail tampil sebagai lembar bawah yang tidak
-     menutupi seluruh peta, dan popup pin dibuka. */
-  if(desktop)petaHideDetail();else petaShowDetail(en);
+  /* Anggota belum terpetakan: tanpa pin & tanpa gerak kamera —
+     keterangannya tampil seperti sebelumnya. */
+  if(en.belum){petaShowDetail(en);petaRenderList();return}
   petaRenderMarkers();petaRenderList();
-  if(en.coords&&PM.map&&(opts.fly||desktop))PM.map.flyTo(en.coords,Math.max(PM.map.getZoom(),11),{duration:.7});
-  if(opts.popup&&!desktop&&PM.markers[en.key])setTimeout(()=>{const mk=PM.markers[en.key];if(mk)mk.openPopup()},opts.fly?750:60);
-  if(desktop){
+  /* Ketuk nama di daftar menerbangkan kamera ke pin (opts.fly);
+     di desktop klik pin pun memusatkan peta seperti sebelumnya.
+     Ketuk pin di HP cukup membuka kartunya — popup Leaflet menata
+     pandangan seperlunya supaya kartu terlihat. */
+  const terbang=!!(en.coords&&PM.map&&(opts.fly||petaLayarDesktop()));
+  if(terbang)PM.map.flyTo(en.coords,Math.max(PM.map.getZoom(),11),{duration:.7});
+  /* Kartu dibuka di atas pin yang BARU digambar ulang, sesudah
+     kamera selesai terbang bila ada penerbangan — di HP maupun
+     desktop. Pilihan yang sudah berganti selama jeda ini berjalan
+     membatalkan pembukaan, jadi kartu tidak melompat ke pin lama. */
+  setTimeout(()=>{if(String(S.petaSelected)===String(en.key))petaShowDetail(en)},terbang?750:60);
+  if(petaLayarDesktop()){
     /* Nama terpilih digulir terlihat di dalam panel daftarnya sendiri
        (panel memang bisa digulir di dalam areanya; halaman tidak). */
     try{const on=document.querySelector('.peta-name-item.on');if(on)on.scrollIntoView({block:'nearest'})}catch(e){}
@@ -1288,15 +1364,16 @@ function petaSelect(en,opts){
    ≥900px. Susunannya: judul ringkas saja di atas, lalu peta + daftar
    nama mengisi seluruh ruang utama sampai mendekati header, dan
    SEMUA kontrol (tombol Semua wilayah / Ke Shikoku / Perbaiki Posisi
-   Pin, chip saringan wilayah, dan pil statistik) tergabung dalam
-   SATU bilah ramping di BAGIAN BAWAH halaman — tepat DUA baris
-   berhuruf kecil: baris pertama tombol + pil statistik sejajar,
-   baris kedua chip wilayah satu baris yang bisa digeser menyamping
-   di dalam barisnya selebar apa pun daftar wilayahnya. Di HP berlaku aturan tersendiri: halaman BOLEH
+   Pin dan pil statistik) tergabung dalam SATU bilah ramping di
+   BAGIAN BAWAH halaman — tepat SATU baris berhuruf kecil: tombol +
+   pil statistik sejajar. (Baris chip wilayah yang dulu menjadi
+   baris kedua sudah dihapus atas permintaan pengguna; keterangan
+   wilayah kini terbaca dari kelompok-kelompok di daftar nama.)
+   Di HP berlaku aturan tersendiri: halaman BOLEH
    digulir alami, peta bertinggi tetap di atas, daftar nama mengalir
    di bawahnya, dan bilah kontrol menempati bagian bawah alur.
-   Daftar hanya menampilkan NAMA + titik warna wilayah (tanpa
-   alamat) supaya muat banyak. */
+   Daftar berkelompok per wilayah dan hanya menampilkan NAMA +
+   titik warna wilayah (tanpa alamat) supaya muat banyak. */
 function vPeta(){
   const {entries,belum}=petaEntries();
   PM.belumList=belum;
@@ -1308,18 +1385,18 @@ function vPeta(){
     h('button',{type:'button',class:'btn s',id:'peta-reset'},'Semua wilayah'),
     h('button',{type:'button',class:'btn s',id:'peta-shikoku'},'Ke Shikoku'),
     S.admin?h('button',{type:'button',class:'btn s'+(fixAktif?' peta-fix-on':''),id:'peta-fix-toggle'},fixAktif?'Selesai Memperbaiki':'Perbaiki Posisi Pin'):null);
-  const chipsRow=h('div',{class:'peta-chips',id:'peta-chips','aria-label':'Saringan warna wilayah'});
   const pills=h('div',{class:'peta-pills'},
     stat('peta-stat-total',(S.members||[]).length,'Total'),
     stat('peta-stat-pin',entries.length,'Di peta'),
     stat('peta-stat-wilayah',new Set((S.members||[]).map(m=>memberRegion(m))).size,'Wilayah'));
-  /* Bilah kontrol bawah: tepat DUA baris berhuruf kecil — baris
-     pertama tombol aksi + pil statistik sejajar rapat, baris kedua
-     chip wilayah dalam satu baris yang bisa digeser menyamping.
-     Menggantikan tumpukan kontrol yang dulu di atas peta. */
+  /* Bilah kontrol bawah: tepat SATU baris berhuruf kecil — tombol
+     aksi + pil statistik sejajar rapat. (Baris chip wilayah yang
+     dulu menjadi baris kedua DIHAPUS atas permintaan pengguna:
+     keterangan wilayah kini terbaca dari kepala kelompok daftar
+     nama, dan tombol 'Semua wilayah' tetap mereset saringan ke
+     semua pin.) */
   const bottomBar=h('div',{class:'peta-bottombar'},
-    h('div',{class:'peta-bottom-row1'},controls,pills),
-    chipsRow);
+    h('div',{class:'peta-bottom-row1'},controls,pills));
   /* Kartu peta = petanya sendiri: permukaan Leaflet memenuhi seluruh
      kartu dari tepi ke tepi (tanpa baris judul/keterangan di atas dan
      tanpa baris kaki di bawah). Pemilih gaya peta (satu tombol yang
@@ -1431,7 +1508,7 @@ function initPetaMap(){
     setTimeout(()=>{if(PM.map)PM.map.invalidateSize()},90);
     if(!PM.resizeBound){
       PM.resizeBound=true;
-      window.addEventListener('resize',()=>{if(PM.map&&S.view==='peta'){try{PM.map.invalidateSize()}catch(e){}/* Jendela melebar ke ukuran desktop: kartu detail yang sedang terbuka ditutup — di desktop kartu itu tidak dipakai. */if(petaLayarDesktop())petaHideDetail()}});
+      window.addEventListener('resize',()=>{if(PM.map&&S.view==='peta'){try{PM.map.invalidateSize()}catch(e){}}});
     }
     /* Penempatan pin presisi dari alamat lengkap berjalan di latar —
        dijeda selama mode Perbaiki Posisi Pin aktif supaya pin yang

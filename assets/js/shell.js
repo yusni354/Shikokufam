@@ -412,3 +412,157 @@ if(brandTitleEl){
   },{passive:false});
 })();
 
+
+/* ===== Usap dari TEPI layar = tombol Kembali (semua halaman) =====
+   Isyarat: usapan mendatar yang DIMULAI di zona tepi layar (±28px
+   dari tepi kiri ATAU kanan), bergerak mendatar ≥70px dengan arah
+   dominan mendatar (jarak mendatar > 1,5× jarak tegak), ke arah
+   mana pun — sesudah jari/kursor dilepas, aplikasi menjalankan SATU
+   langkah "Kembali", persis seperti alur tombol Kembali halaman itu
+   sendiri (lihat aksiUsapKembali). Bila ada panel/modal yang sedang
+   terbuka, usapan MENUTUP panel itu dulu — setara menekan bidang di
+   luarnya — dan halaman tidak berpindah (lihat tutupPanelUsap).
+   Mode isyarat (panel vs navigasi) diputuskan saat jari MENYENTUH
+   layar lewat pendengar tangkap (capture): panel Kepengurusan dan
+   pemilih melayang #qm menutup sendiri dari sentuhan di luar itu
+   juga, jadi snapshot harus diambil sebelum penangan mereka
+   berjalan — satu usapan tidak pernah menutup panel LALU ikut
+   berpindah halaman.
+   PENGECUALIAN (usapan tidak memicu apa pun): halaman Peta &
+   Wilayah dan panel pin formulir (peta Leaflet menangani
+   sentuhannya sendiri); saat ada field isian/teks yang sedang
+   difokuskan (pengguna sedang mengetik); saat seret tekan-lama
+   sedang berlangsung (baris Kepengurusan, menu drawer, seret gulir
+   tabel — dikenali dari kelas penandanya selama isyarat berjalan);
+   dan usapan yang mulai dari segmen seret-isi absensi. Zona tepi
+   dipilih supaya isyarat ini tidak bertabrakan dengan gulir/seret
+   tabel laporan, seret-isi absensi, tekan-lama-seret, dan geser
+   peta — semuanya mulai dari tengah bidang, bukan tepi layar.
+   Berlaku untuk sentuh di HP dan seret mouse dari tepi di desktop.
+   Tidak ada perubahan tampilan apa pun. */
+function panelUsapTerbuka(){
+  if(S.qrScannerOpen)return true;
+  if(document.querySelector('.confirm-overlay,.fin-lightbox,#qm'))return true;
+  if(document.body.classList.contains('open'))return true;
+  if(S.susunanInline)return true;
+  return false;
+}
+/* Tutup panel teratas dengan cara yang sama seperti menekan bidang
+   di luarnya. Mengembalikan true bila ada panel yang ditangani. */
+function tutupPanelUsap(){
+  /* Pemindai QR layar penuh: tutup lewat penangan resminya — sama
+     seperti tombol 'Tutup QR' (kamera berhenti, halaman di belakang
+     tetap utuh). */
+  if(S.qrScannerOpen&&typeof S.activityScannerStop==='function'){S.activityScannerStop();return true}
+  const lapis=document.querySelectorAll('.confirm-overlay,.fin-lightbox,#qm');
+  if(lapis.length){
+    const el=lapis[lapis.length-1];
+    /* Kejadian diarahkan KE elemen latar panel itu sendiri — persis
+       ketukan di bidang luar kartunya: penangan latar panel yang
+       menutupnya (termasuk penjaga waktu dialog Pesan, yang berlaku
+       sama seperti pada ketukan sungguhan). */
+    try{el.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,cancelable:true}))}catch(err){}
+    el.click();
+    /* Formulir Tanya Admin (#qm versi maskot) tidak punya penangan
+       tekan-di-luar: tutup langsung, sama seperti tombol Batalnya. */
+    if(el.id==='qm'&&el.isConnected)el.remove();
+    return true;
+  }
+  /* Drawer terbuka: jalankan penangan latarnya (#ov), persis seperti
+     menekan bidang di luar drawer. */
+  if(document.body.classList.contains('open')){
+    const ov=document.getElementById('ov');
+    if(ov){ov.click();return true}
+    document.body.classList.remove('open');return true;
+  }
+  /* Panel inline Kepengurusan: sentuhan di luar sungguhan biasanya
+     sudah menutupnya saat jari menyentuh layar (penangannya sendiri);
+     baris ini cadangan bila keadaannya masih tercatat terbuka. */
+  if(S.susunanInline&&typeof tutupInlineSusunan==='function'){tutupInlineSusunan();return true}
+  return false;
+}
+/* Satu langkah Kembali mengikuti alur halaman yang sedang tampil —
+   dipakai isyarat usap tepi dalam mode navigasi. */
+function aksiUsapKembali(){
+  if(S.view==='peta')return;
+  if(S.formPinOpen)return;
+  /* Detail anggota / Kartu ID / Profil: tombol Kembali-nya sendiri —
+     kembali ke halaman asal dengan keadaan halaman itu utuh. */
+  if(S.detail){if(typeof kembaliDariDetailAnggota==='function')kembaliDariDetailAnggota();return}
+  /* Formulir tambah/edit anggota: sama seperti tombol Kembali-nya. */
+  if(S.form){S.form=null;S.formPinOpen=false;S.formPinTemp=null;S.formPinAlamatHasil='';render();return}
+  if(S.view==='kegiatan'){
+    /* Fokus absensi kembali ke detail kegiatan yang sama; detail
+       kegiatan kembali ke daftar dengan arsip bulan/tahun yang sama. */
+    if(S.absensiEvent||S.absensiRegion){if(typeof leaveAbsensi==='function')leaveAbsensi();return}
+    if(S.activityDetail){if(typeof leaveActivityDetail==='function')leaveActivityDetail();return}
+  }
+  /* Utas percakapan → daftar percakapan: sama seperti tombol kembali
+     utas (isyarat usap di badan utas yang sudah ada tetap konsisten
+     — hasil akhirnya sama, keadaan tidak berubah dua kali). */
+  if(S.view==='pesan'&&S.openConversation){S.openConversation=null;S.newChat=null;render();return}
+  /* Formulir Laporan Keuangan: sama seperti tombol Batalnya. */
+  if(S.view==='keuangan'&&S.financeForm){S.financeForm=null;S.financePhotoState=null;render();return}
+  if(S.view==='inventaris'){
+    /* Formulir barang: sama seperti tombol Batalnya; rincian /
+       peminjaman yang sedang terbuka ditutup kembali ke daftar. */
+    if(S.inventarisForm){S.inventarisForm=null;S.inventarisPhotoState=null;render();return}
+    if(S.inventarisDetail||S.inventarisPinjam){S.inventarisDetail=null;S.inventarisPinjam=null;render();return}
+  }
+  /* Formulir Jadwal Piket: sama seperti tombol Batalnya. */
+  if(S.view==='piket'&&S.dutyForm){S.dutyForm=null;S.dutyTaskNotice=null;S.dutyTaskConfirm=null;render();return}
+  /* Halaman tanpa alur kembali khusus → Home. Di Home diam saja. */
+  if(S.view!=='landing')go('landing');
+}
+(function(){
+  const TEPI=28,JARAK=70;
+  let usap=null;
+  /* Penanda seret lain yang sedang berlangsung (tekan-lama baris
+     Kepengurusan / menu drawer, seret gulir tabel laporan): selama
+     salah satunya aktif, isyarat usap tepi dibatalkan — jari yang
+     ditahan dulu sampai seret matang lalu digeser mendatar bukan
+     isyarat kembali. */
+  const seretLainAktif=()=>!!document.querySelector('.org-row-dragging,.menu-dragging,.rekap-wrap.menyeret,.laporan-wrap.menyeret,.inv-wrap.menyeret');
+  const sedangMengetik=()=>{
+    const a=document.activeElement;
+    if(!a||a===document.body)return false;
+    return a.tagName==='INPUT'||a.tagName==='TEXTAREA'||a.tagName==='SELECT'||a.isContentEditable===true;
+  };
+  /* Fase tangkap (capture): snapshot keadaan panel diambil SEBELUM
+     penangan tekan-di-luar milik panel lain (Kepengurusan, #qm)
+     sempat menutup panelnya dari sentuhan yang sama. */
+  document.addEventListener('pointerdown',e=>{
+    if(usap||!e.isPrimary)return;
+    if(e.button!=null&&e.button>0)return;
+    /* Gerbang masuk / sesi belum siap: tidak berbuat apa-apa. */
+    if(document.body.classList.contains('auth-locked')||S.authLoading||!S.uid)return;
+    /* Halaman Peta & Wilayah: Leaflet menangani sentuhannya sendiri. */
+    if(S.view==='peta')return;
+    const t=e.target;
+    /* Mulai dari peta mana pun (panel pin formulir), dari field
+       isian, atau dari segmen seret-isi absensi → bukan isyarat ini. */
+    if(t&&t.closest&&t.closest('.leaflet-container,input,textarea,select,[contenteditable="true"],.absensi-seg'))return;
+    if(sedangMengetik())return;
+    /* Hanya usapan yang DIMULAI di zona tepi layar yang dilacak. */
+    const lebar=window.innerWidth||0;
+    if(!(e.clientX<=TEPI||e.clientX>=lebar-TEPI))return;
+    if(seretLainAktif())return;
+    usap={pid:e.pointerId,x:e.clientX,y:e.clientY,panel:panelUsapTerbuka(),batal:false};
+  },true);
+  document.addEventListener('pointermove',e=>{
+    if(!usap||e.pointerId!==usap.pid)return;
+    if(seretLainAktif())usap.batal=true;
+  });
+  const akhiri=e=>{
+    if(!usap||e.pointerId!==usap.pid)return;
+    const u=usap;usap=null;
+    if(u.batal||e.type==='pointercancel')return;
+    if(seretLainAktif())return;
+    const dx=e.clientX-u.x,dy=e.clientY-u.y;
+    if(Math.abs(dx)<JARAK||Math.abs(dx)<=Math.abs(dy)*1.5)return;
+    if(u.panel){tutupPanelUsap();return}
+    aksiUsapKembali();
+  };
+  document.addEventListener('pointerup',akhiri);
+  document.addEventListener('pointercancel',akhiri);
+})();
