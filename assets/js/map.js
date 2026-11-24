@@ -1190,8 +1190,8 @@ function petaSpiderExpand(cl){
 }
 /* Daftar nama di halaman peta: BERKELOMPOK PER WILAYAH seperti
    Daftar Anggota utama. Tiap kelompok berkepala nama wilayah
-   (titik warna wilayahnya + jumlah anggota kelompok itu yang
-   tampil di peta), di bawahnya nama-nama anggota kelompok itu —
+   (titik warna wilayahnya + TOTAL seluruh anggota wilayah itu
+   dari data anggota + jumlah yang tampil di peta), di bawahnya nama-nama anggota kelompok itu —
    tetap NAMA SAJA + titik warna dalam chip rapat banyak-kolom
    supaya muat banyak dalam ruang kecil. Urutan kelompok mengikuti
    daftar wilayah aplikasi; wilayah di luar daftar itu sesudahnya
@@ -1230,10 +1230,16 @@ function petaRenderList(){
     const grupBelum=emberBelum.get(region)||[];
     if(!grupMap.length&&!grupBelum.length)return;
     const c=regionColor(region);
+    /* Total anggota wilayah ini: dihitung dari SELURUH data anggota
+       (S.members) menurut wilayahnya — BUKAN dari daftar yang sedang
+       tampil — jadi angka ini tetap sama walau pencarian menyaring
+       nama atau sebagian anggota belum terpetakan. Yang mengikuti
+       saringan hanyalah daftar nama dan hitungan 'di peta'. */
+    const totalWilayah=(S.members||[]).filter(m=>memberRegion(m)===region).length;
     anak.push(h('li',{class:'peta-group-head',style:'--region-color:'+c},
       h('span',{class:'peta-group-dot','aria-hidden':'true'}),
       h('span',{class:'peta-group-name'},region),
-      h('span',{class:'peta-group-count'},grupMap.length+' di peta')));
+      h('span',{class:'peta-group-count'},h('b',{class:'peta-group-total'},totalWilayah+' anggota'),' · '+grupMap.length+' di peta')));
     grupMap.forEach(en=>{
       const m=en.m;
       anak.push(h('li',{},h('button',{type:'button',class:'peta-name-item'+(String(S.petaSelected)===en.key?' on':''),title:(m.nama||'Tanpa nama')+' — '+en.region,onclick:()=>petaSelect(en,{fly:true,popup:true})},
