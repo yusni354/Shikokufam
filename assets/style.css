@@ -1584,13 +1584,12 @@ body.auth-locked .landing{padding-top:0}
    diam di atas, main mengisi sisa tinggi dan TIDAK bisa digulir);
    .peta-fit menyusun judul ringkas saja di atas, lalu .peta-split:
    peta sebagai ruang utama lentur + panel daftar nama di kolom
-   kanan, dan terakhir SATU bilah kontrol ramping di bagian bawah
-   (tombol, chip wilayah, pil statistik). Hanya daftar nama (dan
-   chip di dalam barisnya) yang boleh digulir DI DALAM areanya
-   sendiri. Di HP berlaku aturan tersendiri (lihat blok
-   max-width:899px): halaman digulir alami, peta bertinggi tetap di
-   atas, daftar nama mengalir di bawahnya, bilah kontrol di bawah
-   alur halaman. */
+   kanan, mengisi sampai ke dasar halaman — bilah kontrol bawah
+   (tombol + pil statistik) sudah DIHAPUS atas permintaan pengguna.
+   Hanya daftar nama yang boleh digulir DI DALAM areanya sendiri.
+   Di HP berlaku aturan tersendiri (lihat blok max-width:899px):
+   halaman digulir alami, peta bertinggi tetap di atas, daftar nama
+   mengalir di bawahnya sampai dasar halaman. */
 body.peta-view{display:flex;flex-direction:column}
 body.peta-view main{width:100%;max-width:1180px;padding:10px 12px 12px;display:flex;flex-direction:column}
 /* Kunci SATU JENDELA tanpa gulir halaman hanya berlaku di layar
@@ -1608,37 +1607,14 @@ body.peta-view main{width:100%;max-width:1180px;padding:10px 12px 12px;display:f
 .peta-fit{flex:1;min-height:0;display:flex;flex-direction:column;gap:8px;isolation:isolate}
 .peta-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;flex:none}
 .peta-title{font-size:20px;margin:0;line-height:1.15}
-.peta-pills{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto}
-.peta-pill{display:inline-flex;align-items:baseline;gap:5px;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:4px 11px;font-size:12px;color:var(--mut);font-weight:600;box-shadow:0 2px 8px rgba(47,134,184,.07)}
-.peta-pill b{font-size:15px;color:#16283a;line-height:1}
-.peta-controls{display:flex;flex-wrap:wrap;gap:7px;align-items:center;flex:none}
 /* Field pencarian anggota kini DI DALAM kartu Daftar Anggota:
    menempel di bawah judul panel, selebar panel, di atas daftar nama */
 .peta-list-panel .peta-search{flex:none;margin-top:9px;padding:1px 5px 1px 12px}
 .peta-list-panel .peta-search input{min-height:32px;font-size:14px}
-.peta-controls .btn.s{padding:6px 11px;font-size:13px;background:var(--card)}
-/* Bilah kontrol BAWAH halaman peta: tepat DUA baris berhuruf KECIL
-   (lebih kecil dari nama daftar anggota ±12,5–13px, bilah ini ±11px)
-   supaya total tingginya ramping dan sisa ruang menjadi tinggi peta.
-   Baris pertama: tombol aksi + pil statistik sejajar rapat. Baris
-   kedua: chip wilayah SATU baris selebar bilah yang bisa digeser
-   menyamping di dalam barisnya — tidak pernah membungkus ke baris
-   ketiga selebar apa pun daftar wilayahnya. Baris pertama pun tidak
-   membungkus: bila layar sangat sempit ia bergeser menyamping di
-   dalam barisnya sendiri. Berlaku sama di desktop dan HP. */
-.peta-bottombar{display:flex;flex-direction:column;gap:4px;flex:none;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:5px 7px;box-shadow:0 4px 16px rgba(47,134,184,.09)}
-.peta-bottom-row1{display:flex;align-items:center;gap:6px;flex-wrap:nowrap;width:100%;min-width:0;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch}
-.peta-bottom-row1::-webkit-scrollbar{display:none}
-.peta-bottombar .peta-controls{flex:none;flex-wrap:nowrap;gap:5px}
-.peta-bottombar .peta-controls .btn.s{padding:4px 9px;font-size:11px}
-.peta-bottombar .peta-pills{flex:none;margin-left:auto;flex-wrap:nowrap;gap:5px}
-.peta-bottombar .peta-pill{padding:3px 9px;font-size:11px;gap:4px}
-.peta-bottombar .peta-pill b{font-size:12.5px}
-.peta-fit .peta-bottombar .peta-chips{flex:none;width:100%;min-width:0;padding:0 1px 1px}
-.peta-fit .peta-bottombar .peta-chip{min-height:26px;padding:3px 8px 3px 7px;font-size:11px;gap:5px}
-.peta-fit .peta-bottombar .peta-chip .peta-dot{width:9px;height:9px}
-.peta-fit .peta-bottombar .peta-chip .peta-count{font-size:10px;padding:1px 5px}
-@media (max-width:640px){.peta-bottombar{gap:3px;padding:4px 5px;border-radius:13px}.peta-bottombar .peta-controls .btn.s{padding:4px 7px;font-size:10.5px}.peta-bottombar .peta-pill{padding:2px 7px;font-size:10.5px}.peta-bottombar .peta-pill b{font-size:11.5px}.peta-fit .peta-bottombar .peta-chip{min-height:24px;font-size:10.5px}}
+/* Bilah kontrol bawah halaman peta SUDAH DIHAPUS atas permintaan
+   pengguna: tidak ada tombol/pil statistik di dasar halaman lagi,
+   jadi .peta-split (peta + daftar nama) mengisi ruang sampai ke
+   dasar area halaman tanpa menyisakan ruang kosong. */
 /* Chip wilayah: SATU baris yang bisa digeser menyamping di dalam
    barisnya sendiri (halaman tetap tidak bergulir) */
 .peta-fit .peta-chips{display:flex;flex-wrap:nowrap;gap:6px;overflow-x:auto;overflow-y:hidden;padding:2px 1px 4px;flex:none;scrollbar-width:thin;-webkit-overflow-scrolling:touch}
@@ -1701,10 +1677,9 @@ body.peta-view main{width:100%;max-width:1180px;padding:10px 12px 12px;display:f
 /* ===== Peta di DESKTOP (≥1024px): tata letak lebar profesional =====
    Lebar layar dimanfaatkan penuh: wadah utama diperlebar, peta
    menjadi elemen dominan yang lega, panel daftar nama di kanan
-   lebih proporsional (tiga kolom nama); di atas hanya judul, dan
-   bilah kontrol bawah tertata tepat dua baris berhuruf kecil
-   (baris tombol + pil statistik, lalu baris chip wilayah) dengan
-   jarak yang konsisten mengikuti tema clay aplikasi.
+   lebih proporsional (tiga kolom nama); di atas hanya judul dan
+   tidak ada bilah apa pun di bagian bawah, dengan jarak yang
+   konsisten mengikuti tema clay aplikasi.
    Kartu detail anggota TIDAK tampil di desktop (dijaga juga oleh
    petaLayarDesktop di map.js): tidak ada elemen melayang yang
    menutupi peta. Di bawah 1024px tata letak tetap seperti
@@ -1713,9 +1688,6 @@ body.peta-view main{width:100%;max-width:1180px;padding:10px 12px 12px;display:f
   body.peta-view main{max-width:1680px;padding:14px 20px 16px}
   .peta-fit{gap:10px}
   .peta-title{font-size:22px}
-  .peta-pill{padding:5px 13px;font-size:12.5px}
-  .peta-pill b{font-size:16px}
-  .peta-controls{gap:8px}
   .peta-split{gap:12px}
   .peta-list-panel{width:400px;border-radius:24px;padding:14px 14px 11px}
   .peta-fit .peta-h2{font-size:16.5px}
@@ -1753,7 +1725,7 @@ h2{line-height:1.3}
 h3,h4{line-height:1.35}
 .sub{line-height:1.55}
 .card small,.member-card-info>small,.home-event small,.conversation-row small{line-height:1.45}
-.stats b,.fin-amount,.fin-total b,.peta-pill b,.activity-counts b,.rekap-num,.lap-pct,.duty-count,.org-group-count,.peta-group-count{font-variant-numeric:tabular-nums}
+.stats b,.fin-amount,.fin-total b,.activity-counts b,.rekap-num,.lap-pct,.duty-count,.org-group-count,.peta-group-count{font-variant-numeric:tabular-nums}
 button,[role="button"],a{-webkit-tap-highlight-color:transparent}
 img{max-width:100%}
 
@@ -2041,7 +2013,6 @@ header .logo{border-radius:13px}
 
 /* ---------- Peta: poles seperlunya (struktur tidak diubah) ---------- */
 .peta-list-panel{box-shadow:6px 8px 18px rgba(70,95,115,.1),-3px -3px 10px rgba(255,255,255,.5)}
-.peta-bottombar{box-shadow:6px 8px 18px rgba(70,95,115,.1)}
 .peta-name-item{border-radius:11px}
 .peta-detail{border-radius:20px}
 .peta-chip{transition:border-color .15s ease,background .15s ease,color .15s ease,box-shadow .15s ease,transform .15s ease}

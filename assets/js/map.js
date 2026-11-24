@@ -1368,41 +1368,28 @@ function petaSelect(en,opts){
    TANPA halaman bisa digulir ke bawah — body diberi kelas 'peta-view'
    oleh render() (views.js) dan CSS mengunci tingginya di layar
    ≥900px. Susunannya: judul ringkas saja di atas, lalu peta + daftar
-   nama mengisi seluruh ruang utama sampai mendekati header, dan
-   SEMUA kontrol (tombol Semua wilayah / Ke Shikoku / Perbaiki Posisi
-   Pin dan pil statistik) tergabung dalam SATU bilah ramping di
-   BAGIAN BAWAH halaman — tepat SATU baris berhuruf kecil: tombol +
-   pil statistik sejajar. (Baris chip wilayah yang dulu menjadi
-   baris kedua sudah dihapus atas permintaan pengguna; keterangan
-   wilayah kini terbaca dari kelompok-kelompok di daftar nama.)
+   nama mengisi seluruh ruang utama sampai ke DASAR halaman. TIDAK
+   ada lagi bilah kontrol di bagian bawah: tombol Semua wilayah /
+   Ke Shikoku / Perbaiki Posisi Pin dan pil statistik (Total /
+   Di peta / Wilayah) sudah DIHAPUS atas permintaan pengguna —
+   keterangan wilayah terbaca dari kelompok-kelompok di daftar nama,
+   dan jumlah pin tampil pada pil melayang di atas peta.
    Di HP berlaku aturan tersendiri: halaman BOLEH
    digulir alami, peta bertinggi tetap di atas, daftar nama mengalir
-   di bawahnya, dan bilah kontrol menempati bagian bawah alur.
+   di bawahnya sampai dasar halaman.
    Daftar berkelompok per wilayah dan hanya menampilkan NAMA +
    titik warna wilayah (tanpa alamat) supaya muat banyak. */
 function vPeta(){
+  /* Mode Perbaiki Posisi Pin tidak lagi punya pintu masuk (tombolnya
+     ikut terhapus bersama bilah bawah): keadaan lamanya yang mungkin
+     masih tersisa dari sesi yang sama dimatikan di sini, supaya pin
+     tidak tertinggal bisa digeser tanpa jalan keluar dan penempatan
+     pin latar tidak terjeda. */
+  if(S.petaFixMode){S.petaFixMode=false;S.petaFixNotice=''}
   const {entries,belum}=petaEntries();
   PM.belumList=belum;
-  const stat=(id,val,label)=>h('span',{class:'peta-pill'},h('b',{id},String(val)),h('span',{},label));
-  const fixAktif=!!(S.admin&&S.petaFixMode);
   const topBar=h('div',{class:'peta-top'},
     h('h1',{class:'peta-title'},'Peta & Wilayah'));
-  const controls=h('div',{class:'peta-controls'},
-    h('button',{type:'button',class:'btn s',id:'peta-reset'},'Semua wilayah'),
-    h('button',{type:'button',class:'btn s',id:'peta-shikoku'},'Ke Shikoku'),
-    S.admin?h('button',{type:'button',class:'btn s'+(fixAktif?' peta-fix-on':''),id:'peta-fix-toggle'},fixAktif?'Selesai Memperbaiki':'Perbaiki Posisi Pin'):null);
-  const pills=h('div',{class:'peta-pills'},
-    stat('peta-stat-total',(S.members||[]).length,'Total'),
-    stat('peta-stat-pin',entries.length,'Di peta'),
-    stat('peta-stat-wilayah',new Set((S.members||[]).map(m=>memberRegion(m))).size,'Wilayah'));
-  /* Bilah kontrol bawah: tepat SATU baris berhuruf kecil — tombol
-     aksi + pil statistik sejajar rapat. (Baris chip wilayah yang
-     dulu menjadi baris kedua DIHAPUS atas permintaan pengguna:
-     keterangan wilayah kini terbaca dari kepala kelompok daftar
-     nama, dan tombol 'Semua wilayah' tetap mereset saringan ke
-     semua pin.) */
-  const bottomBar=h('div',{class:'peta-bottombar'},
-    h('div',{class:'peta-bottom-row1'},controls,pills));
   /* Kartu peta = petanya sendiri: permukaan Leaflet memenuhi seluruh
      kartu dari tepi ke tepi (tanpa baris judul/keterangan di atas dan
      tanpa baris kaki di bawah). Pemilih gaya peta (satu tombol yang
@@ -1424,7 +1411,6 @@ function vPeta(){
         h('div',{class:'peta-style-menu',id:'peta-style-menu',role:'menu','aria-label':'Pilihan gaya peta',hidden:'hidden'},...PETA_STYLE_ORDER.map(styleItem))),
       h('span',{class:'peta-count-badge',id:'peta-count'},entries.length+' pin tampil')),
     h('div',{class:'peta-map-notes'},
-      fixAktif?h('div',{class:'peta-fix-banner'},h('b',{},'Perbaiki Posisi Pin'),h('span',{},'Geser pin anggota ke posisi yang benar lalu lepaskan — posisi baru langsung tersimpan sebagai pin manual. Ketuk "Selesai Memperbaiki" bila sudah.')):null,
       h('div',{id:'peta-fix-notice',class:'peta-fix-notice',style:S.petaFixNotice?'display:block':'display:none'},S.petaFixNotice||''),
       h('div',{id:'peta-geo-status',class:'peta-geo-status',style:'display:none'}),
       h('div',{id:'peta-notice',class:'peta-notice',style:'display:none'},'Server peta luar sedang tidak terjangkau, jadi yang tampil adalah ',h('b',{},'peta dasar cadangan lokal'),'. Pencarian, saringan wilayah, dan detail anggota tetap bekerja.')));
@@ -1436,7 +1422,7 @@ function vPeta(){
     h('div',{class:'peta-empty',id:'peta-empty',style:'display:none'},'Tidak ada anggota yang cocok. Coba kata pencarian lain atau tampilkan semua wilayah.'));
   const detail=h('section',{id:'peta-detail',class:'peta-detail',style:'display:none'});
   const split=h('div',{class:'peta-split'},mapCard,listPanel,detail);
-  return [h('div',{class:'peta-fit'},topBar,split,bottomBar)];
+  return [h('div',{class:'peta-fit'},topBar,split)];
 }
 /* Dipanggil render() sesudah halaman Peta terpasang di DOM: bangun (ulang)
    peta Leaflet dari data terbaru dan pasang semua pengendali halaman.
@@ -1472,18 +1458,11 @@ function initPetaMap(){
     }
     const search=document.getElementById('peta-search');
     if(search){search.value=S.petaSearch||'';search.oninput=()=>{S.petaSearch=search.value.trim();petaRenderMarkers();petaRenderList();petaRenderStats()}}
-    const reset=document.getElementById('peta-reset');
-    if(reset)reset.onclick=()=>{S.petaFilter=null;S.petaSearch='';S.petaSelected=null;const s=document.getElementById('peta-search');if(s)s.value='';petaHideDetail();petaRefresh();petaFrameFiltered()};
-    const ke=document.getElementById('peta-shikoku');
-    if(ke)ke.onclick=()=>{if(PM.map)PM.map.flyTo([33.9,133.7],window.innerWidth<640?7:8,{duration:.7})};
-    const fixBtn=document.getElementById('peta-fix-toggle');
-    if(fixBtn)fixBtn.onclick=()=>{
-      if(!S.admin)return;
-      S.petaFixMode=!S.petaFixMode;
-      if(!S.petaFixMode)S.petaFixNotice='';
-      render();
-    };
-    if(S.petaFixMode&&!S.admin)S.petaFixMode=false;
+    /* Tombol bilah bawah (Semua wilayah / Ke Shikoku / Perbaiki
+       Posisi Pin) sudah dihapus dari halaman, jadi tidak ada lagi
+       pengendali yang dipasang untuk mereka; mode Perbaiki pun
+       dimatikan tuntas di vPeta() dan ditegaskan lagi di sini. */
+    if(S.petaFixMode)S.petaFixMode=false;
     if(typeof L==='undefined'){
       /* Leaflet dimuat malas: selama berkasnya masih dalam perjalanan,
          wadah peta dibiarkan kosong dengan warna dasar kartunya —
