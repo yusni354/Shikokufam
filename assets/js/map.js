@@ -24,19 +24,27 @@ function petaMuatLeaflet(){
 function alamatJp(m,det){return [det?m.alamat_jp:'',m.kec_jp,m.kota,m.pref||m.wilayah,m.kodepos,'Japan'].filter(Boolean).join(', ')}
 async function loadPendingUsers(){
   if(!S.supabase){
-    if(!S.admin){S.pendingUsers=[];S.approvedUsers=[]}
+    if(!S.admin){S.pendingUsers=[];S.approvedUsers=[];S.rejectedUsers=[]}
     else{
       const ringkas=user=>({id:user.id,name:user.name,email:user.email,created_at:user.created_at,approval_status:user.approval_status,approved_at:user.approved_at||null,approved_by:user.approved_by||'',role:user.role,is_main_admin:user.is_main_admin===true,avatar_url:user.avatar_url||''});
       S.pendingUsers=localUsers().filter(user=>user.approval_status==='pending').map(ringkas);
       S.approvedUsers=localUsers().filter(user=>user.approval_status==='approved').map(ringkas);
+      /* Akun ditolak yang masih ber-email = penolakan sungguhan; akun
+         terhapus (email dikosongkan oleh hapusAkun) tidak dihitung. */
+      S.rejectedUsers=localUsers().filter(user=>user.approval_status==='rejected'&&user.email).map(ringkas);
     }
     /* Lencana navigasi Persetujuan mengikuti daftar terbaru ini juga */
     if(typeof updateApprovalBadges==='function')updateApprovalBadges();
     return;
   }
-  if(!S.admin){S.pendingUsers=[];S.approvedUsers=[];if(typeof updateApprovalBadges==='function')updateApprovalBadges();return}
+  if(!S.admin){S.pendingUsers=[];S.approvedUsers=[];S.rejectedUsers=[];if(typeof updateApprovalBadges==='function')updateApprovalBadges();return}
   const {data,error}=await S.supabase.from('profiles').select('id,name,email,created_at,approval_status').eq('approval_status','pending').order('created_at',{ascending:true});
   if(error){console.error(error);S.pendingUsers=[]}else S.pendingUsers=data||[];
+  /* Akun ditolak untuk halaman Laporan Keamanan: hanya penolakan
+     sungguhan (masih ber-email); catatan akun yang dihapus admin
+     (status rejected + email dikosongkan) tidak dihitung. */
+  const ditolak=await S.supabase.from('profiles').select('id,name,email,created_at,approval_status').eq('approval_status','rejected').not('email','is',null).order('created_at',{ascending:false});
+  if(ditolak.error){console.error(ditolak.error);S.rejectedUsers=[]}else S.rejectedUsers=ditolak.data||[];
   /* Catatan akun yang sudah disetujui untuk tab 'Sudah Disetujui'.
      select('*') supaya kolom tambahan (approved_at, approved_by, avatar_url,
      region warisan) ikut terbaca bila ada, tanpa gagal bila belum ada. */

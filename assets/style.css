@@ -2401,3 +2401,17 @@ select.inv-in{-webkit-appearance:none;appearance:none;padding-right:14px;backgro
 @media (prefers-reduced-motion: reduce){
   .anim-kata{will-change:auto}
 }
+
+/* ===== Halaman Laporan Keamanan (khusus admin utama) =====
+   Baris daftar di dalam kartu: teks utama lentur (min-width:0 supaya
+   tidak meluber), lencana status menempel di kanan dan tidak menyusut. */
+.sec-row{display:flex;gap:12px;align-items:flex-start;padding:10px 0;border-bottom:1px solid var(--line)}
+.sec-row:last-child{border-bottom:0;padding-bottom:2px}
+.sec-row:first-of-type{padding-top:12px}
+.sec-row-main{flex:1;min-width:0}
+.sec-row-main small{line-height:1.5;overflow-wrap:break-word}
+.sec-badge{flex:none;font-size:11.5px;font-weight:700;border-radius:999px;padding:3px 10px;margin-top:1px;white-space:nowrap}
+.sec-badge-ok{background:#d9ecdc;color:#14532d}
+.sec-badge-bad{background:#f7d9d9;color:#7f1d1d}
+.sec-badge-note{background:#f2e6c4;color:#5b4a12}
+.sec-badge-mut{background:#e3edf3;color:#22384c}
