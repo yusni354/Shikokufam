@@ -877,7 +877,17 @@ const PETA_STYLES={
 /* Urutan tampil di menu dropdown: gaya raster umum dulu, lalu gaya
    vektor OpenFreeMap. */
 const PETA_STYLE_ORDER=['jalan','terang','jepang','satelit','satelitlabel','topo','kereta','ofmliberty','ofmbright','ofmpositron'];
-const PM={map:null,layer:null,markers:{},entries:[],tileLayer:null,tileLayers:[],tileOk:0,tileErr:0,tileTimer:null,basemapIdx:0,fallback:false,fallbackLayer:null,gen:0,style:'jalan',chain:null,spiderLayer:null,spider:null,spiderTimer:null,clusters:[],clusterOf:{},menuDocBound:false,sementara:false,attribControl:null};
+const PM={map:null,layer:null,markers:{},entries:[],tileLayer:null,tileLayers:[],tileOk:0,tileErr:0,tileTimer:null,basemapIdx:0,fallback:false,fallbackLayer:null,gen:0,style:'jalan',chain:null,spiderLayer:null,spider:null,spiderTimer:null,clusters:[],clusterOf:{},menuDocBound:false,sementara:false,attribControl:null,glMap:null,glWatchdog:null,glHardTimer:null,glRenderCount:0,glIsiCount:0,resizeObs:null,resizeObsSize:null};
+/* Blokir vektor untuk SISA SESI halaman (sampai aplikasi dimuat
+   ulang): dipasang pengawas lukisan GL (petaGLMenyerah) sesudah gaya
+   vektor terbukti tidak melukis, supaya rantai gaya langsung memakai
+   raster dan bidang peta tidak berulang kali kosong pada kunjungan
+   berikutnya. Pilihan EKSPLISIT pengguna dari dropdown gaya membuka
+   blokir ini (lihat petaSetStyle). */
+let petaGLDiblokirSesi=false;
+/* Hasil pemeriksaan dukungan WebGL (diingat sesi ini; pemeriksaan
+   membuat konteks uji sekali saja). */
+let petaWebGLCache=null;
 /* Gaya awal peta TIDAK lagi dibaca dari pilihan sesi lama
    (sessionStorage 'sf_peta_style' dibersihkan di sini): gaya awal
    selalu pilihan admin utama di Pengaturan (dokumen 'sumber_peta').
@@ -1009,16 +1019,27 @@ function petaSyncAtribusi(bp){
   el.classList.toggle('peta-ofm-on',!!(bp&&PETA_STYLES[bp.key]&&PETA_STYLES[bp.key].vector));
 }
 /* Rantai untuk gaya terpilih: gaya itu dulu; bila gagal, kembali ke Jalan
-   (Esri Street); bila itu pun gagal, peta dasar cadangan lokal (SVG). */
+   (Esri Street); bila itu pun gagal, peta dasar cadangan lokal (SVG).
+   Gaya VEKTOR dilewati sejak awal bila sesi ini sudah memblokirnya
+   (pernah terbukti tidak melukis) atau peramban tidak punya WebGL —
+   dalam kedua keadaan itu vektor tidak akan pernah tampil, jadi
+   rantai langsung mulai dari Jalan dan bidang tidak kosong sedetik
+   pun. */
 function petaChain(){
   let pertama=PM.style||'jalan';
   if(!PETA_STYLES[pertama])pertama='jalan';
+  if(PETA_STYLES[pertama].vector&&(petaGLDiblokirSesi||!petaWebGLAda()))pertama='jalan';
   const urutan=[pertama];
   if(pertama!=='jalan')urutan.push('jalan');
   return urutan.map(k=>petaStyleResolved(k)).filter(Boolean);
 }
-/* Buang semua lapisan ubin gaya yang sedang tampil (dasar + overlay). */
+/* Buang semua lapisan ubin gaya yang sedang tampil (dasar + overlay).
+   Lapisan GL yang ikut terbuang juga melepaskan pengawas lukisannya
+   dan acuan peta GL-nya, supaya pengawas sesi lama tidak menembak
+   rantai gaya yang baru. */
 function petaClearTiles(){
+  petaBersihkanPengawasGL();
+  PM.glMap=null;PM.glRenderCount=0;PM.glIsiCount=0;
   if(PM.tileLayers&&PM.map)PM.tileLayers.forEach(l=>{try{PM.map.removeLayer(l)}catch(e){}});
   PM.tileLayers=[];PM.tileLayer=null;
 }
@@ -1047,6 +1068,12 @@ function petaTutupMenuStyle(){
    aplikasi mengembalikan peta ke bawaan admin (petaResetKeBawaanAdmin). */
 function petaSetStyle(key){
   if(!PETA_STYLES[key])return;
+  /* Pilihan EKSPLISIT dari dropdown: memilih gaya vektor langsung
+     membuka blokir sesi dari kegagalan lukis sebelumnya dan vektor
+     dicoba lagi — tetap dengan pengawas lukisan yang sama, jadi
+     bidang peta tidak bisa kosong berlama-lama walau percobaan
+     ulangnya pun gagal melukis. */
+  if(PETA_STYLES[key].vector)petaGLDiblokirSesi=false;
   PM.style=key;
   PM.sementara=true;
   petaSyncStyleUI();
@@ -1111,45 +1138,258 @@ function petaTryBasemap(idx){
   });
   PM.tileTimer=setTimeout(()=>{if(PM.tileOk===0)petaNextBasemap()},6000);
 }
+/* ===== Perbaikan peta vektor tidak langsung muncul =====
+   Laporan dari situs live: gaya OpenFreeMap terpilih, lencana pin
+   dan daftar anggota normal, tetapi bidang peta KOSONG total —
+   tanpa gambar peta dan tanpa pin — saat halaman dibuka. Akar
+   masalahnya pada cara plugin maplibre-gl-leaflet bekerja: ukuran
+   wadah & kanvas GL DIKUNCI dari ukuran peta Leaflet pada saat
+   lapisan dipasang, dan plugin hanya membetulkannya pada peristiwa
+   'move' Leaflet (geser/zoom). Lapisan yang dipasang sebelum tata
+   letak lentur halaman selesai — atau yang ukurannya berubah tepat
+   sesudah tampil — melahirkan kanvas yang salah ukuran/kosong, dan
+   peristiwa 'load' MapLibre bisa tetap tiba tanpa satu piksel pun
+   terlukis, jadi penjaga lama (load/error/10 detik) tidak menolong:
+   tidak ada error, dan gambar ulang halaman terus mengulang timer.
+   Perbaikannya empat lapis, semuanya di bawah ini:
+   1) WebGL diperiksa di awal — tanpa WebGL vektor tidak dicoba.
+   2) Lapisan GL hanya dibuat SESUDAH wadah peta berukuran nyata.
+   3) Sesudah terpasang, ukuran Leaflet + GL disegarkan berulang dan
+      setiap perubahan ukuran wadah (ResizeObserver) memicu
+      penyegaran yang sama — tanpa menunggu geser/zoom pengguna.
+   4) PENGAWAS LUKISAN: dalam ±7 detik sesudah lapisan terpasang,
+      GL harus terbukti BENAR-BENAR melukis (gaya termuat + kanvas
+      berukuran nyata menutupi wadah + gambar selesai/idle); bila
+      tidak, lapisan GL dilepas, rantai turun ke raster Jalan, dan
+      vektor diblokir untuk sisa sesi halaman ini. */
+/* Dukungan WebGL peramban (MapLibre tidak bisa melukis tanpanya).
+   Hasilnya diingat; konteks uji langsung dilepas. */
+function petaWebGLAda(){
+  if(petaWebGLCache!==null)return petaWebGLCache;
+  let ada=false;
+  try{
+    const c=document.createElement('canvas');
+    const gl=c.getContext('webgl2')||c.getContext('webgl')||c.getContext('experimental-webgl');
+    ada=!!gl;
+    if(gl){try{const lose=gl.getExtension&&gl.getExtension('WEBGL_lose_context');if(lose)lose.loseContext()}catch(e){}}
+  }catch(e){ada=false}
+  petaWebGLCache=ada;
+  return ada;
+}
+/* Segarkan ukuran SEMUA lapisan peta sekaligus: Leaflet membaca
+   ulang ukuran wadahnya (invalidateSize), peta GL di dalamnya
+   disamakan ukurannya (resize) dan dipaksa menggambar ulang
+   (triggerRepaint). Inilah yang sebelumnya hanya terjadi tidak
+   langsung — dan sering tidak terjadi sama sekali — sampai
+   pengguna menggeser peta lebih dulu. */
+function petaSegarkanUkuranPeta(){
+  if(!PM.map)return;
+  try{PM.map.invalidateSize()}catch(e){}
+  const gm=PM.glMap;
+  if(gm){
+    try{if(typeof gm.resize==='function')gm.resize()}catch(e){}
+    try{if(typeof gm.triggerRepaint==='function')gm.triggerRepaint()}catch(e){}
+  }
+}
+/* Pengamat ukuran wadah peta: setiap perubahan ukuran NYATA wadah
+   #peta-map (tata letak lentur selesai, jendela berubah, panel
+   daftar menyempit/melebar) menyegarkan ukuran Leaflet + GL pada
+   bingkai gambar berikutnya. Perubahan ke ukuran yang sama diabaikan
+   supaya tidak ada lingkaran segar-tanpa-henti. */
+function petaPasangPengamatUkuran(el){
+  petaLepasPengamatUkuran();
+  if(!el||typeof ResizeObserver==='undefined')return;
+  PM.resizeObsSize={w:el.clientWidth||0,h:el.clientHeight||0};
+  let raf=0;
+  const obs=new ResizeObserver(()=>{
+    const w=el.clientWidth||0,hh=el.clientHeight||0;
+    if(!w||!hh)return;
+    if(PM.resizeObsSize&&PM.resizeObsSize.w===w&&PM.resizeObsSize.h===hh)return;
+    PM.resizeObsSize={w,h:hh};
+    if(raf)return;
+    raf=requestAnimationFrame(()=>{raf=0;if(S.view==='peta')petaSegarkanUkuranPeta()});
+  });
+  try{obs.observe(el)}catch(e){return}
+  PM.resizeObs=obs;
+}
+function petaLepasPengamatUkuran(){
+  if(PM.resizeObs){try{PM.resizeObs.disconnect()}catch(e){}PM.resizeObs=null}
+  PM.resizeObsSize=null;
+}
+/* Tunggu sampai wadah peta berukuran nyata (≥80×80 px) sebelum
+   lapisan GL dibuat — sambil menyegarkan ukuran Leaflet supaya tata
+   letak yang masih berjalan cepat mencapai ukuran akhirnya. Batas
+   ±2,5 detik; batal (false) bila sesi peta sudah berganti atau
+   ukuran tidak kunjung nyata. */
+function petaTungguWadahBerukuran(gen,idx){
+  return new Promise(resolve=>{
+    const mulai=Date.now();
+    const cek=()=>{
+      if(!PM.map||gen!==PM.gen||PM.basemapIdx!==idx){resolve(false);return}
+      const el=document.getElementById('peta-map');
+      if(el&&el.clientWidth>=80&&el.clientHeight>=80){resolve(true);return}
+      if(Date.now()-mulai>=2500){resolve(false);return}
+      try{PM.map.invalidateSize()}catch(e){}
+      setTimeout(cek,120);
+    };
+    cek();
+  });
+}
+/* Keadaan ubin sumber vektor utama ('openmaptiles') di cache
+   sumber MapLibre: 'ada' bila sekurang-kurangnya satu ubin
+   berstatus 'loaded' (benar-benar tiba & terolah), 'kosong' bila
+   ubin sudah dicoba tetapi semuanya 'errored'/belum ada yang tiba,
+   null bila struktur internal versi ini tidak dikenal (penilaian
+   beralih ke tanda cadangan). Pemeriksaan ini perlu karena pada
+   kegagalan ubin total MapLibre tetap melaporkan loaded() /
+   areTilesLoaded() / isStyleLoaded() = true dan tetap memancarkan
+   peristiwa isi — yang terlukis hanya warna latar & relief, persis
+   pola bidang kosong berisi latar polos pada laporan pengguna.
+   Versi MapLibre terkunci SRI (4.7.1), jadi struktur ini tetap. */
+function petaGLKeadaanUbin(glMap){
+  try{
+    const sc=glMap&&glMap.style&&glMap.style.sourceCaches&&glMap.style.sourceCaches.openmaptiles;
+    if(!sc||!sc._tiles)return null;
+    const tiles=Object.values(sc._tiles);
+    if(!tiles.length)return 'kosong';
+    return tiles.some(t=>t&&t.state==='loaded')?'ada':'kosong';
+  }catch(e){return null}
+}
+/* Bukti GL BENAR-BENAR melukis, bukan sekadar termuat: kanvasnya
+   ada, berukuran piksel > 0, dan kotaknya menutupi sekurang-
+   kurangnya separuh wadah peta; gaya sudah termuat; ISI ubin
+   vektor sumber utamanya terbukti tiba (keadaan ubin di atas —
+   tanpa ini peta hanya melukis warna latar & relief walau
+   MapLibre menyatakan loaded); dan MapLibre menyatakan gambarnya
+   selesai (loaded) atau sudah menggambar beberapa bingkai
+   (peristiwa 'render' terpantau pengawas). */
+function petaGLTerlukis(glMap){
+  if(!glMap)return false;
+  let canvas=null;
+  try{canvas=typeof glMap.getCanvas==='function'?glMap.getCanvas():null}catch(e){canvas=null}
+  if(!canvas||!(canvas.width>0)||!(canvas.height>0))return false;
+  const el=document.getElementById('peta-map');
+  if(el){
+    if(!(el.clientWidth>0)||!(el.clientHeight>0))return false;
+    const r=canvas.getBoundingClientRect();
+    if(!(r.width>=el.clientWidth*0.5)||!(r.height>=el.clientHeight*0.5))return false;
+  }
+  let gayaSiap=false;
+  try{gayaSiap=!!(glMap.isStyleLoaded&&glMap.isStyleLoaded())}catch(e){gayaSiap=false}
+  if(!gayaSiap)return false;
+  const ubin=petaGLKeadaanUbin(glMap);
+  if(ubin==='kosong')return false;
+  if(ubin===null&&!(PM.glIsiCount>0))return false;
+  try{if(glMap.loaded&&glMap.loaded())return true}catch(e){}
+  return PM.glRenderCount>=2;
+}
+/* Lepaskan kedua timer pengawas GL (pengawas lukisan + jaring
+   pengaman keras). */
+function petaBersihkanPengawasGL(){
+  if(PM.glWatchdog){clearTimeout(PM.glWatchdog);PM.glWatchdog=null}
+  if(PM.glHardTimer){clearTimeout(PM.glHardTimer);PM.glHardTimer=null}
+}
+/* Vektor menyerah: blokir vektor untuk sisa sesi halaman ini
+   (rantai gaya berikutnya langsung raster, sampai aplikasi dimuat
+   ulang), lepaskan pengawas, lalu turunkan rantai ke gaya
+   berikutnya (Jalan Esri) — bidang peta terisi lagi. */
+function petaGLMenyerah(idx){
+  petaGLDiblokirSesi=true;
+  petaBersihkanPengawasGL();
+  PM.glMap=null;
+  petaNextBasemap();
+}
 /* Gaya VEKTOR OpenFreeMap: pustaka MapLibre GL dimuat malas lebih
    dulu; lapisan GL lalu menjadi layer Leaflet biasa (plugin
    maplibre-gl-leaflet) sehingga pin & kawan-kawannya tidak berubah.
-   Keberhasilan dinilai dari peristiwa 'load' peta GL-nya; kesalahan
-   gaya/ubin atau senyap 10 detik menurunkan rantai ke gaya
-   berikutnya (Jalan Esri) — peta tidak pernah kosong. Penjaga
-   generasi + indeks rantai membuang hasil yang datang terlambat
-   sesudah peta dibangun ulang / gaya diganti. */
+   Keberhasilan TIDAK lagi dinilai dari 'load' saja, melainkan dari
+   bukti lukisan pengawas di atas; kegagalan dalam bentuk apa pun
+   (pustaka gagal, tanpa WebGL, wadah tak berukuran, error gaya,
+   atau kanvas tidak melukis dalam ±7 detik) menurunkan rantai ke
+   Jalan Esri — peta tidak pernah kosong. Penjaga generasi + indeks
+   rantai membuang hasil yang datang terlambat sesudah peta dibangun
+   ulang / gaya diganti. */
 function petaTryBasemapVektor(idx,bp){
   const gen=PM.gen;
   const masihBerlaku=()=>!!(PM.map&&gen===PM.gen&&PM.basemapIdx===idx&&!PM.fallback);
-  PM.tileTimer=setTimeout(()=>{if(masihBerlaku()&&PM.tileOk===0)petaNextBasemap()},10000);
-  petaMuatMapLibre().then(ok=>{
+  /* Tanpa WebGL lapisan vektor tidak akan pernah melukis. */
+  if(!petaWebGLAda()){petaGLMenyerah(idx);return}
+  /* Jaring pengaman keras: apa pun yang tersendat sesudah ini —
+     pustaka GL lambat dimuat, wadah tak kunjung berukuran, kanvas
+     tidak melukis — bidang peta tidak kosong lebih dari ±12 detik;
+     rantai turun sendiri ke raster. */
+  PM.glHardTimer=setTimeout(()=>{if(masihBerlaku()&&PM.tileOk===0)petaGLMenyerah(idx)},12000);
+  petaMuatMapLibre().then(async ok=>{
     if(!masihBerlaku())return;
-    if(!ok){petaNextBasemap();return}
+    if(!ok){petaGLMenyerah(idx);return}
+    /* Lapisan GL hanya dibuat sesudah wadah berukuran nyata (lihat
+       catatan perbaikan di atas); tidak kunjung berukuran → raster. */
+    const siap=await petaTungguWadahBerukuran(gen,idx);
+    if(!masihBerlaku())return;
+    if(!siap){petaGLMenyerah(idx);return}
     let gl=null;
     try{
       gl=L.maplibreGL({style:bp.styleUrl,attribution:bp.attribution});
-    }catch(e){console.error('Lapisan OpenFreeMap gagal dibuat:',e);petaNextBasemap();return}
-    try{gl.addTo(PM.map)}catch(e){console.error('Lapisan OpenFreeMap gagal dipasang:',e);petaNextBasemap();return}
+    }catch(e){console.error('Lapisan OpenFreeMap gagal dibuat:',e);petaGLMenyerah(idx);return}
+    try{gl.addTo(PM.map)}catch(e){console.error('Lapisan OpenFreeMap gagal dipasang:',e);petaGLMenyerah(idx);return}
     PM.tileLayer=gl;PM.tileLayers=[gl];
     let glMap=null;
     try{glMap=typeof gl.getMaplibreMap==='function'?gl.getMaplibreMap():null}catch(e){glMap=null}
-    if(!glMap){petaNextBasemap();return}
+    if(!glMap){petaGLMenyerah(idx);return}
+    PM.glMap=glMap;PM.glRenderCount=0;PM.glIsiCount=0;
     const sukses=()=>{
-      if(!masihBerlaku())return;
+      if(!masihBerlaku()||PM.tileOk===1)return;
       PM.tileOk=1;
       if(PM.tileTimer){clearTimeout(PM.tileTimer);PM.tileTimer=null}
+      petaBersihkanPengawasGL();
       petaSetAttrib(idx>0?('Tampilan pilihan tidak terjangkau — memakai '+bp.name+' • Leaflet'):('Peta dasar: '+bp.name+' • Leaflet'));
-      /* Pin & lapisan anggota harus tetap DI ATAS kanvas GL. */
+      /* Ukuran disamakan sekali lagi pada momen terbukti melukis,
+         lalu pin & lapisan anggota tetap DI ATAS kanvas GL. */
+      petaSegarkanUkuranPeta();
       try{if(PM.spiderLayer&&PM.spiderLayer.eachLayer)PM.spiderLayer.eachLayer(l=>{if(l.bringToFront)l.bringToFront()})}catch(e){}
       try{if(PM.layer&&PM.layer.eachLayer)PM.layer.eachLayer(l=>{if(l.bringToFront)l.bringToFront()})}catch(e){}
     };
-    const gagal=()=>{if(masihBerlaku()&&PM.tileOk===0)petaNextBasemap()};
+    const gagal=()=>{
+      if(!masihBerlaku()||PM.tileOk===1)return;
+      /* Peristiwa 'error' MapLibre juga bisa berarti SATU ubin gagal
+         (tidak fatal): beri kesempatan singkat untuk terbukti
+         melukis lebih dulu — hanya error yang tidak diikuti lukisan
+         yang menurunkan rantai. */
+      setTimeout(()=>{
+        if(!masihBerlaku()||PM.tileOk===1)return;
+        if(petaGLTerlukis(glMap)){sukses();return}
+        petaGLMenyerah(idx);
+      },700);
+    };
     try{
-      if(glMap.loaded&&glMap.loaded())sukses();
-      glMap.on('load',sukses);
+      glMap.on('render',()=>{PM.glRenderCount++});
+      /* Bukti isi: ubin VEKTOR sumber utama ('openmaptiles') yang
+         benar-benar tiba & terolah — pembeda peta yang melukis
+         jalan/label dari peta yang hanya melukis latarnya. */
+      glMap.on('sourcedata',ev=>{try{if(ev&&ev.sourceDataType==='content'&&(!ev.sourceId||ev.sourceId==='openmaptiles'))PM.glIsiCount++}catch(e){}});
+      glMap.on('load',()=>{petaSegarkanUkuranPeta();if(petaGLTerlukis(glMap))sukses()});
+      glMap.on('idle',()=>{if(petaGLTerlukis(glMap))sukses()});
       glMap.on('error',gagal);
-    }catch(e){/* penjaga waktu 10 detik di atas tetap menjadi jaring terakhir */}
+    }catch(e){/* pengawas lukisan di bawah tetap menjadi jaring penentu */}
+    /* Tendangan penyegar ukuran: tepat sesudah lapisan terpasang
+       dan pada dua momen sesudahnya, samakan ukuran Leaflet + GL
+       dan paksa gambar ulang — menutup celah ukuran yang berubah
+       tepat sesudah halaman tampil. */
+    petaSegarkanUkuranPeta();
+    setTimeout(()=>{if(masihBerlaku())petaSegarkanUkuranPeta()},350);
+    setTimeout(()=>{if(masihBerlaku())petaSegarkanUkuranPeta()},1600);
+    /* PENGAWAS LUKISAN: periksa berkala apakah GL benar-benar
+       melukis; ±7 detik sejak lapisan terpasang tanpa bukti lukisan
+       → menyerah ke raster untuk sisa sesi halaman ini. */
+    const batas=Date.now()+7000;
+    const periksa=()=>{
+      if(!masihBerlaku()||PM.tileOk===1)return;
+      if(petaGLTerlukis(glMap)){sukses();return}
+      if(Date.now()>=batas){petaGLMenyerah(idx);return}
+      PM.glWatchdog=setTimeout(periksa,450);
+    };
+    PM.glWatchdog=setTimeout(periksa,450);
+    if(petaGLTerlukis(glMap))sukses();
   });
 }
 function petaFiltered(){
@@ -1639,12 +1879,14 @@ function vPeta(){
    peta Leaflet dari data terbaru dan pasang semua pengendali halaman.
    Kegagalan di sini tidak boleh menghentikan aplikasi — semua dijaga. */
 function initPetaMap(){
-  if(S.view!=='peta')return;
+  if(S.view!=='peta'){petaLepasPengamatUkuran();return}
   const el=document.getElementById('peta-map');
   if(!el)return;
   try{
     if(PM.tileTimer){clearTimeout(PM.tileTimer);PM.tileTimer=null}
-    if(PM.map){try{PM.map.remove()}catch(e){}PM.map=null;PM.layer=null;PM.markers={};PM.tileLayer=null;PM.tileLayers=[];PM.fallbackLayer=null;PM.fallback=false;PM.spiderLayer=null;PM.spider=null;PM.clusters=[];PM.clusterOf={};PM.attribControl=null}
+    petaBersihkanPengawasGL();
+    petaLepasPengamatUkuran();
+    if(PM.map){try{PM.map.remove()}catch(e){}PM.map=null;PM.layer=null;PM.markers={};PM.tileLayer=null;PM.tileLayers=[];PM.fallbackLayer=null;PM.fallback=false;PM.spiderLayer=null;PM.spider=null;PM.clusters=[];PM.clusterOf={};PM.attribControl=null;PM.glMap=null;PM.glRenderCount=0;PM.glIsiCount=0}
     PM.gen=(PM.gen||0)+1;
     /* Gaya awal = bawaan admin, kecuali pilihan sementara kunjungan ini. */
     if(!PM.sementara||!PETA_STYLES[PM.style])PM.style=petaGayaEfektif();
@@ -1708,12 +1950,20 @@ function initPetaMap(){
     petaTryBasemap(0);
     petaRefresh();
     /* Tata letak satu jendela: tinggi peta lentur mengikuti sisa ruang
-       layar, jadi Leaflet perlu diberi tahu ukuran akhirnya sesudah
-       tata letak selesai (dan setiap ukuran jendela berubah). */
-    setTimeout(()=>{if(PM.map)PM.map.invalidateSize()},90);
+       layar, jadi ukuran peta harus disamakan dengan wadahnya sesudah
+       tata letak selesai — untuk Leaflet (invalidateSize) DAN untuk
+       peta GL di dalamnya (resize + gambar ulang), karena lapisan GL
+       tidak membetulkan ukurannya sendiri. Pengamat ukuran wadah
+       menjaga kesamaan itu selama halaman tampil; penyegaran sesaat
+       sesudah bangun menutup celah tata letak yang baru selesai
+       sesudah peta dibuat; perubahan ukuran jendela menyegarkan
+       keduanya juga. */
+    petaPasangPengamatUkuran(el);
+    setTimeout(()=>{if(PM.map)petaSegarkanUkuranPeta()},90);
+    setTimeout(()=>{if(PM.map)petaSegarkanUkuranPeta()},450);
     if(!PM.resizeBound){
       PM.resizeBound=true;
-      window.addEventListener('resize',()=>{if(PM.map&&S.view==='peta'){try{PM.map.invalidateSize()}catch(e){}}});
+      window.addEventListener('resize',()=>{if(PM.map&&S.view==='peta'){try{petaSegarkanUkuranPeta()}catch(e){}}});
     }
     /* Penempatan pin presisi dari alamat lengkap berjalan di latar —
        dijeda selama mode Perbaiki Posisi Pin aktif supaya pin yang
