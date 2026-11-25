@@ -838,6 +838,11 @@ function petaInisial(nama){const p=String(nama||'?').trim().split(/\s+/);return 
    'Satelit + Label' dan 'Kereta' lapisannya dipasang maxNativeZoom
    12 — label tetap tampil saat peta diperbesar, digambar dari ubin
    zoom 12. */
+/* Atribusi resmi Mapbox untuk ubin Mapbox: teks + tautan Mapbox &
+   OpenStreetMap + tautan perbaikan peta. Atribusi ini WAJIB tampil
+   saat gaya Mapbox aktif (aturan Mapbox) — kontrol atribusi Leaflet
+   hanya dinyalakan untuk gaya Mapbox (lihat petaSyncAtribusi). */
+const PETA_MAPBOX_ATTRIBUTION='&copy; <a href="https://www.mapbox.com/about/maps/" target="_blank" rel="noopener">Mapbox</a> &copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> <strong><a href="https://apps.mapbox.com/feedback/" target="_blank" rel="noopener">Improve this map</a></strong>';
 const PETA_STYLES={
   jalan:{label:'Jalan',desc:'Peta jalan umum',name:'Esri World Street Map',url:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',opts:{maxZoom:19,attribution:'Tiles &copy; Esri'},overlays:[]},
   terang:{label:'Terang',desc:'Peta terang minimalis — label huruf romaji',name:'Esri Light Gray Canvas',url:'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',opts:{maxZoom:19,attribution:'Tiles &copy; Esri'},overlays:[
@@ -853,18 +858,117 @@ const PETA_STYLES={
   kereta:{label:'Kereta',desc:'Jalur kereta & stasiun menonjol di atas peta pucat — label romaji',name:'Esri Light Gray + Transportasi',url:'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',opts:{maxZoom:19,attribution:'Tiles &copy; Esri'},overlays:[
     {url:'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}',opts:{maxZoom:19,maxNativeZoom:12,attribution:'Tiles &copy; Esri'}},
     {url:'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',opts:{maxZoom:19,maxNativeZoom:12,attribution:'Tiles &copy; Esri'}}
-  ]}
+  ]},
+  /* Gaya Mapbox (Styles API, ubin raster 512 retina: tileSize 512 +
+     zoomOffset -1). Alamat ubinnya TIDAK statis — dibangun saat peta
+     dimuat dari token publik Mapbox milik admin (lihat
+     petaStyleResolved), jadi entri ini url-nya kosong. Gaya Mapbox
+     hanya DITAWARKAN (Pengaturan & dropdown peta) bila token terisi,
+     dan tidak pernah menjadi gaya tampil tanpa token. */
+  mapboxjalan:{label:'Mapbox Jalan',desc:'Peta jalan Mapbox',name:'Mapbox Streets',mapbox:true,mapboxStyle:'streets-v12',url:'',opts:{tileSize:512,zoomOffset:-1,maxZoom:19,attribution:PETA_MAPBOX_ATTRIBUTION},overlays:[]},
+  mapboxsatelit:{label:'Mapbox Satelit',desc:'Satelit Mapbox dengan nama jalan & tempat',name:'Mapbox Satellite Streets',mapbox:true,mapboxStyle:'satellite-streets-v12',url:'',opts:{tileSize:512,zoomOffset:-1,maxZoom:19,attribution:PETA_MAPBOX_ATTRIBUTION},overlays:[]}
 };
 /* Urutan tampil di menu dropdown: dari yang umum ke yang khusus. */
 const PETA_STYLE_ORDER=['jalan','terang','jepang','satelit','satelitlabel','topo','kereta'];
-const PM={map:null,layer:null,markers:{},entries:[],tileLayer:null,tileLayers:[],tileOk:0,tileErr:0,tileTimer:null,basemapIdx:0,fallback:false,fallbackLayer:null,gen:0,style:'jalan',chain:null,spiderLayer:null,spider:null,spiderTimer:null,clusters:[],clusterOf:{},menuDocBound:false};
-try{const tersimpan=sessionStorage.getItem('sf_peta_style');if(tersimpan&&PETA_STYLES[tersimpan])PM.style=tersimpan}catch(e){}
+const PETA_STYLE_ORDER_MAPBOX=['mapboxjalan','mapboxsatelit'];
+const PM={map:null,layer:null,markers:{},entries:[],tileLayer:null,tileLayers:[],tileOk:0,tileErr:0,tileTimer:null,basemapIdx:0,fallback:false,fallbackLayer:null,gen:0,style:'jalan',chain:null,spiderLayer:null,spider:null,spiderTimer:null,clusters:[],clusterOf:{},menuDocBound:false,sementara:false,attribControl:null};
+/* Gaya awal peta TIDAK lagi dibaca dari pilihan sesi lama
+   (sessionStorage 'sf_peta_style' dibersihkan di sini): gaya awal
+   selalu pilihan admin utama di Pengaturan (dokumen 'sumber_peta').
+   Pilihan dari dropdown peta hanya berlaku SEMENTARA selama
+   kunjungan itu (PM.sementara) dan kembali ke bawaan admin saat
+   halaman Peta dibuka lagi / aplikasi dimuat ulang. */
+try{sessionStorage.removeItem('sf_peta_style')}catch(e){}
+/* ===== Sumber Peta: pilihan admin utama (Pengaturan) =====
+   Tersimpan sebagai dokumen {id:'sumber_peta', gaya, mapboxToken} di
+   koleksi 'pengaturan' — pola yang sama seperti pesan sambutan —
+   jadi berlaku untuk SELURUH pengguna dan tetap sesudah muat ulang.
+   mapboxToken adalah token PUBLIK Mapbox (pk.…): memang dirancang
+   tampil di klien (terlihat juga di alamat ubin), bukan kunci rahasia
+   server. */
+function petaMapboxToken(){return String((S.sumberPeta&&S.sumberPeta.mapboxToken)||'').trim()}
+/* Gaya bawaan yang BENAR-BENAR dipakai: pilihan admin, dengan
+   penjagaan — gaya tak dikenal, atau gaya Mapbox tanpa token, jatuh
+   ke 'jalan' (Esri) yang pasti bekerja. Peta tidak pernah kosong
+   hanya karena bawaan admin tidak bisa dipakai. */
+function petaGayaEfektif(){
+  let g=(S.sumberPeta&&S.sumberPeta.gaya)||'jalan';
+  if(!PETA_STYLES[g])g='jalan';
+  if(PETA_STYLES[g].mapbox&&!petaMapboxToken())g='jalan';
+  return g;
+}
+/* Definisi gaya siap pakai Leaflet: untuk gaya Mapbox, alamat ubin
+   dibangun dari token tersimpan (Styles API, ubin 512 @2x). */
+function petaStyleResolved(key){
+  const st=PETA_STYLES[key];
+  if(!st)return null;
+  if(!st.mapbox)return Object.assign({key},st);
+  return Object.assign({key},st,{url:'https://api.mapbox.com/styles/v1/mapbox/'+st.mapboxStyle+'/tiles/512/{z}/{x}/{y}@2x?access_token='+encodeURIComponent(petaMapboxToken())});
+}
+/* Daftar gaya yang DITAWARKAN: tujuh gaya bebas selalu ada; gaya
+   Mapbox hanya muncul bila token terisi. tokenLangsung dipakai
+   halaman Pengaturan supaya daftar mengikuti isi kolom token yang
+   sedang diketik, sebelum disimpan. */
+function petaDaftarGayaTersedia(tokenLangsung){
+  const token=typeof tokenLangsung==='string'?tokenLangsung.trim():petaMapboxToken();
+  const daftar=PETA_STYLE_ORDER.slice();
+  if(token)PETA_STYLE_ORDER_MAPBOX.forEach(k=>daftar.push(k));
+  return daftar;
+}
+/* Masuk halaman Peta = kembali ke bawaan admin: pilihan sementara
+   dari kunjungan sebelumnya dibuang (dipanggil go() di shell.js). */
+function petaResetKeBawaanAdmin(){
+  PM.sementara=false;
+  PM.style=petaGayaEfektif();
+  try{sessionStorage.removeItem('sf_peta_style')}catch(e){}
+}
+function subscribeSumberPeta(){
+  if(!S.db)return ()=>{};
+  try{
+    return S.db.collection('pengaturan').onSnapshot(snap=>{
+      const doc=(snap.docs||[]).find(d=>d.id==='sumber_peta');
+      const data=doc&&typeof doc.data==='function'?doc.data():null;
+      const next={
+        gaya:(data&&typeof data.gaya==='string'&&PETA_STYLES[data.gaya])?data.gaya:'jalan',
+        mapboxToken:(data&&typeof data.mapboxToken==='string')?data.mapboxToken:''
+      };
+      const prev=S.sumberPeta||{gaya:'jalan',mapboxToken:''};
+      if(next.gaya===prev.gaya&&next.mapboxToken===prev.mapboxToken)return;
+      S.sumberPeta=next;
+      /* Bawaan berubah dari admin / perangkat lain: terapkan sebagai
+         gaya awal, kecuali pengguna sedang memakai pilihan sementara
+         pada kunjungan ini. */
+      if(!PM.sementara)PM.style=petaGayaEfektif();
+      if(S.view==='peta'||S.view==='pengaturan')renderDariData();
+    },error=>{console.error('Sumber peta gagal dimuat:',error)});
+  }catch(error){console.error('Sumber peta gagal dimuat:',error);return ()=>{}}
+}
+async function saveSumberPeta(gaya,token){
+  const bersih={gaya:PETA_STYLES[gaya]?gaya:'jalan',mapboxToken:String(token||'').trim()};
+  if(S.db)await S.db.collection('pengaturan').doc('sumber_peta').set({gaya:bersih.gaya,mapboxToken:bersih.mapboxToken,at:Date.now()});
+  S.sumberPeta=bersih;
+  /* Pilihan yang baru disimpan langsung menjadi gaya awal peta. */
+  PM.sementara=false;
+  PM.style=petaGayaEfektif();
+}
+/* Atribusi Mapbox: class 'peta-mapbox-on' pada wadah peta menyalakan
+   tampilan kontrol atribusi Leaflet (CSS) — HANYA saat lapisan yang
+   benar-benar tampil adalah gaya Mapbox. Gaya lain (termasuk gaya
+   cadangan Esri sesudah Mapbox gagal) tetap tanpa atribusi, persis
+   seperti sebelumnya. */
+function petaSyncAtribusi(bp){
+  const el=document.getElementById('peta-map');
+  if(!el)return;
+  el.classList.toggle('peta-mapbox-on',!!(bp&&PETA_STYLES[bp.key]&&PETA_STYLES[bp.key].mapbox));
+}
 /* Rantai untuk gaya terpilih: gaya itu dulu; bila gagal, kembali ke Jalan
    (Esri Street); bila itu pun gagal, peta dasar cadangan lokal (SVG). */
 function petaChain(){
-  const urutan=[PM.style||'jalan'];
-  if(urutan[0]!=='jalan')urutan.push('jalan');
-  return urutan.map(k=>Object.assign({key:k},PETA_STYLES[k]));
+  let pertama=PM.style||'jalan';
+  if(!PETA_STYLES[pertama]||(PETA_STYLES[pertama].mapbox&&!petaMapboxToken()))pertama='jalan';
+  const urutan=[pertama];
+  if(pertama!=='jalan')urutan.push('jalan');
+  return urutan.map(k=>petaStyleResolved(k)).filter(Boolean);
 }
 /* Buang semua lapisan ubin gaya yang sedang tampil (dasar + overlay). */
 function petaClearTiles(){
@@ -891,11 +995,14 @@ function petaTutupMenuStyle(){
   if(tgl)tgl.setAttribute('aria-expanded','false');
 }
 /* Ganti tampilan peta: hanya lapisan dasar yang diganti — pin, pilihan
-   anggota, dan posisi peta tidak berubah. Pilihan diingat selama sesi. */
+   anggota, dan posisi peta tidak berubah. Pilihan ini SEMENTARA untuk
+   kunjungan ini saja: membuka lagi halaman Peta / memuat ulang
+   aplikasi mengembalikan peta ke bawaan admin (petaResetKeBawaanAdmin). */
 function petaSetStyle(key){
   if(!PETA_STYLES[key])return;
+  if(PETA_STYLES[key].mapbox&&!petaMapboxToken())return;
   PM.style=key;
-  try{sessionStorage.setItem('sf_peta_style',key)}catch(e){}
+  PM.sementara=true;
   petaSyncStyleUI();
   petaTutupMenuStyle();
   if(!PM.map||typeof L==='undefined')return;
@@ -911,6 +1018,7 @@ function petaSetStyle(key){
 function petaSetAttrib(txt){const el=document.getElementById('peta-attrib');if(el)el.textContent=txt}
 function petaActivateFallback(){
   if(PM.fallback)return;PM.fallback=true;
+  petaSyncAtribusi(null);
   if(PM.tileTimer){clearTimeout(PM.tileTimer);PM.tileTimer=null}
   petaClearTiles();
   if(PM.map&&!PM.fallbackLayer&&typeof L!=='undefined'){
@@ -937,6 +1045,7 @@ function petaTryBasemap(idx){
   const chain=PM.chain||petaChain();PM.chain=chain;
   if(idx>=chain.length){petaActivateFallback();return}
   const bp=chain[idx];
+  petaSyncAtribusi(bp);
   petaSetAttrib('Memuat peta dasar: '+bp.name+' …');
   /* Lapisan dasar gaya ini: keberhasilan/kegagalan rantai cadangan
      dinilai dari lapisan ini saja. */
@@ -1394,6 +1503,9 @@ function vPeta(){
      tidak tertinggal bisa digeser tanpa jalan keluar dan penempatan
      pin latar tidak terjeda. */
   if(S.petaFixMode){S.petaFixMode=false;S.petaFixNotice=''}
+  /* Gaya awal halaman ini = bawaan admin (Pengaturan), kecuali ada
+     pilihan sementara yang dibuat selama kunjungan ini. */
+  if(!PM.sementara||!PETA_STYLES[PM.style]||(PETA_STYLES[PM.style].mapbox&&!petaMapboxToken()))PM.style=petaGayaEfektif();
   const {entries,belum}=petaEntries();
   PM.belumList=belum;
   const topBar=h('div',{class:'peta-top'},
@@ -1401,12 +1513,14 @@ function vPeta(){
   /* Kartu peta = petanya sendiri: permukaan Leaflet memenuhi seluruh
      kartu dari tepi ke tepi (tanpa baris judul/keterangan di atas dan
      tanpa baris kaki di bawah). Pemilih gaya peta (satu tombol yang
-     membuka menu DROPDOWN berisi tujuh gaya) & pil jumlah pin
+     membuka menu DROPDOWN berisi gaya yang tersedia) & pil jumlah pin
      MELAYANG di sudut kanan atas peta; pemberitahuan sesaat (mode
      Perbaiki, progres geocoding, peta cadangan) melayang di sudut
      kiri bawah peta — tidak ada baris teks yang menyisakan celah.
-     Kontrol atribusi Leaflet dimatikan (attributionControl:false +
-     CSS) atas permintaan pengguna, jadi pojok peta bersih. */
+     Kontrol atribusi Leaflet disembunyikan (attributionControl:false +
+     CSS) atas permintaan pengguna, jadi pojok peta bersih — KECUALI
+     saat gaya Mapbox tampil: atribusinya wajib tampil menurut aturan
+     Mapbox dan dinyalakan khusus untuk gaya itu (petaSyncAtribusi). */
   const styleItem=key=>{const st=PETA_STYLES[key];return h('button',{type:'button',class:'peta-style-item'+(PM.style===key?' on':''),'data-style':key,role:'menuitemradio','aria-checked':PM.style===key?'true':'false'},
     h('span',{class:'peta-style-item-main'},h('b',{},st.label),h('small',{},st.desc)),
     h('span',{class:'peta-style-check','aria-hidden':'true'},icon('check',14)))};
@@ -1416,7 +1530,7 @@ function vPeta(){
       h('div',{class:'peta-style-picker'},
         h('button',{type:'button',class:'peta-style-toggle',id:'peta-style-toggle','aria-haspopup':'true','aria-expanded':'false','aria-controls':'peta-style-menu','aria-label':'Pilih gaya peta'},
           icon('map',15),h('span',{id:'peta-style-current'},(PETA_STYLES[PM.style]||PETA_STYLES.jalan).label),icon('chevD',15)),
-        h('div',{class:'peta-style-menu',id:'peta-style-menu',role:'menu','aria-label':'Pilihan gaya peta',hidden:'hidden'},...PETA_STYLE_ORDER.map(styleItem))),
+        h('div',{class:'peta-style-menu',id:'peta-style-menu',role:'menu','aria-label':'Pilihan gaya peta',hidden:'hidden'},...petaDaftarGayaTersedia().map(styleItem))),
       h('span',{class:'peta-count-badge',id:'peta-count'},entries.length+' pin tampil')),
     h('div',{class:'peta-map-notes'},
       h('div',{id:'peta-fix-notice',class:'peta-fix-notice',style:S.petaFixNotice?'display:block':'display:none'},S.petaFixNotice||''),
@@ -1441,8 +1555,10 @@ function initPetaMap(){
   if(!el)return;
   try{
     if(PM.tileTimer){clearTimeout(PM.tileTimer);PM.tileTimer=null}
-    if(PM.map){try{PM.map.remove()}catch(e){}PM.map=null;PM.layer=null;PM.markers={};PM.tileLayer=null;PM.tileLayers=[];PM.fallbackLayer=null;PM.fallback=false;PM.spiderLayer=null;PM.spider=null;PM.clusters=[];PM.clusterOf={}}
+    if(PM.map){try{PM.map.remove()}catch(e){}PM.map=null;PM.layer=null;PM.markers={};PM.tileLayer=null;PM.tileLayers=[];PM.fallbackLayer=null;PM.fallback=false;PM.spiderLayer=null;PM.spider=null;PM.clusters=[];PM.clusterOf={};PM.attribControl=null}
     PM.gen=(PM.gen||0)+1;
+    /* Gaya awal = bawaan admin, kecuali pilihan sementara kunjungan ini. */
+    if(!PM.sementara||!PETA_STYLES[PM.style]||(PETA_STYLES[PM.style].mapbox&&!petaMapboxToken()))PM.style=petaGayaEfektif();
     const hasilAwal=petaEntries();
     PM.entries=hasilAwal.entries;
     PM.belumList=hasilAwal.belum;
@@ -1486,6 +1602,13 @@ function initPetaMap(){
       return;
     }
     PM.map=L.map(el,{scrollWheelZoom:true,attributionControl:false}).setView([33.9,133.7],window.innerWidth<640?7:8);
+    /* Kontrol atribusi ditambahkan manual (tanpa awalan 'Leaflet'):
+       isinya mengikuti atribusi lapisan ubin yang sedang tampil, dan
+       CSS hanya MENAMPILKANNYA saat gaya Mapbox aktif (class
+       'peta-mapbox-on' dari petaSyncAtribusi) — gaya lain tetap
+       bersih tanpa atribusi seperti sebelumnya. */
+    PM.attribControl=L.control.attribution({prefix:false});
+    PM.attribControl.addTo(PM.map);
     PM.layer=L.layerGroup().addTo(PM.map);
     PM.spiderLayer=L.layerGroup().addTo(PM.map);
     PM.map.on('zoomstart',()=>petaSpiderCollapse());

@@ -26,12 +26,46 @@ function vPengaturan(){
   if(!S.mainAdmin)return [h('p',{class:'warn'},'Halaman ini hanya dapat diakses admin utama.')];
   const inp=h('textarea',{rows:3,maxlength:200,placeholder:SAMBUTAN_DEFAULT});
   inp.value=S.sambutan||'';
+  /* ===== Sumber Peta: gaya peta bawaan untuk SELURUH pengguna =====
+     Pilihan gaya + token Mapbox tersimpan lewat saveSumberPeta
+     (map.js) sebagai dokumen 'sumber_peta' di koleksi 'pengaturan'.
+     Daftar gaya pada dropdown mengikuti isi kolom token yang sedang
+     diketik: gaya Mapbox hanya muncul bila token terisi. */
+  const tersimpanPeta=(S.sumberPeta&&typeof S.sumberPeta==='object')?S.sumberPeta:{gaya:'jalan',mapboxToken:''};
+  const tokenInp=h('input',{type:'text',placeholder:'pk.…',autocomplete:'off',autocapitalize:'off',spellcheck:'false'});
+  tokenInp.value=tersimpanPeta.mapboxToken||'';
+  const gayaSel=h('select',{'aria-label':'Gaya peta bawaan'});
+  const catatanToken=h('p',{class:'sub'});
+  function segarkanOpsiPeta(){
+    const daftar=petaDaftarGayaTersedia(tokenInp.value);
+    const sebelumnya=gayaSel.value||tersimpanPeta.gaya||'jalan';
+    gayaSel.replaceChildren(...daftar.map(k=>{
+      const st=PETA_STYLES[k];
+      return h('option',{value:k},st.label+' — '+st.desc);
+    }));
+    gayaSel.value=daftar.includes(sebelumnya)?sebelumnya:'jalan';
+    catatanToken.textContent=tokenInp.value.trim()
+      ?'Pilihan Mapbox Jalan & Mapbox Satelit tersedia selama token terisi.'
+      :'Pilihan Mapbox Jalan & Mapbox Satelit muncul di sini dan di menu gaya peta sesudah token Mapbox diisi.';
+  }
+  tokenInp.addEventListener('input',segarkanOpsiPeta);
+  segarkanOpsiPeta();
   return [h('h1',{},'Pengaturan'),
     box(h('b',{},'Pesan sambutan di Home'),
       inp,
       h('div',{class:'fl'},h('button',{class:'btn',onclick:async()=>{
         try{await saveSambutanPesan(inp.value.trim());alert('Pesan sambutan disimpan.');render()}
         catch(e){alert('Gagal menyimpan pesan: '+(e.message||'periksa koneksi'))}
+      }},'Simpan'))),
+    box(h('b',{},'Sumber Peta'),
+      h('p',{class:'sub'},'Gaya peta bawaan untuk halaman Peta & Wilayah, berlaku untuk semua pengguna. Di halaman peta, pengguna tetap bisa mengganti gaya untuk sementara lewat menu gaya di peta — pilihannya kembali ke bawaan ini saat halaman dimuat ulang.'),
+      h('label',{class:'lb'},'Gaya peta bawaan',gayaSel),
+      h('label',{class:'lb'},'Token Mapbox',tokenInp),
+      catatanToken,
+      h('p',{class:'sub'},'Gaya Mapbox memakai akun & token Mapbox Anda sendiri: buat token publik (diawali pk.) di akun Mapbox Anda, lalu tempel di sini. Token publik ini memang dirancang untuk tampil di aplikasi. Saat gaya Mapbox aktif, logo & atribusi Mapbox wajib tetap tampil di peta sesuai aturan Mapbox — atribusi itu tampil otomatis, khusus untuk gaya Mapbox. Bila gaya Mapbox terpilih tetapi token kosong atau tidak bekerja, peta otomatis memakai gaya Jalan.'),
+      h('div',{class:'fl'},h('button',{class:'btn',onclick:async()=>{
+        try{await saveSumberPeta(gayaSel.value,tokenInp.value);alert('Sumber peta disimpan.');render()}
+        catch(e){alert('Gagal menyimpan sumber peta: '+(e.message||'periksa koneksi'))}
       }},'Simpan')))];
 }
 /* Maskot Home: VIDEO transparan pilihan pengguna — karakter dari

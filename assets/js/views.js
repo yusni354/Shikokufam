@@ -279,6 +279,7 @@ function startDataSubscriptions(){
   add(()=>subscribePilihan());
   if(!S.supabase)add(()=>sub('pengaturan','pengaturan'));
   add(()=>subscribeSambutan());
+  add(()=>subscribeSumberPeta());
   add(()=>subscribeMenuAktif());
   add(()=>subscribeSusunan());
 }
