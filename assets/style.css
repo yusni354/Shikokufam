@@ -1351,16 +1351,18 @@ body.auth-locked .landing{padding-top:0}
    disembunyikan atas permintaan pengguna — berlaku untuk semua peta
    Leaflet di aplikasi (halaman Peta & Wilayah, panel pin formulir,
    dan mode Perbaiki Posisi Pin) dan untuk semua gaya peta dasar,
-   KECUALI gaya Mapbox yang atribusinya wajib tampil (aturan Mapbox,
-   lihat aturan pengecualian tepat sesudah ini). */
+   KECUALI gaya vektor OpenFreeMap yang atribusinya wajib tampil
+   (lisensi data OpenStreetMap/OpenMapTiles, lihat aturan
+   pengecualian tepat sesudah ini). */
 .leaflet-control-attribution{display:none!important}
-/* Pengecualian WAJIB Mapbox: class 'peta-mapbox-on' dipasang
+/* Pengecualian OpenFreeMap: class 'peta-ofm-on' dipasang
    petaSyncAtribusi (map.js) pada wadah #peta-map HANYA saat lapisan
-   yang benar-benar tampil adalah gaya Mapbox — termasuk hilang lagi
-   begitu peta jatuh ke gaya cadangan Esri. Panel pin formulir tidak
-   pernah memakai gaya Mapbox, jadi atribusinya tetap tersembunyi. */
-#peta-map.peta-mapbox-on .leaflet-control-attribution{display:block!important;background:rgba(255,255,255,.88);color:#333;padding:2px 7px;font-size:10.5px;line-height:1.5;box-shadow:0 1px 5px rgba(30,50,70,.18)}
-#peta-map.peta-mapbox-on .leaflet-control-attribution a{color:#005f9e}
+   yang benar-benar tampil adalah gaya OpenFreeMap — termasuk hilang
+   lagi begitu peta jatuh ke gaya cadangan Esri. Panel pin formulir
+   tidak pernah memakai gaya vektor, jadi atribusinya tetap
+   tersembunyi. */
+#peta-map.peta-ofm-on .leaflet-control-attribution{display:block!important;background:rgba(255,255,255,.88);color:#333;padding:2px 7px;font-size:10.5px;line-height:1.5;box-shadow:0 1px 5px rgba(30,50,70,.18)}
+#peta-map.peta-ofm-on .leaflet-control-attribution a{color:#005f9e}
 .peta-map-card{position:relative;z-index:0;isolation:isolate;background:#dbe5ee;border:1px solid rgba(255,255,255,.85);border-radius:24px;overflow:hidden;box-shadow:10px 12px 24px rgba(70,95,115,.16),-6px -6px 18px rgba(255,255,255,.6);margin-bottom:12px}
 /* Peta memenuhi seluruh kartu tepi ke tepi: pilihan tampilan peta &
    pil jumlah pin melayang di sudut kanan atas permukaan peta, dan

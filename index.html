@@ -5,10 +5,10 @@
 <!-- Keamanan dari pihak luar (CSP): hanya asal yang benar-benar dipakai
      aplikasi yang diizinkan — skrip hanya dari berkas sendiri dan jsDelivr
      (pustaka terkunci SRI); data hanya
-     ke/dari Supabase proyek ini, ubin peta Esri/GSI/OSM/Mapbox, geocoding
+     ke/dari Supabase proyek ini, ubin peta Esri/GSI/OSM/OpenFreeMap, geocoding
      Nominatim/GSI/HeartRails, dan font Google.
      Skrip & gaya sebaris dari luar daftar ini ditolak peramban. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https://api.mapbox.com https://*.supabase.co https://*.arcgisonline.com https://cyberjapandata.gsi.go.jp https://tile.openstreetmap.org https://*.googleusercontent.com; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' data: blob: https://*.supabase.co wss://*.supabase.co https://nominatim.openstreetmap.org https://msearch.gsi.go.jp https://geoapi.heartrails.com; media-src 'self' data: blob: https://*.supabase.co; frame-src 'self'; worker-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; img-src 'self' data: blob: https://tiles.openfreemap.org https://*.supabase.co https://*.arcgisonline.com https://cyberjapandata.gsi.go.jp https://tile.openstreetmap.org https://*.googleusercontent.com; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' data: blob: https://tiles.openfreemap.org https://*.supabase.co wss://*.supabase.co https://nominatim.openstreetmap.org https://msearch.gsi.go.jp https://geoapi.heartrails.com; media-src 'self' data: blob: https://*.supabase.co; frame-src 'self'; worker-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="description" content="Shikoku Family adalah komunitas Indonesia di Shikoku, Jepang untuk saling terhubung, berbagi informasi, dan bertumbuh bersama.">
 <meta name="theme-color" content="#2f86b8">
@@ -26,7 +26,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://uwshronrpfkypkjqewgw.supabase.co">
 <link href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;500;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/style.css?v=20270510">
+<link rel="stylesheet" href="assets/style.css?v=20270511">
 </head>
 <body class="auth-locked">
 <div id="ov"></div>
@@ -52,7 +52,7 @@
 <script src="assets/config.js"></script>
 
 <!-- Kode aplikasi: URUTAN PENTING, jangan ditukar -->
-<script src="assets/js/state.js?v=20270510"></script>
+<script src="assets/js/state.js?v=20270511"></script>
 <script src="assets/js/dom.js?v=20270509"></script>
 <script src="assets/js/constants.js?v=20270509"></script>
 <script src="assets/js/pilihan.js?v=20261223"></script>
@@ -61,14 +61,14 @@
 <script src="assets/js/db.js?v=20270502"></script>
 <script src="assets/js/media.js?v=20270202"></script>
 <script src="assets/js/messages.js?v=20270503"></script>
-<script src="assets/js/auth.js?v=20270510"></script>
+<script src="assets/js/auth.js?v=20270511"></script>
 <script src="assets/js/activities.js?v=20270406"></script>
-<script src="assets/js/home.js?v=20270510"></script>
+<script src="assets/js/home.js?v=20270511"></script>
 <script src="assets/js/members.js?v=20270428"></script>
 <script src="assets/js/finance.js?v=20261219"></script>
 <script src="assets/js/inventaris.js?v=20261125"></script>
 <script src="assets/js/duties-forum.js?v=20261124"></script>
-<script src="assets/js/map.js?v=20270510"></script>
+<script src="assets/js/map.js?v=20270511"></script>
 <script src="assets/js/musyawarah.js?v=20261218"></script>
 <script src="assets/js/keamanan.js?v=20270509"></script>
 <script src="assets/js/views.js?v=20270510"></script>
