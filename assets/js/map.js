@@ -390,7 +390,7 @@ function vApprovals(){
    bisa di-hover dan diklik, lalu kembali bertumpuk.
    Peta dasar dicoba berurutan dari beberapa penyedia ubin gratis; bila
    satu gagal, otomatis pindah ke berikutnya. Bila semuanya gagal, tampil
-   peta dasar cadangan lokal (assets/japan-basemap.svg). Seluruh modul
+   peta dasar cadangan lokal (data URI di assets/js/peta-basemap-lokal.js). Seluruh modul
    dijaga: bila Leaflet gagal dimuat, halaman tetap tampil. */
 function petaNormKey(v){return String(v||'').toLowerCase().replace(/[^a-z0-9]/g,'')}
 /* ===== Pin manual (pinManual {lat,lng} pada data anggota) =====
@@ -1055,7 +1055,7 @@ function petaSyncAtribusi(bp){
   el.classList.toggle('peta-ofm-on',!!(bp&&PETA_STYLES[bp.key]&&PETA_STYLES[bp.key].vector));
 }
 /* Rantai untuk gaya terpilih: gaya itu dulu; bila gagal, kembali ke Jalan
-   (Esri Street); bila itu pun gagal, peta dasar cadangan lokal (SVG).
+   (Esri Street); bila itu pun gagal, peta dasar cadangan lokal (data URI).
    Gaya VEKTOR dilewati sejak awal bila sesi ini sudah memblokirnya
    (pernah terbukti tidak melukis) atau peramban tidak punya WebGL —
    dalam kedua keadaan itu vektor tidak akan pernah tampil, jadi
@@ -1112,32 +1112,103 @@ function petaTutupMenuStyle(){
    menutup semua keadaan itu.
    Karena itu urutan lukisnya DIBALIK:
    1) Lapisan paling bawah yang digambar SEKETIKA saat peta dibuat
-      adalah peta dasar LOKAL aplikasi (assets/japan-basemap.svg,
-      berkas yang sama dengan cadangan lama) — tanpa jaringan sama
-      sekali — dengan pin anggota di atasnya (panel penanda Leaflet
-      memang berada di atas panel hamparan tempat lapisan lokal ini
-      tinggal, sedangkan lapisan daring tinggal di panel ubin di
-      BAWAH lapisan lokal, jadi lapisan daring yang sedang memuat
-      tidak pernah menutupi lukisan lokal).
+      adalah peta dasar LOKAL aplikasi — tanpa jaringan sama sekali —
+      dengan pin anggota di atasnya (panel penanda Leaflet memang
+      berada di atas panel hamparan tempat lapisan lokal ini tinggal,
+      sedangkan lapisan daring tinggal di panel ubin di BAWAH lapisan
+      lokal, jadi lapisan daring yang sedang memuat tidak pernah
+      menutupi lukisan lokal).
    2) Gaya daring terpilih (vektor OpenFreeMap / raster Esri) dimuat
       MENYUSUL di latar seperti biasa; lapisan lokal hanya DILEPAS
-      sesudah gaya daring TERBUKTI benar-benar melukis — ubin raster
-      pertama termuat (tileload) atau bukti lukisan pengawas GL —
-      lewat petaLepasLapisanLokal().
+      sesudah gaya daring TERBUKTI benar-benar melukis — seluruh ubin
+      raster pandangan awal termuat (peristiwa 'load' lapisan) atau
+      bukti lukisan pengawas GL — lewat petaLepasLapisanLokal(),
+      dengan pudar silang singkat supaya pergantiannya tidak
+      mengagetkan.
    3) Bila gaya daring tidak pernah terbukti (jaringan mati, WebGL
       tidak ada, pustaka GL gagal), lapisan lokal TETAP tampil
-      menemani pin — bidang peta tidak kosong dalam keadaan apa pun. */
+      menemani pin — bidang peta tidak kosong dalam keadaan apa pun.
+   GAMBAR LOKALNYA BUKAN LAGI SKETSA: versi lama memakai SVG
+   skematis seluruh Jepang yang TIDAK berkoordinat tepat — pin
+   tampak melayang di laut dan berpindah saat peta asli datang.
+   Gambar lokal sekarang dirakit dari
+   ubin ASLI Esri World Street Map zoom 9 (gaya yang sama dengan
+   bawaan 'Jalan') untuk rentang lng 131,8–135,9 / lat 32,3–35,3
+   dan dipasang dengan batas yang PERSIS sama dengan jahitannya,
+   jadi pin berada di posisi yang benar sejak detik pertama dan
+   TIDAK melompat saat gaya daring menggantikan. Gambar yang sama
+   adalah cadangan luring terakhir.
+   PENGANTARAN gambarnya: berkas biner .webp TIDAK bisa ikut
+   terunggah lewat jalur unggah repo aplikasi ini (jalur itu hanya
+   menerima berkas teks dan menolak biner), jadi gambar yang
+   byte-for-byte sama disematkan sebagai data URI base64 di dalam
+   berkas JS assets/js/peta-basemap-lokal.js — pola yang sama
+   seperti video maskot (assets/js/maskot-video-alpha.js). Berkas
+   itu DIMUAT MALAS hanya di sini, saat lapisan lokal pertama
+   dibutuhkan (petaMuatBasemapLokal), dan ikut dipasang service
+   worker sejak awal supaya tetap tersedia luring. Sesudah
+   termuat, pemasangan lapisannya seketika (jalur sinkron di
+   petaPasangLapisanLokal) persis seperti sebelumnya. */
+const PETA_LOKAL_BOUNDS=[[32.3,131.8],[35.3,135.9]];
+let petaBasemapLokalJanji=null;
+function petaMuatBasemapLokal(){
+  if(window.PETA_BASEMAP_LOKAL)return Promise.resolve(true);
+  if(petaBasemapLokalJanji)return petaBasemapLokalJanji;
+  petaBasemapLokalJanji=new Promise(resolve=>{
+    const s=document.createElement('script');
+    s.src='assets/js/peta-basemap-lokal.js?v=20270515';
+    s.async=true;
+    s.onload=()=>resolve(!!window.PETA_BASEMAP_LOKAL);
+    s.onerror=()=>{petaBasemapLokalJanji=null;resolve(false)};
+    document.head.appendChild(s);
+  });
+  return petaBasemapLokalJanji;
+}
 function petaPasangLapisanLokal(){
   if(!PM.map||!petaL()||PM.localLayer)return;
-  try{
-    PM.localLayer=petaL().imageOverlay('assets/japan-basemap.svg',[[31,129],[45.5,145.5]],{opacity:1,interactive:false}).addTo(PM.map);
-  }catch(e){PM.localLayer=null}
+  const src=window.PETA_BASEMAP_LOKAL||null;
+  if(src){
+    try{
+      PM.localLayer=petaL().imageOverlay(src,PETA_LOKAL_BOUNDS,{opacity:1,interactive:false}).addTo(PM.map);
+    }catch(e){PM.localLayer=null}
+    return;
+  }
+  /* Data gambar belum termuat: muat malas sekarang dan pasang
+     begitu tiba — hanya bila peta sesi ini masih hidup, lapisan
+     belum terpasang, dan gaya daring belum terbukti melukis
+     (bila gaya daring menang lebih dulu, lukisan lokal tidak
+     perlu muncul menimpanya). */
+  const gen=PM.gen,mapRef=PM.map;
+  petaMuatBasemapLokal().then(ok=>{
+    if(!ok||!window.PETA_BASEMAP_LOKAL)return;
+    if(!PM.map||PM.map!==mapRef||PM.gen!==gen||PM.localLayer||PM.onlineProven)return;
+    try{
+      PM.localLayer=petaL().imageOverlay(window.PETA_BASEMAP_LOKAL,PETA_LOKAL_BOUNDS,{opacity:1,interactive:false}).addTo(PM.map);
+      if(PM.layer&&PM.layer.eachLayer)PM.layer.eachLayer(l=>{if(l.bringToFront)l.bringToFront()});
+    }catch(e){PM.localLayer=null}
+  });
 }
-/* Gaya daring terbukti melukis: lukisan lokal digantikan olehnya. */
+/* Gaya daring terbukti melukis: lukisan lokal digantikan olehnya
+   lewat pudar silang ±0,45 detik (gambar lokal memudar di atas
+   gambar daring yang sudah terlukis penuh di bawahnya — karena
+   keduanya peta yang sama secara geografis, yang terasa hanyalah
+   perubahan gaya, bukan perpindahan). */
 function petaLepasLapisanLokal(){
   PM.onlineProven=true;
-  if(PM.localLayer&&PM.map){try{PM.map.removeLayer(PM.localLayer)}catch(e){}}
+  const layer=PM.localLayer;
   PM.localLayer=null;
+  if(!layer||!PM.map)return;
+  const img=layer._image||null;
+  if(img&&img.style){
+    try{
+      img.style.transition='opacity .45s ease';
+      layer.setOpacity(0);
+      const map=PM.map;
+      setTimeout(()=>{try{map.removeLayer(layer)}catch(e){}},500);
+      return;
+    }catch(e){}
+  }
+  try{PM.map.removeLayer(layer)}catch(e){}
 }
 /* Ganti tampilan peta: hanya lapisan dasar yang diganti — pin, pilihan
    anggota, dan posisi peta tidak berubah. Pilihan ini SEMENTARA untuk
@@ -1209,7 +1280,22 @@ function petaTryBasemap(idx){
   /* Lapisan dasar gaya ini: keberhasilan/kegagalan rantai cadangan
      dinilai dari lapisan ini saja. */
   const utama=petaL().tileLayer(bp.url,bp.opts);
-  utama.on('tileload',()=>{PM.tileOk++;if(PM.tileOk===1){if(PM.tileTimer){clearTimeout(PM.tileTimer);PM.tileTimer=null}/* Ubin pertama benar-benar tiba & tampil: gaya raster ini terbukti melukis, lukisan lokal digantikan olehnya. */petaLepasLapisanLokal();petaSetAttrib(idx>0?('Tampilan pilihan tidak terjangkau — memakai '+bp.name+' • Leaflet'):('Peta dasar: '+bp.name+' • Leaflet'))}});
+  /* Lukisan lokal dilepas hanya sesudah gaya raster ini terbukti
+     melukis PENUH pada pandangan awal — peristiwa 'load' lapisan
+     (semua ubin yang dibutuhkan sudah tiba) — BUKAN pada ubin
+     pertama seperti sebelumnya: melepas pada ubin pertama membuat
+     peta tampil belang-belang setengah lokal setengah daring dan
+     gambar berubah dua kali. Jaring kedua: 6 ubin termuat pun
+     dianggap bukti kuat (satu ubin lambat tidak menahan transisi). */
+  let rasterTerbukti=false;
+  const rasterSukses=()=>{
+    if(rasterTerbukti)return;rasterTerbukti=true;
+    if(PM.tileTimer){clearTimeout(PM.tileTimer);PM.tileTimer=null}
+    petaLepasLapisanLokal();
+    petaSetAttrib(idx>0?('Tampilan pilihan tidak terjangkau — memakai '+bp.name+' • Leaflet'):('Peta dasar: '+bp.name+' • Leaflet'));
+  };
+  utama.on('tileload',()=>{PM.tileOk++;if(PM.tileOk>=6)rasterSukses()});
+  utama.on('load',()=>{if(PM.tileOk>0)rasterSukses()});
   utama.on('tileerror',()=>{PM.tileErr++;petaCheckTiles()});
   utama.addTo(PM.map);
   PM.tileLayer=utama;PM.tileLayers=[utama];
@@ -2020,7 +2106,15 @@ function initPetaMap(){
       });
       return;
     }
-    PM.map=petaL().map(el,{scrollWheelZoom:true,attributionControl:false}).setView([33.9,133.7],window.innerWidth<640?7:8);
+    /* Pandangan awal: terpusat di Shikoku pada zoom 8 di SEMUA ukuran
+       layar. Zoom 7 lama di HP membentangkan pandangan jauh melampaui
+       gambar lokal (dan jauh ke laut lepas di selatan), sehingga
+       separuh bawah kartu tampak sebagai bidang pucat kosong dan
+       pulau tampak kecil di atas; zoom 8 membingkai Shikoku penuh —
+       seluruh pandangan awal berada DI DALAM batas gambar lokal
+       (lng 131,8–135,9 / lat 32,3–35,3), jadi lukisan pertama terlukis
+       penuh dari tepi ke tepi kartu, di HP maupun desktop. */
+    PM.map=petaL().map(el,{scrollWheelZoom:true,attributionControl:false}).setView([33.8,133.7],8);
     /* Kontrol atribusi ditambahkan manual (tanpa awalan 'Leaflet'):
        isinya mengikuti atribusi lapisan yang sedang tampil, dan
        CSS hanya MENAMPILKANNYA saat gaya OpenFreeMap aktif (class
@@ -2049,6 +2143,12 @@ function initPetaMap(){
     petaPasangPengamatUkuran(el);
     setTimeout(()=>{if(PM.map)petaSegarkanUkuranPeta()},90);
     setTimeout(()=>{if(PM.map)petaSegarkanUkuranPeta()},450);
+    /* Satu penyegaran lambat terakhir: di HP, tata letak akhir (bilah
+       alamat peramban yang menyusut, font yang baru tiba) bisa
+       mengubah tinggi kartu peta sesudah 450 md — tanpa ini Leaflet
+       mempertahankan ukuran lukis yang lebih pendek dari wadahnya
+       dan menyisakan bidang pucat kosong di dasar kartu. */
+    setTimeout(()=>{if(PM.map)petaSegarkanUkuranPeta()},1400);
     if(!PM.resizeBound){
       PM.resizeBound=true;
       window.addEventListener('resize',()=>{if(PM.map&&S.view==='peta'){try{petaSegarkanUkuranPeta()}catch(e){}}});
@@ -2068,7 +2168,7 @@ function initPetaMap(){
 /* ===== Panel 'Letakkan Pin di Peta' pada formulir anggota =====
    Peta kecil Leaflet di dalam formulir (bagian alamat di Jepang).
    Rantai peta dasar sama seperti halaman peta: Esri Jalan → OSM →
-   cadangan lokal SVG. Admin mengetuk peta atau menggeser penanda;
+   cadangan lokal (data URI). Admin mengetuk peta atau menggeser penanda;
    titik terpilih disimpan sementara di FP.temp / S.formPinTemp dan
    baru masuk ke data formulir lewat tombol 'Pakai Posisi Ini' di
    formulir (tersimpan ke data anggota saat formulir disimpan). */
@@ -2094,6 +2194,22 @@ function formPinSetMarker(coords){
   }
   formPinSetCoordsText();
 }
+/* Cadangan terakhir panel formulir = gambar lokal yang sama dengan
+   halaman peta (data URI dari petaMuatBasemapLokal, dimuat malas
+   bila belum ada); penanda tetap di atasnya. */
+function formPinPasangFallbackLokal(){
+  if(!FP.map||!petaL()||FP.fallbackLayer)return;
+  const mapRef=FP.map;
+  const pasang=src=>{
+    if(!FP.map||FP.map!==mapRef||FP.fallbackLayer)return;
+    try{
+      FP.fallbackLayer=petaL().imageOverlay(src,PETA_LOKAL_BOUNDS,{opacity:1,interactive:false}).addTo(FP.map);
+      if(FP.marker)FP.marker.bringToFront();
+    }catch(e){FP.fallbackLayer=null}
+  };
+  if(window.PETA_BASEMAP_LOKAL){pasang(window.PETA_BASEMAP_LOKAL);return}
+  petaMuatBasemapLokal().then(ok=>{if(ok&&window.PETA_BASEMAP_LOKAL)pasang(window.PETA_BASEMAP_LOKAL)});
+}
 function formPinTryBasemap(idx){
   if(!FP.map||!petaL())return;
   FP.idx=idx;FP.tileOk=0;FP.tileErr=0;
@@ -2101,8 +2217,7 @@ function formPinTryBasemap(idx){
   if(FP.tileLayer){try{FP.map.removeLayer(FP.tileLayer)}catch(e){}FP.tileLayer=null}
   const urutan=[PETA_STYLES.jalan,PETA_STYLES.terang];
   if(idx>=urutan.length){
-    if(!FP.fallbackLayer)FP.fallbackLayer=petaL().imageOverlay('assets/japan-basemap.svg',[[31,129],[45.5,145.5]],{opacity:1,interactive:false}).addTo(FP.map);
-    if(FP.marker)FP.marker.bringToFront();
+    formPinPasangFallbackLokal();
     return;
   }
   const bp=urutan[idx];
