@@ -3,7 +3,7 @@
    Catatan penempatan: berkas ini ada di assets/. Di situs produksi,
    salin berkas ini ke folder utama situs (di samping index.html)
    dengan nama sw.js supaya cakupannya meliputi seluruh aplikasi. */
-const CACHE = 'shikoku-family-v28';
+const CACHE = 'shikoku-family-v29';
 const CORE = [
   './',
   '../',
@@ -13,7 +13,13 @@ const CORE = [
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/apple-touch-icon.png',
-  './mascot.webp'
+  './mascot.webp',
+  /* Lukisan pertama halaman Peta & Wilayah adalah berkas LOKAL ini:
+     ikut dipasang sejak awal supaya peta tampil seketika (dan tetap
+     tampil tanpa jaringan) sebelum gaya peta daring apa pun tiba. */
+  './japan-basemap.svg',
+  './leaflet.css',
+  './js/leaflet.js'
 ];
 
 self.addEventListener('install', event => {

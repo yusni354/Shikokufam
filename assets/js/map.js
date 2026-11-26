@@ -5,9 +5,37 @@
    pertama dipakai — halaman lain tidak membutuhkannya. Suntikan gagal
    (berkas tak terjangkau) → kedua pemakai jatuh ke tampilan tanpa peta
    yang sudah ada, dan percobaan berikutnya boleh mengulang. */
+/* ===== AKAR MASALAH peta kosong di situs live: tabrakan nama 'L' =====
+   Diagnosis dengan aplikasi asli utuh (CSP + service worker aktif,
+   viewport HP) membuktikan penyebabnya BUKAN CSP (nol pelanggaran;
+   gaya/ubin/glyph/sprite OpenFreeMap semua tiba 200), BUKAN WebGL
+   (tersedia), dan BUKAN service worker (peta tetap kosong sebelum SW
+   sempat terdaftar). Penyebabnya tabrakan global 'L':
+   pustaka Lenis (dimuat malas oleh animasi.js dari berkas
+   lenis.min.js) mendeklarasikan 'var L = class {...}' di tingkat
+   atas skrip klasik — jadi window.L berisi KELAS LENIS, bukan
+   Leaflet. Akibatnya penjaga lama 'typeof L!=="undefined"' di sini
+   mengira Leaflet SUDAH termuat (padahal yang ada Lenis), berkas
+   leaflet.js TIDAK PERNAH dimuat, lalu 'L.map is not a function'
+   membuat peta gagal dibangun — bidang peta kosong total sementara
+   daftar/lencana tetap normal, persis laporan pengguna. Uji lama
+   tidak menangkapnya karena hanya memuat berkas pilihan tanpa
+   animasi.js/Lenis.
+   Perbaikannya: modul peta TIDAK lagi membaca global 'L' mentah.
+   Objek Leaflet dikenali dari bentuknya (punya .map & .tileLayer),
+   ditangkap sekali ke petaLeafletObj, dan semua pemakaian Leaflet
+   di berkas ini lewat petaL(). Sekali tertangkap, timpaan window.L
+   oleh pustaka lain tidak berpengaruh lagi. */
+let petaLeafletObj=null;
+function petaL(){
+  if(petaLeafletObj&&typeof petaLeafletObj.map==='function')return petaLeafletObj;
+  const w=(typeof window!=='undefined'&&window.L&&typeof window.L.map==='function'&&typeof window.L.tileLayer==='function')?window.L:null;
+  if(w)petaLeafletObj=w;
+  return petaLeafletObj;
+}
 let petaLeafletJanji=null;
 function petaMuatLeaflet(){
-  if(typeof L!=='undefined')return Promise.resolve(true);
+  if(petaL())return Promise.resolve(true);
   if(petaLeafletJanji)return petaLeafletJanji;
   petaLeafletJanji=new Promise(resolve=>{
     const css=document.createElement('link');
@@ -15,7 +43,9 @@ function petaMuatLeaflet(){
     document.head.appendChild(css);
     const s=document.createElement('script');
     s.src='assets/js/leaflet.js';
-    s.onload=()=>resolve(typeof L!=='undefined');
+    /* leaflet.js menaruh objeknya ke window.L saat berkasnya jalan;
+       yang diperiksa tetap bentuknya (petaL), bukan sekadar ada. */
+    s.onload=()=>resolve(!!petaL());
     s.onerror=()=>{petaLeafletJanji=null;resolve(false)};
     document.head.appendChild(s);
   });
@@ -877,7 +907,7 @@ const PETA_STYLES={
 /* Urutan tampil di menu dropdown: gaya raster umum dulu, lalu gaya
    vektor OpenFreeMap. */
 const PETA_STYLE_ORDER=['jalan','terang','jepang','satelit','satelitlabel','topo','kereta','ofmliberty','ofmbright','ofmpositron'];
-const PM={map:null,layer:null,markers:{},entries:[],tileLayer:null,tileLayers:[],tileOk:0,tileErr:0,tileTimer:null,basemapIdx:0,fallback:false,fallbackLayer:null,gen:0,style:'jalan',chain:null,spiderLayer:null,spider:null,spiderTimer:null,clusters:[],clusterOf:{},menuDocBound:false,sementara:false,attribControl:null,glMap:null,glWatchdog:null,glHardTimer:null,glRenderCount:0,glIsiCount:0,resizeObs:null,resizeObsSize:null};
+const PM={map:null,layer:null,markers:{},entries:[],tileLayer:null,tileLayers:[],tileOk:0,tileErr:0,tileTimer:null,basemapIdx:0,fallback:false,localLayer:null,onlineProven:false,gen:0,style:'jalan',chain:null,spiderLayer:null,spider:null,spiderTimer:null,clusters:[],clusterOf:{},menuDocBound:false,sementara:false,attribControl:null,glMap:null,glWatchdog:null,glHardTimer:null,glRenderCount:0,glIsiCount:0,resizeObs:null,resizeObsSize:null};
 /* Blokir vektor untuk SISA SESI halaman (sampai aplikasi dimuat
    ulang): dipasang pengawas lukisan GL (petaGLMenyerah) sesudah gaya
    vektor terbukti tidak melukis, supaya rantai gaya langsung memakai
@@ -939,7 +969,7 @@ const PETA_GL_PUSTAKA=[
   {jenis:'js',url:'https://cdn.jsdelivr.net/npm/@maplibre/maplibre-gl-leaflet@0.0.22/leaflet-maplibre-gl.js',sri:'sha384-4CB9Vtol9LN6lGgBCvmPLbUEZwilrqIvPieSRurgAXAB7FVJaLS9n8WyAIA5wjQ+'}
 ];
 let petaGLJanji=null;
-function petaGLSiap(){return !!(window.maplibregl&&typeof L!=='undefined'&&typeof L.maplibreGL==='function')}
+function petaGLSiap(){return !!(window.maplibregl&&!!petaL()&&typeof petaL().maplibreGL==='function')}
 function petaMuatSatuGL(item){
   return new Promise(resolve=>{
     if(item.jenis==='css'){
@@ -966,6 +996,12 @@ function petaMuatMapLibre(){
        membaca global L & maplibregl saat dimuat, jadi urutannya
        wajib). Satu saja gagal → seluruhnya dianggap gagal. */
     for(const item of PETA_GL_PUSTAKA){
+      /* Plugin menempelkan dirinya ke global L yang ia baca saat
+         dimuat: pulihkan window.L ke objek Leaflet yang tertangkap
+         (petaL) tepat sebelum plugin dimuat, supaya ia menempel ke
+         Leaflet — bukan ke kelas Lenis yang mungkin sedang memegang
+         nama 'L' (lihat catatan tabrakan 'L' di atas). */
+      if(item.url.indexOf('maplibre-gl-leaflet')>=0&&petaL()){try{window.L=petaL()}catch(e){}}
       const ok=await petaMuatSatuGL(item);
       if(!ok)return false;
     }
@@ -1062,6 +1098,47 @@ function petaTutupMenuStyle(){
   const tgl=document.getElementById('peta-style-toggle');
   if(tgl)tgl.setAttribute('aria-expanded','false');
 }
+/* ===== Lukisan pertama LOKAL — bidang peta TIDAK PERNAH kosong =====
+   Diagnosis situs live (dengan meta CSP asli + service worker aktif,
+   viewport HP): tidak ditemukan pelanggaran CSP apa pun untuk
+   MapLibre/OpenFreeMap — gaya, ubin vektor, glyph, dan sprite semua
+   tiba 200, worker blob berjalan, WebGL tersedia, dan peta vektor
+   terbukti melukis di peramban uji. Kekosongan yang sebenarnya
+   disebabkan tabrakan global 'L' oleh Lenis (lihat catatan di
+   petaMuatLeaflet) dan sudah diperbaiki di sumbernya; lapisan lokal
+   ini adalah lapis keduanya: selama tampilan pertama peta bergantung
+   pada jaringan / WebGL / pustaka GL yang dimuat malas, selalu ada
+   keadaan perangkat di mana bidangnya bisa kosong — lukisan lokal
+   menutup semua keadaan itu.
+   Karena itu urutan lukisnya DIBALIK:
+   1) Lapisan paling bawah yang digambar SEKETIKA saat peta dibuat
+      adalah peta dasar LOKAL aplikasi (assets/japan-basemap.svg,
+      berkas yang sama dengan cadangan lama) — tanpa jaringan sama
+      sekali — dengan pin anggota di atasnya (panel penanda Leaflet
+      memang berada di atas panel hamparan tempat lapisan lokal ini
+      tinggal, sedangkan lapisan daring tinggal di panel ubin di
+      BAWAH lapisan lokal, jadi lapisan daring yang sedang memuat
+      tidak pernah menutupi lukisan lokal).
+   2) Gaya daring terpilih (vektor OpenFreeMap / raster Esri) dimuat
+      MENYUSUL di latar seperti biasa; lapisan lokal hanya DILEPAS
+      sesudah gaya daring TERBUKTI benar-benar melukis — ubin raster
+      pertama termuat (tileload) atau bukti lukisan pengawas GL —
+      lewat petaLepasLapisanLokal().
+   3) Bila gaya daring tidak pernah terbukti (jaringan mati, WebGL
+      tidak ada, pustaka GL gagal), lapisan lokal TETAP tampil
+      menemani pin — bidang peta tidak kosong dalam keadaan apa pun. */
+function petaPasangLapisanLokal(){
+  if(!PM.map||!petaL()||PM.localLayer)return;
+  try{
+    PM.localLayer=petaL().imageOverlay('assets/japan-basemap.svg',[[31,129],[45.5,145.5]],{opacity:1,interactive:false}).addTo(PM.map);
+  }catch(e){PM.localLayer=null}
+}
+/* Gaya daring terbukti melukis: lukisan lokal digantikan olehnya. */
+function petaLepasLapisanLokal(){
+  PM.onlineProven=true;
+  if(PM.localLayer&&PM.map){try{PM.map.removeLayer(PM.localLayer)}catch(e){}}
+  PM.localLayer=null;
+}
 /* Ganti tampilan peta: hanya lapisan dasar yang diganti — pin, pilihan
    anggota, dan posisi peta tidak berubah. Pilihan ini SEMENTARA untuk
    kunjungan ini saja: membuka lagi halaman Peta / memuat ulang
@@ -1078,12 +1155,14 @@ function petaSetStyle(key){
   PM.sementara=true;
   petaSyncStyleUI();
   petaTutupMenuStyle();
-  if(!PM.map||typeof L==='undefined')return;
+  if(!PM.map||!petaL())return;
   if(PM.fallback){
     PM.fallback=false;
-    if(PM.fallbackLayer){try{PM.map.removeLayer(PM.fallbackLayer)}catch(e){}PM.fallbackLayer=null}
     const el=document.getElementById('peta-map');if(el)el.style.background='';
     const nt=document.getElementById('peta-notice');if(nt)nt.style.display='none';
+    /* Lapisan lokal TIDAK dilepas di sini: ia tetap menjadi lukisan
+       yang tampil sampai gaya baru terbukti melukis (petaTryBasemap
+       memasangnya lagi lebih dulu bila sudah sempat terlepas). */
   }
   PM.chain=petaChain();
   petaTryBasemap(0);
@@ -1094,10 +1173,12 @@ function petaActivateFallback(){
   petaSyncAtribusi(null);
   if(PM.tileTimer){clearTimeout(PM.tileTimer);PM.tileTimer=null}
   petaClearTiles();
-  if(PM.map&&!PM.fallbackLayer&&typeof L!=='undefined'){
-    PM.fallbackLayer=L.imageOverlay('assets/japan-basemap.svg',[[31,129],[45.5,145.5]],{opacity:1,interactive:false}).addTo(PM.map);
-    if(PM.layer)PM.layer.eachLayer(l=>{if(l.bringToFront)l.bringToFront()});
-  }
+  /* Cadangan terakhir = lukisan lokal yang memang sudah tampil sejak
+     peta dibuat (lihat petaPasangLapisanLokal): cukup pastikan ia
+     terpasang; pengguna tetap melihat peta + pin, bukan bidang
+     kosong, dan diberi tahu lewat pemberitahuan melayang. */
+  petaPasangLapisanLokal();
+  if(PM.layer)PM.layer.eachLayer(l=>{if(l.bringToFront)l.bringToFront()});
   const el=document.getElementById('peta-map');if(el)el.style.background='#cfe0ee';
   const nt=document.getElementById('peta-notice');if(nt)nt.style.display='block';
   petaSetAttrib('Peta dasar cadangan lokal • Leaflet');
@@ -1111,10 +1192,14 @@ function petaCheckTiles(){
   else if(total>=8&&PM.tileOk===0)petaNextBasemap();
 }
 function petaTryBasemap(idx){
-  if(!PM.map||typeof L==='undefined')return;
+  if(!PM.map||!petaL())return;
   PM.basemapIdx=idx;PM.tileOk=0;PM.tileErr=0;
   if(PM.tileTimer){clearTimeout(PM.tileTimer);PM.tileTimer=null}
   petaClearTiles();
+  /* Lukisan lokal dipastikan tampil lebih dulu pada SETIAP percobaan
+     gaya: selama gaya daring ini belum terbukti melukis, pengguna
+     melihat peta lokal + pin, bukan bidang kosong. */
+  petaPasangLapisanLokal();
   const chain=PM.chain||petaChain();PM.chain=chain;
   if(idx>=chain.length){petaActivateFallback();return}
   const bp=chain[idx];
@@ -1123,8 +1208,8 @@ function petaTryBasemap(idx){
   if(bp.vector){petaTryBasemapVektor(idx,bp);return}
   /* Lapisan dasar gaya ini: keberhasilan/kegagalan rantai cadangan
      dinilai dari lapisan ini saja. */
-  const utama=L.tileLayer(bp.url,bp.opts);
-  utama.on('tileload',()=>{PM.tileOk++;if(PM.tileOk===1){if(PM.tileTimer){clearTimeout(PM.tileTimer);PM.tileTimer=null}petaSetAttrib(idx>0?('Tampilan pilihan tidak terjangkau — memakai '+bp.name+' • Leaflet'):('Peta dasar: '+bp.name+' • Leaflet'))}});
+  const utama=petaL().tileLayer(bp.url,bp.opts);
+  utama.on('tileload',()=>{PM.tileOk++;if(PM.tileOk===1){if(PM.tileTimer){clearTimeout(PM.tileTimer);PM.tileTimer=null}/* Ubin pertama benar-benar tiba & tampil: gaya raster ini terbukti melukis, lukisan lokal digantikan olehnya. */petaLepasLapisanLokal();petaSetAttrib(idx>0?('Tampilan pilihan tidak terjangkau — memakai '+bp.name+' • Leaflet'):('Peta dasar: '+bp.name+' • Leaflet'))}});
   utama.on('tileerror',()=>{PM.tileErr++;petaCheckTiles()});
   utama.addTo(PM.map);
   PM.tileLayer=utama;PM.tileLayers=[utama];
@@ -1132,7 +1217,7 @@ function petaTryBasemap(idx){
      kereta) menumpuk di atas lapisan dasar; kesalahannya tidak
      menggagalkan gaya — dasar yang tampil tetap utuh. */
   (bp.overlays||[]).forEach(ov=>{
-    const l=L.tileLayer(ov.url,ov.opts);
+    const l=petaL().tileLayer(ov.url,ov.opts);
     l.addTo(PM.map);
     PM.tileLayers.push(l);
   });
@@ -1329,7 +1414,7 @@ function petaTryBasemapVektor(idx,bp){
     if(!siap){petaGLMenyerah(idx);return}
     let gl=null;
     try{
-      gl=L.maplibreGL({style:bp.styleUrl,attribution:bp.attribution});
+      gl=petaL().maplibreGL({style:bp.styleUrl,attribution:bp.attribution});
     }catch(e){console.error('Lapisan OpenFreeMap gagal dibuat:',e);petaGLMenyerah(idx);return}
     try{gl.addTo(PM.map)}catch(e){console.error('Lapisan OpenFreeMap gagal dipasang:',e);petaGLMenyerah(idx);return}
     PM.tileLayer=gl;PM.tileLayers=[gl];
@@ -1342,6 +1427,9 @@ function petaTryBasemapVektor(idx,bp){
       PM.tileOk=1;
       if(PM.tileTimer){clearTimeout(PM.tileTimer);PM.tileTimer=null}
       petaBersihkanPengawasGL();
+      /* Vektor terbukti BENAR-BENAR melukis (bukti pengawas lukisan):
+         barulah lukisan lokal dilepas dan digantikan peta vektor. */
+      petaLepasLapisanLokal();
       petaSetAttrib(idx>0?('Tampilan pilihan tidak terjangkau — memakai '+bp.name+' • Leaflet'):('Peta dasar: '+bp.name+' • Leaflet'));
       /* Ukuran disamakan sekali lagi pada momen terbukti melukis,
          lalu pin & lapisan anggota tetap DI ATAS kanvas GL. */
@@ -1402,7 +1490,7 @@ function petaFiltered(){
 }
 function petaIcon(en,selected){
   const c=regionColor(en.region);
-  return L.divIcon({className:'peta-pin-wrap'+(selected?' peta-pin-selected':''),html:'<div class="peta-pin"><div class="peta-pin-body" style="background:'+c+'"></div></div>',iconSize:[30,38],iconAnchor:[15,36],popupAnchor:[0,-34]});
+  return petaL().divIcon({className:'peta-pin-wrap'+(selected?' peta-pin-selected':''),html:'<div class="peta-pin"><div class="peta-pin-body" style="background:'+c+'"></div></div>',iconSize:[30,38],iconAnchor:[15,36],popupAnchor:[0,-34]});
 }
 /* Isi popup pin: KARTU ANGGOTA RINGKAS yang melayang tepat di atas
    pin — popup Leaflet terikat pada penanda, jadi kartu tetap
@@ -1488,12 +1576,12 @@ function petaRenderMarkers(){
   const list=petaFiltered();
   const cnt=document.getElementById('peta-count');if(cnt)cnt.textContent=list.length+' pin tampil';
   const hint=document.getElementById('peta-hint');if(hint)hint.textContent=S.petaFixMode?'Mode Perbaiki Posisi Pin aktif — geser pin untuk memindahkannya':(S.petaFilter?('Menyaring: '+S.petaFilter):'Menampilkan semua wilayah');
-  if(!PM.map||!PM.layer||typeof L==='undefined')return;
+  if(!PM.map||!PM.layer||!petaL())return;
   petaSpiderCollapse();
   PM.layer.clearLayers();PM.markers={};
   const bisaGeser=!!(S.admin&&S.petaFixMode);
   list.forEach(en=>{
-    const mk=L.marker(en.coords,{icon:petaIcon(en,String(S.petaSelected)===en.key),draggable:bisaGeser});
+    const mk=petaL().marker(en.coords,{icon:petaIcon(en,String(S.petaSelected)===en.key),draggable:bisaGeser});
     const m=en.m;
     mk.bindPopup(petaPopupContent(en),{closeButton:false,maxWidth:280,className:'peta-popup'});
     /* Tooltip hover: nama anggota melayang di atas pin saat kursor diarahkan.
@@ -1573,7 +1661,7 @@ function petaRenderMarkers(){
 function petaComputeClusters(){
   PM.clusters=[];PM.clusterOf={};
   if(S.petaFixMode)return; /* spiderfy nonaktif selama mode Perbaiki */
-  if(!PM.map||typeof L==='undefined')return;
+  if(!PM.map||!petaL())return;
   const pts=petaFiltered().map(en=>({en,pt:PM.map.latLngToContainerPoint(en.coords)}));
   const used=new Set();
   pts.forEach(a=>{
@@ -1611,7 +1699,7 @@ function petaSpiderHover(key){
   petaSpiderExpand(cl);
 }
 function petaSpiderExpand(cl){
-  if(!PM.map||!PM.spiderLayer||typeof L==='undefined')return;
+  if(!PM.map||!PM.spiderLayer||!petaL())return;
   petaSpiderCollapse();
   PM.spider={cluster:cl};
   const center=PM.map.latLngToContainerPoint(cl.anchor);
@@ -1619,10 +1707,10 @@ function petaSpiderExpand(cl){
   const radius=n<=2?32:Math.min(66,26+n*7);
   cl.entries.forEach((en,i)=>{
     const ang=(Math.PI*2*i/n)-Math.PI/2;
-    const px=L.point(center.x+Math.cos(ang)*radius,center.y+Math.sin(ang)*radius);
+    const px=petaL().point(center.x+Math.cos(ang)*radius,center.y+Math.sin(ang)*radius);
     const ll=PM.map.containerPointToLatLng(px);
-    L.polyline([cl.anchor,ll],{color:'#527f9f',weight:1.5,opacity:.75,interactive:false}).addTo(PM.spiderLayer);
-    const mk=L.marker(ll,{icon:petaIcon(en,String(S.petaSelected)===en.key),zIndexOffset:1200});
+    petaL().polyline([cl.anchor,ll],{color:'#527f9f',weight:1.5,opacity:.75,interactive:false}).addTo(PM.spiderLayer);
+    const mk=petaL().marker(ll,{icon:petaIcon(en,String(S.petaSelected)===en.key),zIndexOffset:1200});
     const m=en.m;
     const tip='<div class="pin-tip-name">'+petaEsc(m.nama||'Tanpa nama')+'</div>'
       +'<div class="pin-tip-sub"><i style="background:'+regionColor(en.region)+'"></i>'+petaEsc(en.region)+(m.kota?' • '+petaEsc(m.kota):'')+'</div>';
@@ -1718,11 +1806,11 @@ function petaRefresh(){petaRenderChips();petaRenderMarkers();petaRenderList();pe
    petaRefresh: penyegaran latar geocoding tidak boleh menggerakkan
    kamera. Tanpa pin tampil, pandangan dibiarkan apa adanya. */
 function petaFrameFiltered(){
-  if(!PM.map||typeof L==='undefined')return;
+  if(!PM.map||!petaL())return;
   const list=petaFiltered();
   if(!list.length)return;
   if(list.length===1){PM.map.flyTo(list[0].coords,Math.max(PM.map.getZoom(),12),{duration:.7});return}
-  PM.map.flyToBounds(L.latLngBounds(list.map(en=>en.coords)),{padding:[36,36],maxZoom:13,duration:.7});
+  PM.map.flyToBounds(petaL().latLngBounds(list.map(en=>en.coords)),{padding:[36,36],maxZoom:13,duration:.7});
 }
 function petaLayarDesktop(){return typeof window!=='undefined'&&window.innerWidth>=1024}
 /* ===== Kartu anggota melayang DI ATAS PIN (semua ukuran layar) =====
@@ -1886,7 +1974,7 @@ function initPetaMap(){
     if(PM.tileTimer){clearTimeout(PM.tileTimer);PM.tileTimer=null}
     petaBersihkanPengawasGL();
     petaLepasPengamatUkuran();
-    if(PM.map){try{PM.map.remove()}catch(e){}PM.map=null;PM.layer=null;PM.markers={};PM.tileLayer=null;PM.tileLayers=[];PM.fallbackLayer=null;PM.fallback=false;PM.spiderLayer=null;PM.spider=null;PM.clusters=[];PM.clusterOf={};PM.attribControl=null;PM.glMap=null;PM.glRenderCount=0;PM.glIsiCount=0}
+    if(PM.map){try{PM.map.remove()}catch(e){}PM.map=null;PM.layer=null;PM.markers={};PM.tileLayer=null;PM.tileLayers=[];PM.localLayer=null;PM.onlineProven=false;PM.fallback=false;PM.spiderLayer=null;PM.spider=null;PM.clusters=[];PM.clusterOf={};PM.attribControl=null;PM.glMap=null;PM.glRenderCount=0;PM.glIsiCount=0}
     PM.gen=(PM.gen||0)+1;
     /* Gaya awal = bawaan admin, kecuali pilihan sementara kunjungan ini. */
     if(!PM.sementara||!PETA_STYLES[PM.style])PM.style=petaGayaEfektif();
@@ -1918,7 +2006,7 @@ function initPetaMap(){
        pengendali yang dipasang untuk mereka; mode Perbaiki pun
        dimatikan tuntas di vPeta() dan ditegaskan lagi di sini. */
     if(S.petaFixMode)S.petaFixMode=false;
-    if(typeof L==='undefined'){
+    if(!petaL()){
       /* Leaflet dimuat malas: selama berkasnya masih dalam perjalanan,
          wadah peta dibiarkan kosong dengan warna dasar kartunya —
          pesan tidak tampil hanya muncul bila pemuatan benar-benar
@@ -1932,16 +2020,16 @@ function initPetaMap(){
       });
       return;
     }
-    PM.map=L.map(el,{scrollWheelZoom:true,attributionControl:false}).setView([33.9,133.7],window.innerWidth<640?7:8);
+    PM.map=petaL().map(el,{scrollWheelZoom:true,attributionControl:false}).setView([33.9,133.7],window.innerWidth<640?7:8);
     /* Kontrol atribusi ditambahkan manual (tanpa awalan 'Leaflet'):
        isinya mengikuti atribusi lapisan yang sedang tampil, dan
        CSS hanya MENAMPILKANNYA saat gaya OpenFreeMap aktif (class
        'peta-ofm-on' dari petaSyncAtribusi) — gaya lain tetap
        bersih tanpa atribusi seperti sebelumnya. */
-    PM.attribControl=L.control.attribution({prefix:false});
+    PM.attribControl=petaL().control.attribution({prefix:false});
     PM.attribControl.addTo(PM.map);
-    PM.layer=L.layerGroup().addTo(PM.map);
-    PM.spiderLayer=L.layerGroup().addTo(PM.map);
+    PM.layer=petaL().layerGroup().addTo(PM.map);
+    PM.spiderLayer=petaL().layerGroup().addTo(PM.map);
     PM.map.on('zoomstart',()=>petaSpiderCollapse());
     PM.map.on('movestart',()=>petaSpiderCollapse());
     PM.map.on('zoomend moveend',()=>petaComputeClusters());
@@ -1995,30 +2083,30 @@ function formPinSetCoordsText(){
   else el.textContent='Belum ada titik dipilih — ketuk peta untuk meletakkan pin.';
 }
 function formPinSetMarker(coords){
-  if(!FP.map||typeof L==='undefined')return;
+  if(!FP.map||!petaL())return;
   FP.temp=[coords[0],coords[1]];
   S.formPinTemp=FP.temp;
-  const icon=L.divIcon({className:'peta-pin-wrap',html:'<div class="peta-pin"><div class="peta-pin-body" style="background:#2b7a8c"></div></div>',iconSize:[30,38],iconAnchor:[15,36]});
+  const icon=petaL().divIcon({className:'peta-pin-wrap',html:'<div class="peta-pin"><div class="peta-pin-body" style="background:#2b7a8c"></div></div>',iconSize:[30,38],iconAnchor:[15,36]});
   if(FP.marker){FP.marker.setLatLng(FP.temp);FP.marker.setIcon(icon)}
   else{
-    FP.marker=L.marker(FP.temp,{icon,draggable:true}).addTo(FP.map);
+    FP.marker=petaL().marker(FP.temp,{icon,draggable:true}).addTo(FP.map);
     FP.marker.on('dragend',()=>{const ll=FP.marker.getLatLng();FP.temp=[ll.lat,ll.lng];S.formPinTemp=FP.temp;formPinSetCoordsText()});
   }
   formPinSetCoordsText();
 }
 function formPinTryBasemap(idx){
-  if(!FP.map||typeof L==='undefined')return;
+  if(!FP.map||!petaL())return;
   FP.idx=idx;FP.tileOk=0;FP.tileErr=0;
   if(FP.tileTimer){clearTimeout(FP.tileTimer);FP.tileTimer=null}
   if(FP.tileLayer){try{FP.map.removeLayer(FP.tileLayer)}catch(e){}FP.tileLayer=null}
   const urutan=[PETA_STYLES.jalan,PETA_STYLES.terang];
   if(idx>=urutan.length){
-    if(!FP.fallbackLayer)FP.fallbackLayer=L.imageOverlay('assets/japan-basemap.svg',[[31,129],[45.5,145.5]],{opacity:1,interactive:false}).addTo(FP.map);
+    if(!FP.fallbackLayer)FP.fallbackLayer=petaL().imageOverlay('assets/japan-basemap.svg',[[31,129],[45.5,145.5]],{opacity:1,interactive:false}).addTo(FP.map);
     if(FP.marker)FP.marker.bringToFront();
     return;
   }
   const bp=urutan[idx];
-  FP.tileLayer=L.tileLayer(bp.url,bp.opts);
+  FP.tileLayer=petaL().tileLayer(bp.url,bp.opts);
   FP.tileLayer.on('tileload',()=>{FP.tileOk++;if(FP.tileTimer){clearTimeout(FP.tileTimer);FP.tileTimer=null}});
   FP.tileLayer.on('tileerror',()=>{FP.tileErr++;const total=FP.tileOk+FP.tileErr;if((FP.tileOk===0&&FP.tileErr>=5)||(total>=8&&FP.tileOk===0))formPinTryBasemap(idx+1)});
   FP.tileLayer.addTo(FP.map);
@@ -2044,7 +2132,7 @@ function initFormPinMap(){
   }
   try{
     formPinCleanup();
-    if(typeof L==='undefined'){
+    if(!petaL()){
       /* Sama seperti peta utama: wadah dibiarkan kosong selama Leaflet
          dimuat malas; pesan tidak tampil hanya bila pemuatan gagal. */
       petaMuatLeaflet().then(ok=>{
@@ -2060,7 +2148,7 @@ function initFormPinMap(){
     /* Titik mulai panel: pilihan sementara sesi ini (bila panel dibuka
        lagi tanpa menyimpan) didahulukan, lalu titik awal terbaik. */
     const mulai=(Array.isArray(S.formPinTemp)&&S.formPinTemp.length===2)?S.formPinTemp:(pinManualCoords(f)||awal.coords);
-    FP.map=L.map(el,{scrollWheelZoom:true,attributionControl:false}).setView(awal.coords,awal.zoom);
+    FP.map=petaL().map(el,{scrollWheelZoom:true,attributionControl:false}).setView(awal.coords,awal.zoom);
     formPinTryBasemap(0);
     FP.map.on('click',ev=>{formPinSetMarker([ev.latlng.lat,ev.latlng.lng])});
     const punyaTitik=!!(pinManualCoords(f)||(Array.isArray(S.formPinTemp)&&S.formPinTemp.length===2)||formPinTitikAwal(f).zoom>8);
