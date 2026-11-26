@@ -2146,12 +2146,15 @@ span.piket-chip-ava{display:grid;place-items:center;font-size:12px;font-weight:7
 .inv-borrower{color:var(--mut);font-size:12px;margin-top:3px;line-height:1.3}
 /* Tabel barang bergaya spreadsheet (Excel): satu tabel dengan kepala
    kolom slate seperti tabel laporan, baris zebra, garis antar sel
-   jelas, angka rata kanan tabular. SELURUH kolom selalu muat dalam
-   lebar wadah — table-layout fixed dengan lebar kolom proporsional
-   pada kepala tabel, huruf sedikit lebih kecil, padding sel ramping,
-   teks nama/kategori/lokasi membungkus ke baris bawah — jadi TIDAK
-   ada gulir kanan-kiri untuk tabel ini di desktop maupun HP
-   (±360px); wadahnya tidak lagi bisa digeser mendatar. */
+   jelas, angka rata kanan tabular. Di DESKTOP seluruh kolom selalu
+   muat dalam lebar wadah — table-layout fixed dengan lebar kolom
+   proporsional pada kepala tabel, huruf sedikit lebih kecil, padding
+   sel ramping, teks nama/kategori/lokasi membungkus ke baris bawah —
+   jadi tidak ada gulir kanan-kiri. Khusus HP (di bawah breakpoint
+   desktop) berlaku blok "Geser menyamping" di bawah: kolom diberi
+   lebar minimum yang nyaman dan tabelnya bisa digeser menyamping di
+   dalam wadahnya saja (halaman tidak ikut melebar). */
+.inv-scroll-fade{display:none}
 .inv-table-meta{display:flex;align-items:baseline;justify-content:space-between;gap:8px 14px;flex-wrap:wrap;margin-bottom:8px;font-size:12.5px;color:var(--mut)}
 .inv-table-meta span:first-child{font-weight:700;color:var(--ink)}
 .inv-wrap{overflow-x:hidden;overflow-y:hidden;max-width:100%;border:1px solid var(--line);border-radius:12px;background:var(--card);box-shadow:5px 7px 16px rgba(70,95,115,.09)}
@@ -2240,6 +2243,66 @@ select.inv-in{-webkit-appearance:none;appearance:none;padding-right:14px;backgro
   .inv-table{font-size:10.5px}
   .inv-table th,.inv-table td{padding:4px 3px}
   .inv-filters select{flex:1 1 45%}
+}
+/* ===== Inventari di HP: tabel bisa digeser menyamping =====
+   Hanya di bawah breakpoint desktop aplikasi (1024px); desktop tidak
+   berubah sama sekali. Kolom-kolom diberi lebar tetap dalam piksel
+   yang nyaman dibaca/diisi, wadahnya (.inv-wrap) menjadi satu-satunya
+   bidang yang bergeser — menyamping untuk mencapai semua kolom dan
+   tegak untuk daftar panjang, dengan kepala tabel menetap di atas
+   wadah selama digulir ke bawah. Kolom No, Foto, dan Nama MENETAP di
+   tepi kiri (sticky) dengan latar selnya sendiri yang menutupi kolom
+   di bawahnya, jadi konteks barang tidak hilang saat menggeser;
+   bayangan lembut di tepi kanan cangkang menjadi isyarat visual
+   bahwa tabel masih bisa digeser, dan hilang di ujung kanan. Baris
+   tambah di kaki tabel memakai tata letak yang sama sehingga semua
+   isiannya terjangkau dengan geseran. */
+@media (max-width:1023px){
+  .inv-scroll-shell{position:relative}
+  .inv-wrap{overflow-x:auto;overflow-y:auto;max-height:74vh;max-height:74dvh;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;scrollbar-width:thin}
+  .inv-scroll-fade{display:block;position:absolute;top:1px;right:1px;bottom:1px;width:26px;border-radius:0 11px 11px 0;background:linear-gradient(to right,rgba(255,253,248,0),rgba(44,74,94,.22));pointer-events:none;opacity:1;transition:opacity .18s ease;z-index:8}
+  .inv-scroll-shell.inv-scrolled-end .inv-scroll-fade{opacity:0}
+  .inv-table{width:920px;min-width:920px;font-size:12.5px}
+  .inv-table-kelola{width:1024px;min-width:1024px}
+  .inv-table th,.inv-table td{padding:8px 7px}
+  .inv-table thead th{font-size:10.5px}
+  .inv-table thead th.inv-c-no{width:38px}
+  .inv-table thead th.inv-c-foto{width:54px}
+  .inv-table thead th.inv-c-nama{width:158px}
+  .inv-table thead th.inv-c-kat{width:104px}
+  .inv-table thead th.inv-w-jumlah{width:78px}
+  .inv-table thead th.inv-w-kondisi{width:94px}
+  .inv-table thead th.inv-c-lokasi{width:112px}
+  .inv-table thead th.inv-w-harga{width:94px}
+  .inv-table thead th.inv-w-total{width:94px}
+  .inv-table thead th.inv-w-status{width:94px}
+  .inv-table-kelola thead th.inv-c-kat{width:100px}
+  .inv-table-kelola thead th.inv-w-jumlah{width:76px}
+  .inv-table-kelola thead th.inv-w-kondisi{width:90px}
+  .inv-table-kelola thead th.inv-c-lokasi{width:108px}
+  .inv-table-kelola thead th.inv-w-harga{width:90px}
+  .inv-table-kelola thead th.inv-w-total{width:90px}
+  .inv-table-kelola thead th.inv-w-status{width:92px}
+  .inv-table-kelola thead th.inv-w-aksi{width:128px}
+  .inv-thumb-sm{width:36px;height:36px;border-radius:9px}
+  .inv-table .inv-badge{font-size:10.5px;padding:2px 7px}
+  .inv-table .inv-borrower{font-size:11px}
+  .inv-actions .btn.s{padding:6px 8px;font-size:11px;border-radius:9px}
+  .inv-in{padding:7px 6px;font-size:12.5px;border-radius:8px}
+  select.inv-in{padding-right:16px;background-position:right 5px center}
+  .inv-save-btn{padding:8px 6px;font-size:11.5px}
+  /* Kepala tabel menetap di atas wadah saat daftar digulir ke bawah */
+  .inv-table thead th{position:sticky;top:0;z-index:5}
+  /* Kolom No + Foto + Nama menetap di tepi kiri saat digeser.
+     Lebar ketiganya sama untuk tabel biasa maupun kelola
+     (38 + 54 = 92px titik mulai kolom Nama). */
+  .inv-table thead th:nth-child(-n+3),
+  .inv-table tbody td:nth-child(-n+3),
+  .inv-table tfoot tr.inv-add-row:not(.inv-add-row2) td:nth-child(-n+3){position:sticky;z-index:3}
+  .inv-table thead th:nth-child(-n+3){z-index:7}
+  .inv-table thead th:nth-child(1),.inv-table tbody td:nth-child(1),.inv-table tfoot tr.inv-add-row:not(.inv-add-row2) td:nth-child(1){left:0}
+  .inv-table thead th:nth-child(2),.inv-table tbody td:nth-child(2),.inv-table tfoot tr.inv-add-row:not(.inv-add-row2) td:nth-child(2){left:38px}
+  .inv-table thead th:nth-child(3),.inv-table tbody td:nth-child(3),.inv-table tfoot tr.inv-add-row:not(.inv-add-row2) td:nth-child(3){left:92px;box-shadow:10px 0 14px -10px rgba(23,50,77,.35)}
 }
 
 /* ===== Daftar Anggota: ubin ringkas (foto + nama + wilayah saja) =====

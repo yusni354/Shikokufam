@@ -289,12 +289,15 @@ function vInventaris(){
   };
   /* Daftar barang tampil sebagai SATU TABEL bergaya spreadsheet
      (Excel): kepala kolom slate, baris zebra, garis antar sel jelas,
-     angka rata kanan tabular. Seluruh kolom MUAT dalam lebar wadah
-     (table-layout fixed di style.css) — tidak ada gulir kanan-kiri
-     di desktop maupun HP; Jumlah dan Satuan digabung dalam satu sel
-     ("2 unit") supaya lebarnya cukup. Ketuk baris (di luar tombol
-     Aksi) membuka panel detail seperti sebelumnya; tombol Aksi di
-     kolom terakhir hanya untuk Pengurus & Admin Utama. */
+     angka rata kanan tabular. Di desktop seluruh kolom MUAT dalam
+     lebar wadah (table-layout fixed di style.css) tanpa gulir
+     kanan-kiri; khusus di HP (di bawah breakpoint desktop) kolom
+     diberi lebar minimum yang nyaman dan tabelnya bisa DIGESER
+     menyamping di dalam wadahnya — kolom No, Foto, dan Nama menetap
+     di tepi kiri selama digeser (diatur di style.css). Jumlah dan
+     Satuan digabung dalam satu sel ("2 unit"). Ketuk baris (di luar
+     tombol Aksi) membuka panel detail seperti sebelumnya; tombol
+     Aksi di kolom terakhir hanya untuk Pengurus & Admin Utama. */
   const barisTabel=(item,idx)=>{
     const dipinjam=invStatus(item)==='dipinjam';
     const sel=[
@@ -424,9 +427,20 @@ function vInventaris(){
       h('thead',{},h('tr',{},...kepala.map(([label,cls])=>h('th',{class:cls},label)))),
       h('tbody',{},...barisIsi),
       h('tfoot',{},...barisKaki));
+    /* Cangkang geser: wadah tabel + bayangan lembut di tepi kanan
+       (hanya tampil di HP lewat style.css) sebagai isyarat visual
+       bahwa tabel bisa digeser menyamping; bayangan hilang begitu
+       pengguna mencapai ujung kanan tabel. Di desktop cangkang ini
+       tidak mengubah tampilan apa pun. */
+    const wrapGeser=h('div',{class:'inv-wrap'},tabel);
+    const cangkang=h('div',{class:'inv-scroll-shell'},wrapGeser,h('div',{class:'inv-scroll-fade','aria-hidden':'true'}));
+    const segarkanBayang=()=>{const mentok=wrapGeser.scrollWidth<=wrapGeser.clientWidth||wrapGeser.scrollLeft+wrapGeser.clientWidth>=wrapGeser.scrollWidth-8;cangkang.classList.toggle('inv-scrolled-end',mentok)};
+    wrapGeser.addEventListener('scroll',segarkanBayang,{passive:true});
     listWrap.replaceChildren(
       h('div',{class:'inv-table-meta'},h('span',{},'Menampilkan '+filtered.length+' dari '+all.length+' barang'),h('span',{},'Ketuk baris untuk melihat detail')),
-      h('div',{class:'inv-wrap'},tabel));
+      cangkang);
+    segarkanBayang();
+    if(typeof requestAnimationFrame==='function')requestAnimationFrame(segarkanBayang);
     if(typeof hydrateMemberMedia==='function')hydrateMemberMedia();
   };
   const cari=h('input',{type:'search',placeholder:'Cari nama barang atau lokasi…','aria-label':'Cari barang'});
