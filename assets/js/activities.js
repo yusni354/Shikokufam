@@ -644,11 +644,15 @@ function tahunDariTanggal(tanggal){
    zebra mengikuti gaya tabel rekap, wadahnya bisa digeser kanan-kiri
    bila tabel lebih lebar dari layar. Kolom memakai kelas 'lap-left'
    (rata kiri) atau 'lap-num' (rata kanan, tebal untuk isi angka). */
-function laporanTabel(kolom,baris,lebarMin){
-  return h('div',{class:'laporan-wrap'},
-    h('table',{class:'laporan-table',...(lebarMin?{style:'min-width:'+lebarMin+'px'}:{})},
-      h('thead',{},h('tr',{},...kolom.map(([label,kelas])=>h('th',kelas?{class:kelas}:{},label)))),
-      h('tbody',{},...baris)));
+function laporanTabel(kolom,baris,lebarMin,idTabel){
+  const table=h('table',{class:'laporan-table',...(lebarMin?{style:'min-width:'+lebarMin+'px'}:{})},
+    h('thead',{},h('tr',{},...kolom.map(([label,kelas])=>h('th',kelas?{class:kelas}:{},label)))),
+    h('tbody',{},...baris));
+  /* Lebar kolom yang diatur admin utama (lebar-kolom.js): diterapkan
+     untuk semua pengguna, pegangannya hanya terpasang untuk admin
+     utama. Tanpa id tabel, tabel tampil dengan lebar bawaan. */
+  if(idTabel){lkTerapkan(table,idTabel);lkPasang(table,idTabel)}
+  return h('div',{class:'laporan-wrap'},table);
 }
 /* Batang mendatar sederhana untuk kolom 'Bagian' (persen) */
 function laporanBar(persen,warna){
@@ -695,7 +699,7 @@ function vRingkasanKeuangan(year){
     h('td',{class:'lap-num'},'100%')));
   const bulanCard=h('section',{class:'card lap-card'},
     h('h3',{class:'lap-h'},'Pengeluaran per bulan'),
-    laporanTabel([['Bulan','lap-left'],['Catatan','lap-num'],['Total','lap-num'],['Bagian','lap-num']],bulanRows));
+    laporanTabel([['Bulan','lap-left'],['Catatan','lap-num'],['Total','lap-num'],['Bagian','lap-num']],bulanRows,0,'rekap_keuangan_bulan'));
   /* Pengelompokan generik: kunci -> {label, count, total}, urut total terbesar */
   const kelompokkan=(keyOf,labelOf)=>{
     const map=new Map();
@@ -717,7 +721,7 @@ function vRingkasanKeuangan(year){
     h('td',{class:'lap-bar-cell'},laporanBar(persen(v.total)),h('span',{class:'lap-pct'},persen(v.total)+'%'))));
   const kategoriCard=h('section',{class:'card lap-card'},
     h('h3',{class:'lap-h'},'Pengeluaran per kategori'),
-    laporanTabel([['Kategori','lap-left'],['Catatan','lap-num'],['Total','lap-num'],['Bagian','lap-left']],kategoriRows));
+    laporanTabel([['Kategori','lap-left'],['Catatan','lap-num'],['Total','lap-num'],['Bagian','lap-left']],kategoriRows,0,'rekap_keuangan_kategori'));
   const penggunaRows=kelompokkan(
     item=>String(item.uid||item.nama_user||'anggota'),
     item=>item.nama_user||'Anggota'
@@ -728,7 +732,7 @@ function vRingkasanKeuangan(year){
     h('td',{class:'lap-num'},persen(v.total)+'%')));
   const penggunaCard=h('section',{class:'card lap-card'},
     h('h3',{class:'lap-h'},'Belanja per pengguna'),
-    laporanTabel([['Nama','lap-left'],['Catatan','lap-num'],['Total','lap-num'],['Bagian','lap-num']],penggunaRows));
+    laporanTabel([['Nama','lap-left'],['Catatan','lap-num'],['Total','lap-num'],['Bagian','lap-num']],penggunaRows,0,'rekap_keuangan_pengguna'));
   return [summary,bulanCard,kategoriCard,penggunaCard];
 }
 /* ===== Ruangan ANGGOTA: potret daftar anggota SAAT INI (tanpa
@@ -768,10 +772,10 @@ function vRingkasanAnggota(){
       wilayahRows.map(r=>h('tr',{},
         h('td',{class:'lap-left'},h('span',{class:'lap-dot',style:'background:'+r.color,'aria-hidden':'true'}),r.name),
         h('td',{class:'lap-num'},String(r.count)),
-        h('td',{class:'lap-num'},persen(r.count)+'%')))));
+        h('td',{class:'lap-num'},persen(r.count)+'%'))),0,'rekap_anggota_wilayah'));
   /* Kartu rincian dari satu field anggota; null bila field itu kosong
      pada semua anggota aktif (tidak ada yang bisa dilaporkan). */
-  const rincian=(judul,kolom,ambil)=>{
+  const rincian=(judul,kolom,ambil,idTabel)=>{
     const map=new Map();
     aktif.forEach(member=>{
       const value=String(ambil(member)||'').trim();
@@ -786,13 +790,13 @@ function vRingkasanAnggota(){
         h('td',{class:'lap-num'},persen(count)+'%')));
     return h('section',{class:'card lap-card'},
       h('h3',{class:'lap-h'},judul),
-      laporanTabel([[kolom,'lap-left'],['Anggota','lap-num'],['Bagian','lap-num']],rows));
+      laporanTabel([[kolom,'lap-left'],['Anggota','lap-num'],['Bagian','lap-num']],rows,0,idTabel));
   };
   return [summary,wilayahCard,
-    rincian('Anggota per kelompok','Kelompok',m=>m.kelompok),
-    rincian('Anggota per status visa','Status visa',m=>m.tinggal),
-    rincian('Anggota per bidang pekerjaan','Bidang pekerjaan',m=>m.bidang),
-    rincian('Anggota per jenis kelamin','Jenis kelamin',m=>m.kelamin)
+    rincian('Anggota per kelompok','Kelompok',m=>m.kelompok,'rekap_anggota_kelompok'),
+    rincian('Anggota per status visa','Status visa',m=>m.tinggal,'rekap_anggota_visa'),
+    rincian('Anggota per bidang pekerjaan','Bidang pekerjaan',m=>m.bidang,'rekap_anggota_bidang'),
+    rincian('Anggota per jenis kelamin','Jenis kelamin',m=>m.kelamin,'rekap_anggota_kelamin')
   ].filter(Boolean);
 }
 /* ===== Ruangan JADWAL PIKET: ringkasan koleksi 'cleaning_duties'
@@ -830,7 +834,7 @@ function vRingkasanPiket(year){
     });
     out.push(h('section',{class:'card lap-card'},
       h('h3',{class:'lap-h'},'Jadwal terdekat'),
-      laporanTabel([['Tanggal','lap-left'],['Nama bertugas','lap-left'],['Tugas','lap-left']],rows,520)));
+      laporanTabel([['Tanggal','lap-left'],['Nama bertugas','lap-left'],['Tugas','lap-left']],rows,520,'rekap_piket')));
   }else{
     out.push(h('p',{class:'warn'},'Tidak ada jadwal piket yang akan datang.'));
   }
@@ -848,7 +852,7 @@ function vRingkasanPiket(year){
         h('td',{class:'lap-num'},(yearAssignments?Math.round(count/yearAssignments*100):0)+'%')));
     if(rows.length)out.push(h('section',{class:'card lap-card'},
       h('h3',{class:'lap-h'},'Jumlah piket per anggota · '+year),
-      laporanTabel([['Nama','lap-left'],['Kali piket','lap-num'],['Bagian','lap-num']],rows)));
+      laporanTabel([['Nama','lap-left'],['Kali piket','lap-num'],['Bagian','lap-num']],rows,0,'rekap_piket_anggota')));
   }else{
     out.push(h('p',{class:'warn'},'Belum ada jadwal piket pada tahun '+year+'.'));
   }
@@ -949,6 +953,9 @@ function bangunKepalaRekapMelayang(wrap,table){
   const cloneTable=h('table',{class:'rekap-table'});
   cloneTable.style.width=table.offsetWidth+'px';
   const cloneHead=thead.cloneNode(true);
+  /* Pegangan atur lebar kolom tidak ikut disalin ke kepala melayang:
+     salinan ini hanya penampil, bukan tempat mengatur lebar. */
+  cloneHead.querySelectorAll('.lk-handle').forEach(el=>el.remove());
   const asal=thead.querySelectorAll('th'),salinan=cloneHead.querySelectorAll('th');
   salinan.forEach((th,i)=>{
     const o=asal[i];
@@ -1230,12 +1237,19 @@ function vRingkasan(){
     barisRekap.push(pembatas,...barisAnggota);
   });
   const rekapBody=h('tbody',{},...barisRekap);
+  /* Tabel rekap ikut sistem lebar kolom admin utama (lebar-kolom.js):
+     lebar efektif disesuaikan dengan jumlah kolom bulan ini, lalu
+     diterapkan untuk semua pengguna; pegangan aturnya hanya untuk
+     admin utama. */
+  const rekapTabelEl=h('table',{class:'rekap-table'},rekapHead,rekapBody);
+  lkTerapkan(rekapTabelEl,'rekap_kegiatan',lebarRekapEfektif(rekapTotalKolom));
+  lkPasang(rekapTabelEl,'rekap_kegiatan');
   const rekapCard=h('section',{class:'card ringkasan-rekap'},
     h('div',{class:'rekap-head-info'},
       h('h3',{class:'rekap-title'},'Rekap '+namaBulanTerpilih+' '+selected),
       h('p',{class:'rekap-subtitle'},rekapEvents.length+' kegiatan pada bulan ini · Total Hadir, Izin, Cuti, Alpha, dan % Hadir dihitung dari bulan ini saja')),
     rekapMembers.length
-      ?h('div',{class:'rekap-wrap'},h('table',{class:'rekap-table'},rekapHead,rekapBody))
+      ?h('div',{class:'rekap-wrap'},rekapTabelEl)
       :h('p',{class:'warn'},'Belum ada anggota aktif.'));
   /* Kartu ringkasan BULANAN: bentuknya sama persis dengan kartu
      ringkasan tahunan (judul, baris jumlah kegiatan, pil total empat

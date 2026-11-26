@@ -524,7 +524,7 @@ function aksiUsapKembali(){
      salah satunya aktif, isyarat usap tepi dibatalkan — jari yang
      ditahan dulu sampai seret matang lalu digeser mendatar bukan
      isyarat kembali. */
-  const seretLainAktif=()=>!!document.querySelector('.org-row-dragging,.menu-dragging,.rekap-wrap.menyeret,.laporan-wrap.menyeret,.inv-wrap.menyeret');
+  const seretLainAktif=()=>!!document.querySelector('.org-row-dragging,.menu-dragging,.rekap-wrap.menyeret,.laporan-wrap.menyeret,.inv-wrap.menyeret,table.lk-menyeret');
   const sedangMengetik=()=>{
     const a=document.activeElement;
     if(!a||a===document.body)return false;

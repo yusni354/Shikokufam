@@ -277,6 +277,7 @@ function startDataSubscriptions(){
   add(()=>sub('keuangan','keuangan'));
   add(()=>sub('inventaris','inventaris'));
   add(()=>subscribePilihan());
+  add(()=>subscribeLebarKolom());
   if(!S.supabase)add(()=>sub('pengaturan','pengaturan'));
   add(()=>subscribeSambutan());
   add(()=>subscribeSumberPeta());

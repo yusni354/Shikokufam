@@ -2301,8 +2301,8 @@ select.inv-in{-webkit-appearance:none;appearance:none;padding-right:14px;backgro
   .inv-table tfoot tr.inv-add-row:not(.inv-add-row2) td:nth-child(-n+3){position:sticky;z-index:3}
   .inv-table thead th:nth-child(-n+3){z-index:7}
   .inv-table thead th:nth-child(1),.inv-table tbody td:nth-child(1),.inv-table tfoot tr.inv-add-row:not(.inv-add-row2) td:nth-child(1){left:0}
-  .inv-table thead th:nth-child(2),.inv-table tbody td:nth-child(2),.inv-table tfoot tr.inv-add-row:not(.inv-add-row2) td:nth-child(2){left:38px}
-  .inv-table thead th:nth-child(3),.inv-table tbody td:nth-child(3),.inv-table tfoot tr.inv-add-row:not(.inv-add-row2) td:nth-child(3){left:92px;box-shadow:10px 0 14px -10px rgba(23,50,77,.35)}
+  .inv-table thead th:nth-child(2),.inv-table tbody td:nth-child(2),.inv-table tfoot tr.inv-add-row:not(.inv-add-row2) td:nth-child(2){left:var(--lk-l2,38px)}
+  .inv-table thead th:nth-child(3),.inv-table tbody td:nth-child(3),.inv-table tfoot tr.inv-add-row:not(.inv-add-row2) td:nth-child(3){left:var(--lk-l3,92px);box-shadow:10px 0 14px -10px rgba(23,50,77,.35)}
 }
 
 /* ===== Daftar Anggota: ubin ringkas (foto + nama + wilayah saja) =====
@@ -2489,3 +2489,28 @@ select.inv-in{-webkit-appearance:none;appearance:none;padding-right:14px;backgro
 .sec-badge-bad{background:#f7d9d9;color:#7f1d1d}
 .sec-badge-note{background:#f2e6c4;color:#5b4a12}
 .sec-badge-mut{background:#e3edf3;color:#22384c}
+
+/* ===== Lebar kolom tabel diatur ADMIN UTAMA (lebar-kolom.js) =====
+   Begitu sebuah tabel punya lebar tersimpan, ia mendapat kelas
+   'lk-ada-lebar': tata letak fixed + colgroup nyata dari JS membuat
+   lebar tersimpan menang atas lebar bawaan CSS di bawah ini (lebar
+   persen/piksel kepala kolom Inventari, batas kolom nama & kolom
+   kegiatan rekap). Tanpa simpanan, tidak ada kelas ini dan semua
+   tabel tampil persis dengan lebar bawaannya seperti sebelumnya.
+   Pegangan (.lk-handle) hanya dirender untuk admin utama: jalur
+   sempit tak terlihat di tepi kanan tiap kepala kolom; sesudah tekan
+   lama matang, kepala kolom yang aktif menebalkan garis tealnya dan
+   kursor berubah menjadi kursor atur kolom selama menyeret. */
+table.lk-ada-lebar{table-layout:fixed}
+.inv-table.lk-ada-lebar thead th{width:auto}
+.rekap-table.lk-ada-lebar thead th.rekap-ev{max-width:none}
+.rekap-table.lk-ada-lebar thead th.rekap-name-head{width:auto;min-width:0;max-width:none}
+.rekap-table.lk-ada-lebar .rekap-name{width:auto;min-width:0;max-width:none}
+.lk-th{position:relative}
+.lk-handle{position:absolute;top:0;right:-7px;width:14px;height:100%;cursor:col-resize;z-index:8;touch-action:none;-webkit-tap-highlight-color:transparent}
+.lk-handle::after{content:'';position:absolute;left:50%;top:0;bottom:0;width:3px;transform:translateX(-50%);border-radius:2px;background:transparent}
+th.lk-aktif .lk-handle::after{background:#35c4b5;box-shadow:0 0 0 1px rgba(23,50,77,.25),0 0 10px rgba(53,196,181,.55)}
+th.lk-aktif{box-shadow:inset -2px 0 0 #35c4b5}
+body.lk-menyeret-body{user-select:none;-webkit-user-select:none}
+body.lk-menyeret-body,body.lk-menyeret-body *{cursor:col-resize!important}
+@media print{.lk-handle{display:none!important}}

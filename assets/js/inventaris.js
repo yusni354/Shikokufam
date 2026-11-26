@@ -427,6 +427,14 @@ function vInventaris(){
       h('thead',{},h('tr',{},...kepala.map(([label,cls])=>h('th',{class:cls},label)))),
       h('tbody',{},...barisIsi),
       h('tfoot',{},...barisKaki));
+    /* Lebar kolom yang diatur admin utama (lebar-kolom.js) berlaku
+       untuk semua pengguna — termasuk tata letak geser HP, yang
+       memakai lebar tersimpan yang sama sebagai dasar kolomnya;
+       pegangan aturnya hanya terpasang untuk admin utama. Kolom Aksi
+       (khusus pengelola) berada paling kanan, jadi daftar lebar yang
+       sama tetap sejajar untuk tabel tanpa kolom Aksi. */
+    lkTerapkan(tabel,'inventaris');
+    lkPasang(tabel,'inventaris');
     /* Cangkang geser: wadah tabel + bayangan lembut di tepi kanan
        (hanya tampil di HP lewat style.css) sebagai isyarat visual
        bahwa tabel bisa digeser menyamping; bayangan hilang begitu
