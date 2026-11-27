@@ -2729,3 +2729,50 @@ input,textarea,select{padding:8px 11px}
    toast Musyawarah; muncul hanya selama siaga keluar 2,5 detik. */
 #back-exit-hint{position:fixed;left:50%;bottom:calc(22px + env(safe-area-inset-bottom,0px));transform:translateX(-50%) translateY(8px);background:#24344a;color:#eef5f9;padding:9px 18px;border-radius:99px;font-size:13.5px;font-weight:500;opacity:0;transition:opacity .25s,transform .25s;pointer-events:none;z-index:1300;box-shadow:0 10px 24px rgba(20,35,50,.35);white-space:nowrap}
 #back-exit-hint.s{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ===== Home lebih baik: agenda gabungan, statistik berisi keterangan,
+   batang bagian wilayah, ringkasan bulan ini, pintasan delapan =====
+   Lapisan terakhir khusus halaman Home (vHome di home.js): kartu
+   sambutan mendapat info hari ini + dua tombol aksi; ubin statistik
+   bisa diketuk dan memuat keterangan kecil; bagian "Agenda terdekat"
+   menggabungkan kegiatan & piket mendatang dalam satu daftar waktu;
+   kartu wilayah memuat batang bagian + persen; "Ringkasan bulan ini"
+   merangkum keuangan, inventaris, pesan, dan persetujuan; akses cepat
+   menjadi delapan pintasan. Warna mengikuti tema clay yang sama. */
+.home-welcome-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.home-welcome-cta2{background:rgba(255,255,255,.14);color:#eef5f9;border:2px solid rgba(255,255,255,.55);box-shadow:none;margin-top:10px}
+.home-today-info{display:flex;align-items:flex-start;gap:6px;margin-top:9px;padding:7px 10px;border-radius:11px;background:rgba(255,255,255,.13);color:#eef5f9;font-size:12.5px;line-height:1.45}
+.home-today-info>.app-icon{flex:none;margin-top:1px}
+.home-today-info span{color:#eef5f9}
+.home-stat{cursor:pointer}
+.home-stat-detail{display:block;margin-top:2px;font-size:10.5px;line-height:1.35;color:#3d5568}
+.home-agenda-row{display:flex;align-items:center;gap:12px;width:100%;padding:11px 12px;border:1px solid rgba(255,255,255,.85);border-radius:18px;background:#f8fbfc;color:var(--ink);text-align:left;box-shadow:6px 8px 18px rgba(70,95,115,.1);cursor:pointer;font-family:inherit}
+.home-agenda-row:active{transform:scale(.99)}
+.home-agenda-info{flex:1;min-width:0}
+.home-agenda-info b{display:block;font-size:14.5px;line-height:1.3;overflow-wrap:anywhere}
+.home-agenda-info small{display:block;margin-top:3px;font-size:12px;line-height:1.4;color:#43586a;overflow-wrap:anywhere}
+.home-agenda-tags{display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex:none}
+.home-agenda-rel{padding:3px 8px;border-radius:999px;background:#dff4e8;color:#17603f;font-size:11px;font-weight:700;white-space:nowrap}
+.home-agenda-type{font-size:11px;font-weight:600;color:#5b7183}
+.home-region-bar{height:7px;border-radius:99px;background:rgba(70,95,115,.13);overflow:hidden}
+.home-region-bar>span{display:block;height:100%;border-radius:99px;background:var(--region-color,#718096)}
+.home-region-pct{margin:6px 0 0;font-size:11.5px;color:#43586a}
+.home-region-heading{margin-bottom:7px}
+.home-summary{display:grid;gap:0;background:#f8fbfc;border:1px solid rgba(255,255,255,.85);border-radius:20px;box-shadow:8px 10px 20px rgba(70,95,115,.12);overflow:hidden}
+.home-summary-row{display:flex;align-items:center;gap:11px;width:100%;padding:12px 13px;border:0;border-bottom:1px solid #dde7ee;background:transparent;color:var(--ink);text-align:left;cursor:pointer;font-family:inherit}
+.home-summary-row:last-child{border-bottom:0}
+.home-summary-row:active{background:rgba(255,255,255,.8)}
+.home-summary-icon{width:38px;height:38px;flex:none;display:grid;place-items:center;border-radius:13px;background:#dceef8;color:#22384c}
+.home-summary-row:nth-child(2) .home-summary-icon{background:#cdeee6}
+.home-summary-row:nth-child(3) .home-summary-icon{background:#f6dcc0}
+.home-summary-row:nth-child(4) .home-summary-icon{background:#f3cfd8}
+.home-summary-main{flex:1;min-width:0}
+.home-summary-main b{display:block;font-size:14px;line-height:1.3;overflow-wrap:anywhere}
+.home-summary-main small{display:block;margin-top:2px;font-size:12.5px;line-height:1.4;color:#43586a;overflow-wrap:anywhere}
+.home-summary-row .nav-badge{margin-left:0}
+.home-summary-arrow{flex:none;font-size:18px;color:#5b7183}
+.home-shortcut:nth-child(5) .home-shortcut-icon{background:#dceef8}
+.home-shortcut:nth-child(6) .home-shortcut-icon{background:#f3e3b8}
+.home-shortcut:nth-child(7) .home-shortcut-icon{background:#d8ecd2}
+.home-shortcut:nth-child(8) .home-shortcut-icon{background:#f3cfd8}
+@media (max-width:430px){.home-agenda-rel{font-size:10.5px;padding:2px 7px}.home-agenda-info b{font-size:13.5px}}

@@ -341,6 +341,22 @@ function mulaiHidupMaskotVideo(stage,video){
   jadwalJeda();
   /* Maskot diam di posisinya: tidak ada penjadwal jalan-jalan lagi. */
 }
+/* Sapaan mengikuti jam perangkat: pagi / siang / sore / malam */
+function homeSapaan(){
+  const jam=new Date().getHours();
+  if(jam>=4&&jam<11)return 'Selamat pagi';
+  if(jam>=11&&jam<15)return 'Selamat siang';
+  if(jam>=15&&jam<19)return 'Selamat sore';
+  return 'Selamat malam';
+}
+/* Label jarak hari untuk agenda: 'Hari ini', 'Besok', atau 'x hari lagi' */
+function homeLabelHari(tanggalKey,todayKey){
+  const a=new Date(todayKey+'T00:00:00'),b=new Date(tanggalKey+'T00:00:00');
+  const selisih=Math.round((b-a)/86400000);
+  if(selisih<=0)return 'Hari ini';
+  if(selisih===1)return 'Besok';
+  return selisih+' hari lagi';
+}
 /* Halaman Home dan Ringkasan */
 function vHome(){
   /* Spanduk satu kali 'Selamat, akun Anda telah disetujui.' bagi akun yang
@@ -348,41 +364,101 @@ function vHome(){
      di auth.js yang memutuskan & menandainya sudah tampil). */
   const approvedBanner=(typeof authOnSignedIn==='function'&&authOnSignedIn())?h('p',{class:'warn approved-banner'},'Selamat, akun Anda telah disetujui.'):null;
   const today=new Date(),todayKey=[today.getFullYear(),String(today.getMonth()+1).padStart(2,'0'),String(today.getDate()).padStart(2,'0')].join('-');
-  const upcomingDuties=[...S.cleaningDuties].filter(duty=>duty.tanggal&&duty.tanggal>=todayKey).sort((a,b)=>a.tanggal.localeCompare(b.tanggal)).slice(0,2);
-  const recentEvents=[...S.events].sort((a,b)=>(b.at||0)-(a.at||0)).slice(0,2);
+  const monthKey=todayKey.slice(0,7);
+  const aktifMembers=S.members.filter(m=>String(m.status||'aktif').toLowerCase()!=='nonaktif');
+  const nonaktifCount=S.members.length-aktifMembers.length;
+  /* ===== Agenda gabungan terdekat: kegiatan & piket yang akan datang,
+     diurutkan menurut tanggalnya (yang paling dekat di atas) ===== */
+  const upcomingEvents=[...S.events].filter(e=>e.tanggal&&e.tanggal>=todayKey).sort((a,b)=>(a.tanggal||'').localeCompare(b.tanggal||'')||(a.waktu||'').localeCompare(b.waktu||''));
+  const upcomingDuties=[...S.cleaningDuties].filter(d=>d.tanggal&&d.tanggal>=todayKey).sort((a,b)=>(a.tanggal||'').localeCompare(b.tanggal||''));
+  const agendaItems=[
+    ...upcomingEvents.map(e=>({jenis:'kegiatan',tanggal:e.tanggal,waktu:e.waktu||'',judul:e.judul||'Kegiatan komunitas',meta:(e.waktu?e.waktu+' · ':'')+(e.lokasi||'')+' · '+eventParticipantCount(e)+' peserta',event:e})),
+    ...upcomingDuties.map(d=>{
+      const asg=Array.isArray(d.assignments)&&d.assignments.length?d.assignments:[{nama:d.nama||'',tugas:d.tugas||''}];
+      return {jenis:'piket',tanggal:d.tanggal,waktu:'',judul:'Jadwal Piket',meta:asg.map(a=>[a.nama,a.tugas].filter(Boolean).join(' — ')).filter(Boolean).join(' · ')};
+    })
+  ].sort((a,b)=>a.tanggal.localeCompare(b.tanggal)||a.waktu.localeCompare(b.waktu)).slice(0,4);
+  const agendaRows=agendaItems.map(item=>{
+    const d=new Date(item.tanggal+'T00:00:00');
+    return h('button',{class:'home-agenda-row',onclick:()=>{
+        if(item.jenis==='kegiatan'){go('kegiatan');openActivityDetail(item.event.id)}
+        else go('piket');
+      }},
+      h('div',{class:'home-duty-date'},h('b',{},String(d.getDate()).padStart(2,'0')),h('small',{},d.toLocaleDateString('id-ID',{month:'short'}))),
+      h('div',{class:'home-agenda-info'},h('b',{},item.judul),h('small',{},d.toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long'})+(item.meta?' · '+item.meta:''))),
+      h('span',{class:'home-agenda-tags'},h('span',{class:'home-agenda-rel'},homeLabelHari(item.tanggal,todayKey)),h('span',{class:'home-agenda-type'},item.jenis==='kegiatan'?'Kegiatan':'Piket')));
+  });
+  /* ===== Info hari ini untuk kartu sambutan ===== */
+  const infoHariIni=[];
+  upcomingEvents.filter(e=>e.tanggal===todayKey).slice(0,1).forEach(e=>infoHariIni.push('Kegiatan hari ini: '+(e.judul||'Kegiatan komunitas')+(e.waktu?' · '+e.waktu:'')));
+  upcomingDuties.filter(d=>d.tanggal===todayKey).slice(0,1).forEach(d=>{
+    const asg=Array.isArray(d.assignments)&&d.assignments.length?d.assignments:[{nama:d.nama||'',tugas:d.tugas||''}];
+    const nama=asg.map(a=>a.nama).filter(Boolean).join(', ');
+    infoHariIni.push('Piket hari ini'+(nama?': '+nama:''));
+  });
+  /* ===== Statistik: ubin bisa diketuk menuju halamannya, lengkap
+     dengan keterangan kecil dari data yang sama ===== */
   const memberGroups=wilayah();
-  const regionCards=wilayahEfektif().map(([name,color])=>{
-    const members=[...(memberGroups[name]||[])].sort((a,b)=>(a.nama||'').localeCompare(b.nama||'','id'));
+  const regionNames=Object.keys(memberGroups);
+  const topRegion=regionNames.filter(n=>n!=='Belum dipilih').sort((a,b)=>(memberGroups[b]||[]).length-(memberGroups[a]||[]).length)[0];
+  const eventsBulanIni=S.events.filter(e=>String(e.tanggal||'').slice(0,7)===monthKey).length;
+  const statTiles=[
+    ['Anggota',S.members.length,(nonaktifCount>0?(aktifMembers.length+' aktif · '+nonaktifCount+' nonaktif'):'Semua anggota aktif'),'members'],
+    ['Kegiatan',S.events.length,eventsBulanIni+' kegiatan bulan ini','kegiatan'],
+    ['Wilayah',regionNames.length,(topRegion?(topRegion+' terbanyak ('+(memberGroups[topRegion]||[]).length+')'):'Belum ada anggota'),'peta'],
+    ['Jadwal Piket',S.cleaningDuties.length,(upcomingDuties.length?(upcomingDuties.length+' jadwal mendatang'):'Belum ada yang mendatang'),'piket']
+  ];
+  /* ===== Kartu wilayah: nama, jumlah, batang bagian & persen ===== */
+  const totalMembers=S.members.length||1;
+  const regionCard=(name,color,members)=>{
+    const pct=Math.round(members.length/totalMembers*100);
     return h('section',{class:'home-region-card',style:'--region-color:'+color,onclick:()=>{S.memberRegion=name;S.memberQuery='';S.memberStatus='';go('members')}},
-      h('div',{class:'home-region-heading'},h('b',{},name),h('span',{},members.length+' anggota'))
+      h('div',{class:'home-region-heading'},h('b',{},name==='Belum dipilih'?'Wilayah belum dipilih':name),h('span',{},members.length+' anggota')),
+      h('div',{class:'home-region-bar'},h('span',{style:'width:'+pct+'%'})),
+      h('p',{class:'home-region-pct'},pct+'% dari seluruh anggota')
     );
-  });
-  if(memberGroups['Belum dipilih']?.length)regionCards.push(h('section',{class:'home-region-card home-region-unknown',onclick:()=>{S.memberRegion='Belum dipilih';S.memberQuery='';S.memberStatus='';go('members')}},
-    h('div',{class:'home-region-heading'},h('b',{},'Wilayah belum dipilih'),h('span',{},memberGroups['Belum dipilih'].length+' anggota'))
-  ));
-  const shortcuts=[['brush','Jadwal Piket','piket'],['calendar','Kegiatan','kegiatan'],['messages','Forum','forum'],['map','Peta','peta']];
-  const dutyRows=upcomingDuties.flatMap(duty=>{
-    const assignments=Array.isArray(duty.assignments)&&duty.assignments.length?duty.assignments:[{nama:duty.nama||'',tugas:duty.tugas||''}];
-    return [h('div',{class:'home-duty'},
-      h('div',{class:'home-duty-date'},h('b',{},String(new Date(duty.tanggal+'T00:00:00').getDate()).padStart(2,'0')),h('small',{},new Date(duty.tanggal+'T00:00:00').toLocaleDateString('id-ID',{month:'short'}))),
-      h('div',{class:'home-duty-info'},...assignments.map(assignment=>h('p',{},h('b',{},assignment.nama),h('span',{},assignment.tugas))))
-    )];
-  });
+  };
+  const regionCards=wilayahEfektif().map(([name,color])=>regionCard(name,color,memberGroups[name]||[]));
+  if(memberGroups['Belum dipilih']?.length)regionCards.push(regionCard('Belum dipilih','#718096',memberGroups['Belum dipilih']));
+  /* ===== Akses cepat: delapan pintasan, mengikuti menu yang aktif ===== */
+  const shortcuts=[['users','Anggota','members'],['calendar','Kegiatan','kegiatan'],['brush','Jadwal Piket','piket'],['messages','Forum','forum'],['map','Peta','peta'],['wallet','Keuangan','keuangan'],['box','Inventaris','inventaris'],['notebook','Musyawarah','musyawarah']]
+    .filter(([, ,view])=>S.mainAdmin||menuAktifUntuk(view));
+  /* ===== Ringkasan bulan ini: keuangan, inventaris, pesan, persetujuan ===== */
+  const finBulanIni=(S.keuangan||[]).filter(item=>financeMonthKey(item.tanggal)===monthKey);
+  const finTotalBulanIni=finBulanIni.reduce((s,item)=>s+(Number(item.jumlah)||0),0);
+  const invDipinjam=(S.inventaris||[]).filter(item=>typeof invStatus==='function'&&invStatus(item)==='dipinjam').length;
+  const summaryRows=[
+    {glyph:'wallet',judul:'Keuangan · '+today.toLocaleDateString('id-ID',{month:'long',year:'numeric'}),isi:formatYen(finTotalBulanIni)+' dari '+finBulanIni.length+' catatan belanja',view:'keuangan'},
+    {glyph:'box',judul:'Inventari Benda SB',isi:(S.inventaris||[]).length+' benda tercatat'+(invDipinjam?' · '+invDipinjam+' sedang dipinjam':' · semua tersedia'),view:'inventaris'},
+    {glyph:'inbox',judul:'Pesan Masuk',isi:S.unreadMessages>0?S.unreadMessages+' pesan belum dibaca':'Tidak ada pesan yang belum dibaca',view:'pesan',badge:S.unreadMessages>0?String(S.unreadMessages):''}
+  ].filter(row=>S.mainAdmin||menuAktifUntuk(row.view));
+  if(S.admin&&(S.pendingUsers||[]).length>0)summaryRows.push({glyph:'users',judul:'Persetujuan Akun',isi:(S.pendingUsers||[]).length+' akun menunggu persetujuan',view:'approvals',badge:String((S.pendingUsers||[]).length)});
   return [
     approvedBanner,
     h('section',{class:'home-welcome'},
-      h('div',{class:'home-welcome-text'},h('small',{},today.toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'})),h('h1',{},'Selamat datang'+(S.name?', '+S.name.split(' ')[0]:'')+'!'),h('p',{},welcomeMessage()),h('button',{class:'btn home-welcome-cta',onclick:()=>go('kegiatan')},'Lihat Kegiatan')),
+      h('div',{class:'home-welcome-text'},
+        h('small',{},today.toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'})),
+        h('h1',{},homeSapaan()+(S.name?', '+S.name.split(' ')[0]:'')+'!'),
+        h('p',{},welcomeMessage()),
+        infoHariIni.length?h('p',{class:'home-today-info'},icon('calendar',14),h('span',{},infoHariIni.join('  ·  '))):null,
+        h('div',{class:'home-welcome-actions'},
+          h('button',{class:'btn home-welcome-cta',onclick:()=>go('kegiatan')},'Lihat Kegiatan'),
+          h('button',{class:'btn home-welcome-cta2',onclick:()=>go('piket')},'Jadwal Piket'))),
       homeMascot()
     ),
-    h('div',{class:'stats home-stats'},...[['Anggota',S.members.length],['Kegiatan',S.events.length],['Wilayah',Object.keys(wilayah()).length],['Jadwal Piket',S.cleaningDuties.length]].map(item=>h('div',{},h('small',{},item[0]),h('b',{},String(item[1]))))),
+    h('div',{class:'stats home-stats'},...statTiles.map(([label,value,detail,view])=>h('div',{class:'home-stat',title:'Buka '+label,onclick:()=>go(view)},h('small',{},label),h('b',{},String(value)),h('span',{class:'home-stat-detail'},detail)))),
+    h('div',{class:'home-section-heading'},h('h2',{},'Agenda terdekat'),h('button',{class:'btn s',onclick:()=>go('ringkasan')},'Ringkasan')),
+    agendaRows.length?h('div',{class:'home-agenda'},...agendaRows):h('div',{class:'home-empty'},icon('calendar',23),h('p',{},'Belum ada agenda mendatang. Kegiatan dan jadwal piket terdekat akan tampil di sini.')),
     h('div',{class:'home-section-heading'},h('h2',{},'Daftar anggota'),S.admin&&h('button',{class:'btn s',onclick:()=>go('members')},'+ Tambah')),
     h('div',{class:'home-region-list'},...regionCards),
     h('div',{class:'home-section-heading'},h('h2',{},'Akses cepat')),
     h('div',{class:'home-shortcuts'},...shortcuts.map(([glyph,label,view])=>h('button',{class:'home-shortcut',onclick:()=>go(view)},h('span',{class:'home-shortcut-icon'},icon(glyph,22)),h('b',{},label),h('span',{class:'home-shortcut-arrow'},'›')))),
-    h('div',{class:'home-section-heading'},h('h2',{},'Jadwal piket terdekat'),h('button',{class:'btn s',onclick:()=>go('piket')},'Lihat semua')),
-    upcomingDuties.length?h('div',{class:'home-agenda'},...dutyRows):h('div',{class:'home-empty'},icon('brush',23),h('p',{},'Belum ada jadwal piket mendatang.')),
-    h('div',{class:'home-section-heading'},h('h2',{},'Kegiatan komunitas'),h('button',{class:'btn s',onclick:()=>go('kegiatan')},'Lihat kegiatan')),
-    recentEvents.length?h('div',{class:'home-events'},...recentEvents.map(event=>h('div',{class:'home-event'},icon('calendar',19),h('div',{},h('b',{},event.judul||'Kegiatan komunitas'),h('small',{},eventParticipantCount(event)+' peserta · '+eventAttendanceCount(event)+' hadir'))))):h('div',{class:'home-empty'},icon('calendar',23),h('p',{},'Belum ada kegiatan komunitas.')),
+    h('div',{class:'home-section-heading'},h('h2',{},'Ringkasan bulan ini')),
+    h('div',{class:'home-summary'},...summaryRows.map(row=>h('button',{class:'home-summary-row',onclick:()=>go(row.view)},
+      h('span',{class:'home-summary-icon'},icon(row.glyph,19)),
+      h('span',{class:'home-summary-main'},h('b',{},row.judul),h('small',{},row.isi)),
+      row.badge?h('span',{class:'nav-badge'},row.badge):null,
+      h('span',{class:'home-summary-arrow'},'›')))),
     homeAttendanceChart(),
     h('button',{class:'home-admin-link',onclick:askForm},icon('messages',17),' Butuh bantuan? Hubungi Admin')
   ];
