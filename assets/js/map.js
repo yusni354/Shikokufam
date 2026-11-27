@@ -349,9 +349,12 @@ function vApprovals(){
     const wilayah=wilayahAkun(user);
     const tglSetuju=tanggalAkun(user.approved_at);
     const tglDaftar=tanggalAkun(user.created_at);
+    /* Selain waktu disetujui, tampilkan juga waktu pengajuan masuk
+       (tanggal daftar akun, created_at) supaya lamanya menunggu terlihat. */
     const barisTanggal=tglSetuju
       ?'Disetujui '+tglSetuju+(user.approved_by?' oleh '+user.approved_by:'')
       :(tglDaftar?'Terdaftar '+tglDaftar:'—');
+    const barisPengajuan=(tglSetuju&&tglDaftar)?'Pengajuan masuk '+tglDaftar:null;
     /* Aksi khusus admin utama (jadikan admin utama — tidak tampil pada
        admin utama saat ini; hapus akun — tidak tampil pada akun
        sendiri) kini SATU tombol gerigi kecil per baris: panel aksinya
@@ -365,6 +368,7 @@ function vApprovals(){
         h('b',{},user.name||'Nama belum diisi',h('span',{class:'tag'},peranAkun(user))),
         h('small',{},user.email||'-'),
         wilayah?h('small',{},'Wilayah: '+wilayah):null,
+        barisPengajuan?h('small',{},barisPengajuan):null,
         h('small',{},barisTanggal)),
       punyaAksi?aksiGearBtn('akun '+(user.name||user.email||''),{jenis:'akun',id:user.id}):null);
   });
