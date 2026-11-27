@@ -352,12 +352,13 @@ function vApprovals(){
     const barisTanggal=tglSetuju
       ?'Disetujui '+tglSetuju+(user.approved_by?' oleh '+user.approved_by:'')
       :(tglDaftar?'Terdaftar '+tglDaftar:'—');
-    /* Aksi khusus admin utama: jadikan admin utama (tidak tampil pada
-       admin utama saat ini — padanya hanya lencana peran) dan hapus
-       akun (tidak tampil pada akun sendiri). */
-    const aksi=[];
-    if(S.mainAdmin&&!user.is_main_admin)aksi.push(h('button',{class:'btn s btn-eh',onclick:()=>{S.approvalDialog={jenis:'utama',user:{id:user.id,name:user.name,email:user.email,is_main_admin:user.is_main_admin}};render()}},'Jadikan Admin Utama'));
-    if(S.mainAdmin&&user.id!==S.uid)aksi.push(h('button',{class:'btn s btn-eh',onclick:()=>{S.approvalDialog={jenis:'hapus',user:{id:user.id,name:user.name,email:user.email}};render()}},'Hapus'));
+    /* Aksi khusus admin utama (jadikan admin utama — tidak tampil pada
+       admin utama saat ini; hapus akun — tidak tampil pada akun
+       sendiri) kini SATU tombol gerigi kecil per baris: panel aksinya
+       berlabel jelas dibuka dari gerigi itu (aksi-gerigi.js) dan tetap
+       membuka dialog konfirmasi akun yang sama. Tombol keputusan
+       Setujui/Tolak pada tab Menunggu TIDAK berubah. */
+    const punyaAksi=S.mainAdmin&&(!user.is_main_admin||user.id!==S.uid);
     return h('div',{class:'card approval-row'},
       user.avatar_url?h('img',{class:'av',src:user.avatar_url,alt:'Foto '+(user.name||'akun'),style:'object-fit:cover'}):h('div',{class:'av'},(user.name||user.email||'?').trim().slice(0,1).toUpperCase()),
       h('div',{style:'flex:1;min-width:0'},
@@ -365,13 +366,13 @@ function vApprovals(){
         h('small',{},user.email||'-'),
         wilayah?h('small',{},'Wilayah: '+wilayah):null,
         h('small',{},barisTanggal)),
-      aksi.length?h('div',{class:'approval-actions'},...aksi):null);
+      punyaAksi?aksiGearBtn('akun '+(user.name||user.email||''),{jenis:'akun',id:user.id}):null);
   });
   /* Kata sandi akun tersimpan sebagai hash satu arah di Supabase Auth:
      tidak bisa ditampilkan oleh siapa pun, jadi yang ditampilkan hanya
      keterangan jujur ini, bukan kolom kata sandi. */
   const catatanKataSandi=h('p',{class:'approval-note'},'Kata sandi tidak dapat ditampilkan karena tersimpan terenkripsi; anggota yang lupa kata sandi dapat mengatur ulang lewat tautan lupa kata sandi di halaman masuk.');
-  return [h('h1',{},'Persetujuan Akun'),toggle,catatanKataSandi,...(rows.length?rows:[h('p',{class:'warn'},'Belum ada akun yang disetujui.')]),dialogKonfirmasiAkun()];
+  return [h('h1',{},'Persetujuan Akun'),toggle,catatanKataSandi,...(rows.length?rows:[h('p',{class:'warn'},'Belum ada akun yang disetujui.')]),dialogKonfirmasiAkun(),aksiMenuAktif()];
 }
 
 /* ===== Peta Anggota (Leaflet) — menggantikan embed Google My Maps =====

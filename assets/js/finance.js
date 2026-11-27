@@ -136,12 +136,10 @@ function vKeuangan(){
         item.catatan&&h('small',{class:'fin-note'},item.catatan)),
       h('div',{class:'fin-side'},
         h('b',{class:'fin-amount'},formatYen(item.jumlah)),
-        editable&&h('div',{class:'fin-actions'},
-          h('button',{class:'btn s btn-eh',onclick:()=>{S.financeForm={...item};S.financePhotoState=null;render()}},icon('edit',14),h('span',{},'Edit')),
-          h('button',{class:'btn s fin-delete btn-eh',onclick:async()=>{
-            if(!confirm('Hapus catatan belanja "'+(item.nama_pengeluaran||'ini')+'" sebesar '+formatYen(item.jumlah)+'?'))return;
-            try{await S.db.collection('keuangan').doc(item.id).delete()}catch(error){console.error(error);alert('Gagal menghapus catatan: '+(error.message||'periksa koneksi'))}
-          }},'Hapus'))));
+        /* Aksi per catatan (Edit/Hapus, hanya pemilik & admin) kini
+           SATU tombol gerigi kecil di samping jumlah — panel aksinya
+           berlabel jelas dibuka dari gerigi itu (aksi-gerigi.js). */
+        editable&&aksiGearBtn('belanja '+(item.nama_pengeluaran||''),{jenis:'keuangan',id:item.id})));
   });
   return [
     h('div',{class:'duty-heading'},h('div',{},h('h1',{},'Laporan Keuangan')),h('span',{class:'duty-count'},all.length+' catatan')),
@@ -157,6 +155,7 @@ function vKeuangan(){
       h('b',{},'Belanja per pengguna'),
       ...summary.map(entry=>h('div',{class:'fin-summary-row'},h('span',{},entry.nama+' · '+entry.count+'x belanja'),h('b',{},formatYen(entry.total))))):null,
     rows.length?h('div',{class:'fin-list'},...rows):h('div',{class:'duty-empty'},icon('wallet',24),h('b',{},'Belum ada catatan belanja'),h('p',{},selected==='semua'?'Catatan belanja anggota akan tampil di sini.':'Belum ada catatan pada '+financeMonthLabel(selected)+'. Pilih "Semua bulan" untuk melihat semua catatan.')),
-    S.financePhoto&&h('div',{class:'fin-lightbox',onclick:()=>{S.financePhoto=null;render()}},h('img',{...memberMediaAttributes(S.financePhoto,'src'),alt:'Foto nota ukuran besar'}))
+    S.financePhoto&&h('div',{class:'fin-lightbox',onclick:()=>{S.financePhoto=null;render()}},h('img',{...memberMediaAttributes(S.financePhoto,'src'),alt:'Foto nota ukuran besar'})),
+    aksiMenuAktif()
   ];
 }

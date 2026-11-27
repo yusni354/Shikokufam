@@ -190,7 +190,8 @@ function invDetailOverlay(item){
   const baris=(label,nilai)=>h('div',{class:'inv-detail-row'},h('span',{},label),h('b',{},nilai));
   const anak=[
     item.foto&&h('img',{class:'inv-detail-photo',...memberMediaAttributes(item.foto,'src'),alt:'Foto '+(item.nama||'barang'),onclick:()=>{S.inventarisPhoto=item.foto;render()}}),
-    h('b',{class:'inv-detail-name'},item.nama||'Barang'),
+    h('div',{class:'inv-detail-top'},h('b',{class:'inv-detail-name'},item.nama||'Barang'),
+      kelola&&aksiGearBtn('barang '+(item.nama||''),{jenis:'inventaris',id:item.id,dari:'detail'})),
     h('div',{class:'inv-badges'},invBadgeStatus(item),invBadgeKondisi(item),h('span',{class:'inv-badge inv-badge-cat'},item.kategori||'Lainnya')),
     baris('Jumlah',invJumlah(item)+' '+(item.satuan||'unit')),
     baris('Lokasi penyimpanan',item.lokasi||'—'),
@@ -204,17 +205,11 @@ function invDetailOverlay(item){
   }
   if(item.keterangan)anak.push(baris('Keterangan',item.keterangan));
   if(kelola){
-    const aksi=[h('button',{class:'btn s btn-eh',onclick:()=>{S.inventarisForm={...item};S.inventarisPhotoState=null;S.inventarisDetail=null;S.inventarisPinjam=null;render()}},icon('edit',14),h('span',{},'Ubah')),
-      h('button',{class:'btn s fin-delete btn-eh',onclick:()=>{S.inventarisConfirm=item;S.inventarisDetail=null;S.inventarisPinjam=null;render()}},'Hapus')];
-    if(invStatus(item)==='dipinjam'){
-      aksi.push(h('button',{class:'btn s',onclick:async()=>{
-        try{
-          await S.db.collection('inventaris').doc(item.id).update({status:'tersedia',peminjam_uid:'',peminjam_nama:'',tanggal_pinjam:'',diubah_oleh:S.name||S.email||'Pengurus'});
-          S.inventarisDetail=null;
-          render();
-        }catch(error){console.error(error);alert('Gagal mengembalikan barang: '+(error.message||'periksa koneksi'))}
-      }},'Kembalikan'));
-    }else if(S.inventarisPinjam===item.id){
+    /* Aksi kelola panel detail (Ubah / Hapus / Pinjamkan / Kembalikan)
+       kini lewat tombol GERIGI di kepala panel (aksi-gerigi.js) —
+       panel ini hanya menampung formulir peminjaman bila sedang
+       dibuka dari pilihan 'Pinjamkan' pada panel gerigi itu. */
+    if(invStatus(item)!=='dipinjam'&&S.inventarisPinjam===item.id){
       const hariIni=new Date();
       const todayKey=[hariIni.getFullYear(),String(hariIni.getMonth()+1).padStart(2,'0'),String(hariIni.getDate()).padStart(2,'0')].join('-');
       const peminjam=invPeminjamSelect('','');
@@ -235,10 +230,7 @@ function invDetailOverlay(item){
             }catch(error){console.error(error);alert('Gagal mencatat peminjaman: '+(error.message||'periksa koneksi'))}
           }},'Simpan peminjaman'),
           h('button',{class:'btn s',onclick:()=>{S.inventarisPinjam=null;render()}},'Batal'))));
-    }else{
-      aksi.push(h('button',{class:'btn s',onclick:()=>{S.inventarisPinjam=item.id;render()}},'Pinjamkan'));
     }
-    anak.push(h('div',{class:'fl inv-detail-actions'},...aksi));
   }
   return h('div',{class:'confirm-overlay',onclick:tutup},
     h('div',{class:'card confirm-card inv-detail-card',onclick:ev=>ev.stopPropagation()},...anak));
@@ -318,13 +310,12 @@ function vInventaris(){
         dipinjam&&item.tanggal_pinjam?h('div',{class:'inv-borrower'},invTanggalLabel(item.tanggal_pinjam)):null)
     ];
     if(kelola){
+      /* Kolom Aksi kini SATU tombol gerigi kecil per baris (hemat
+         tempat, baris tetap ramping): mengetuknya membuka panel aksi
+         berlabel Pinjamkan/Kembalikan, Ubah, Hapus (aksi-gerigi.js).
+         Ketuk baris di luar sel ini tetap membuka panel detail. */
       sel.push(h('td',{class:'inv-c-aksi',onclick:ev=>ev.stopPropagation()},
-        h('div',{class:'inv-actions'},
-          h('button',{class:'btn s btn-eh',onclick:ev=>{ev.stopPropagation();S.inventarisForm={...item};S.inventarisPhotoState=null;S.inventarisDetail=null;S.inventarisPinjam=null;render()}},icon('edit',14),h('span',{},'Ubah')),
-          dipinjam
-            ?h('button',{class:'btn s btn-eh',onclick:async ev=>{ev.stopPropagation();try{await S.db.collection('inventaris').doc(item.id).update({status:'tersedia',peminjam_uid:'',peminjam_nama:'',tanggal_pinjam:'',diubah_oleh:S.name||S.email||'Pengurus'});render()}catch(error){console.error(error);alert('Gagal mengembalikan barang: '+(error.message||'periksa koneksi'))}}},'Kembalikan')
-            :h('button',{class:'btn s btn-eh',onclick:ev=>{ev.stopPropagation();S.inventarisDetail=item.id;S.inventarisPinjam=item.id;render()}},'Pinjamkan'),
-          h('button',{class:'btn s fin-delete btn-eh',onclick:ev=>{ev.stopPropagation();S.inventarisConfirm=item;render()}},'Hapus'))));
+        aksiGearBtn('barang '+(item.nama||''),{jenis:'inventaris',id:item.id,dari:'tabel'})));
     }
     return h('tr',{class:'inv-tr',onclick:()=>{S.inventarisDetail=item.id;S.inventarisPinjam=null;render()}},...sel);
   };
@@ -400,7 +391,7 @@ function vInventaris(){
         h('div',{class:'inv-add-date'},
           h('span',{},'Tanggal beli:'),
           inTgl,
-          h('span',{class:'inv-add-hint'},'Foto & keterangan bisa dilengkapi lewat tombol Ubah sesudah barang tersimpan.'))));
+          h('span',{class:'inv-add-hint'},'Foto & keterangan bisa dilengkapi lewat tombol gerigi (Ubah) sesudah barang tersimpan.'))));
     return [barisUtama,barisTanggal];
   };
   const gambarDaftar=()=>{
@@ -433,7 +424,17 @@ function vInventaris(){
        pegangan aturnya hanya terpasang untuk admin utama. Kolom Aksi
        (khusus pengelola) berada paling kanan, jadi daftar lebar yang
        sama tetap sejajar untuk tabel tanpa kolom Aksi. */
-    lkTerapkan(tabel,'inventaris');
+    /* Lebar tersimpan untuk kolom Aksi LAMA (yang dulu selebar tiga
+       tombol berjajar) dijepit ke lebar gerigi (44–56px) supaya tata
+       letak tidak rusak sesudah kolom Aksi menyempit; kolom lain
+       memakai simpanan apa adanya. */
+    const lkSaved=(typeof lebarKolomUntuk==='function')?lebarKolomUntuk('inventaris'):null;
+    let lkPakai=null;
+    if(lkSaved&&lkSaved.length===colCount){
+      lkPakai=lkSaved.slice();
+      if(kelola)lkPakai[colCount-1]=Math.max(44,Math.min(56,lkPakai[colCount-1]));
+    }
+    lkTerapkan(tabel,'inventaris',lkPakai||undefined);
     lkPasang(tabel,'inventaris');
     /* Cangkang geser: wadah tabel + bayangan lembut di tepi kanan
        (hanya tampil di HP lewat style.css) sebagai isyarat visual
@@ -482,6 +483,8 @@ function vInventaris(){
   ];
   const detailItem=S.inventarisDetail?(S.inventaris||[]).find(item=>item.id===S.inventarisDetail):null;
   if(detailItem)hasil.push(invDetailOverlay(detailItem));
+  const menuGerigiInv=aksiMenuAktif();
+  if(menuGerigiInv)hasil.push(menuGerigiInv);
   if(S.inventarisConfirm)hasil.push(invConfirmOverlay(S.inventarisConfirm));
   if(S.inventarisPhoto)hasil.push(h('div',{class:'fin-lightbox',onclick:()=>{S.inventarisPhoto=null;render()}},h('img',{...memberMediaAttributes(S.inventarisPhoto,'src'),alt:'Foto barang ukuran besar'})));
   return hasil;

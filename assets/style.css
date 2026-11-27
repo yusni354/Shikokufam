@@ -1112,7 +1112,7 @@ input,textarea,select{background:#f4f8fa;border-color:#bfcfdb}
 .fin-info>b{display:block;font-size:15px;overflow-wrap:anywhere}
 .fin-info small{display:block;color:var(--mut);font-size:12px;margin-top:2px;overflow-wrap:anywhere}
 .fin-note{font-size:13px!important}
-.fin-side{flex:none;text-align:right}
+.fin-side{flex:none;display:flex;align-items:center;gap:8px}
 .fin-amount{color:var(--acc);font-size:16px;white-space:nowrap}
 .fin-actions{display:flex;gap:5px;justify-content:flex-end;margin-top:6px;flex-wrap:wrap}
 .fin-delete{color:#b45353!important}
@@ -2178,15 +2178,15 @@ span.piket-chip-ava{display:grid;place-items:center;font-size:12px;font-weight:7
 /* Dengan kolom Aksi (Pengurus & Admin Utama): total tetap 100%. */
 .inv-table-kelola thead th.inv-c-no{width:5%}
 .inv-table-kelola thead th.inv-c-foto{width:7.5%}
-.inv-table-kelola thead th.inv-c-nama{width:13.5%}
+.inv-table-kelola thead th.inv-c-nama{width:15.5%}
 .inv-table-kelola thead th.inv-c-kat{width:9.5%}
 .inv-table-kelola thead th.inv-w-jumlah{width:9%}
 .inv-table-kelola thead th.inv-w-kondisi{width:9.5%}
-.inv-table-kelola thead th.inv-c-lokasi{width:9.5%}
+.inv-table-kelola thead th.inv-c-lokasi{width:11.5%}
 .inv-table-kelola thead th.inv-w-harga{width:8.5%}
 .inv-table-kelola thead th.inv-w-total{width:8.5%}
 .inv-table-kelola thead th.inv-w-status{width:9%}
-.inv-table-kelola thead th.inv-w-aksi{width:10.5%}
+.inv-table-kelola thead th.inv-w-aksi{width:6.5%}
 .inv-table tbody td{background:var(--card)}
 .inv-table tbody tr:nth-child(even) td{background:#f2f6f3}
 .inv-table tbody tr:hover td{background:#e9f3ee}
@@ -2263,7 +2263,7 @@ select.inv-in{-webkit-appearance:none;appearance:none;padding-right:14px;backgro
   .inv-scroll-fade{display:block;position:absolute;top:1px;right:1px;bottom:1px;width:26px;border-radius:0 11px 11px 0;background:linear-gradient(to right,rgba(255,253,248,0),rgba(44,74,94,.22));pointer-events:none;opacity:1;transition:opacity .18s ease;z-index:8}
   .inv-scroll-shell.inv-scrolled-end .inv-scroll-fade{opacity:0}
   .inv-table{width:920px;min-width:920px;font-size:12.5px}
-  .inv-table-kelola{width:1024px;min-width:1024px}
+  .inv-table-kelola{width:948px;min-width:948px}
   .inv-table th,.inv-table td{padding:8px 7px}
   .inv-table thead th{font-size:10.5px}
   .inv-table thead th.inv-c-no{width:38px}
@@ -2283,7 +2283,7 @@ select.inv-in{-webkit-appearance:none;appearance:none;padding-right:14px;backgro
   .inv-table-kelola thead th.inv-w-harga{width:90px}
   .inv-table-kelola thead th.inv-w-total{width:90px}
   .inv-table-kelola thead th.inv-w-status{width:92px}
-  .inv-table-kelola thead th.inv-w-aksi{width:128px}
+  .inv-table-kelola thead th.inv-w-aksi{width:52px}
   .inv-thumb-sm{width:36px;height:36px;border-radius:9px}
   .inv-table .inv-badge{font-size:10.5px;padding:2px 7px}
   .inv-table .inv-borrower{font-size:11px}
@@ -2514,3 +2514,33 @@ th.lk-aktif{box-shadow:inset -2px 0 0 #35c4b5}
 body.lk-menyeret-body{user-select:none;-webkit-user-select:none}
 body.lk-menyeret-body,body.lk-menyeret-body *{cursor:col-resize!important}
 @media print{.lk-handle{display:none!important}}
+
+/* ===== Tombol GERIGI + panel aksi bersama (aksi-gerigi.js) =====
+   Satu tombol gerigi kecil per baris/item menggantikan tombol-tombol
+   aksi teks berjajar (Ubah/Hapus/Pinjam/Kembalikan/Simpan per tugas
+   dan sejenisnya) di Inventari, Laporan Keuangan, Jadwal Piket,
+   Forum, dan Persetujuan — baris & kolom jadi hemat tempat dan
+   tampilannya seragam. Ukuran & gaya gerigi diselaraskan dengan
+   gerigi Kepengurusan (.org-gear-btn) dan kartu Kegiatan
+   (.activity-gear-btn): kotak 30px, radius 10px, aksen teal.
+   Panel aksinya memakai lapisan confirm-overlay aplikasi (ketuk
+   bidang di luar menutup, tanpa tombol X) dengan daftar aksi
+   berlabel teks jelas; aksi berbahaya (Hapus) bernuansa merah. */
+.aksi-gear-btn{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;padding:0;border:2px solid var(--line);border-radius:10px;background:var(--card);color:var(--acc);cursor:pointer;box-shadow:none;flex:none;-webkit-tap-highlight-color:transparent}
+.aksi-gear-btn:active{transform:scale(.93)}
+.aksi-gear-btn .app-icon{margin:0}
+.aksi-menu-card{width:100%;max-width:360px}
+.aksi-menu-list{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+.aksi-menu-item{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:11px 13px;border:2px solid var(--line);border-radius:14px;background:var(--card);color:var(--ink);font-weight:600;font-family:inherit;font-size:14.5px;cursor:pointer}
+.aksi-menu-item .app-icon{color:var(--acc);flex:none;margin:0}
+.aksi-menu-item:active{background:#eef4f7}
+.aksi-menu-item-danger{color:#b03a3a;border-color:#ecc9c9;background:#fdf1f1}
+.aksi-menu-item-danger .app-icon{color:#b03a3a}
+/* Sel Aksi Inventari kini hanya memuat gerigi: isinya rata tengah */
+.inv-table td.inv-c-aksi{text-align:center}
+/* Kepala panel detail Inventari: nama barang lentur + gerigi di kanan */
+.inv-detail-top{display:flex;align-items:flex-start;gap:10px}
+.inv-detail-top .inv-detail-name{flex:1;min-width:0}
+/* Kepala kartu topik Forum: judul lentur + gerigi di kanan */
+.forum-topic-head{display:flex;align-items:flex-start;gap:10px}
+.forum-topic-head>b{flex:1;min-width:0}

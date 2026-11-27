@@ -193,12 +193,10 @@ function vPiket(){
         h('div',{class:'piket-head-info'},
           h('b',{class:'piket-head-tanggal'},dateLabel(duty.tanggal)),
           h('span',{class:'piket-summary'},kelompok.length+' tugas · '+totalPetugas+' petugas')),
-        S.admin&&h('div',{class:'piket-actions'},
-          h('button',{class:'btn s btn-eh',title:'Edit jadwal',onclick:()=>{S.dutyForm={id:duty.id,tanggal:duty.tanggal||'',groups:dutyKelompokTugas(duty).map(g=>({tugas:g.tugas,petugas:g.petugas.length?[...g.petugas]:[''],tugasAsli:g.tugas,petugasTersimpan:[...g.petugas]}))};if(!S.dutyForm.groups.length)S.dutyForm.groups=[{tugas:'',petugas:['']}];S.dutyTaskNotice=null;S.dutyTaskConfirm=null;render()}},icon('edit',15),h('span',{},'Edit')),
-          h('button',{class:'btn s btn-eh',title:'Hapus jadwal',onclick:async()=>{
-            if(!confirm('Hapus jadwal piket tanggal '+dateLabel(duty.tanggal)+'?'))return;
-            try{await S.db.collection('cleaning_duties').doc(duty.id).delete()}catch(error){console.error(error);alert('Gagal menghapus jadwal: '+(error.message||'periksa koneksi'))}
-          }},'Hapus'))),
+        /* Aksi per jadwal (Edit/Hapus, khusus admin) kini SATU tombol
+           gerigi kecil di kepala kartu — panel aksinya berlabel jelas
+           dibuka dari gerigi itu (aksi-gerigi.js). */
+        S.admin&&aksiGearBtn('jadwal '+dateLabel(duty.tanggal),{jenis:'piket',id:duty.id})),
       h('div',{class:'piket-tasks'},...kelompok.map(grup=>
         h('section',{class:'piket-task'},
           h('div',{class:'piket-task-head'},icon('brush',15),h('b',{},grup.tugas),h('span',{class:'piket-task-count'},grup.petugas.length+' petugas')),
@@ -211,6 +209,7 @@ function vPiket(){
   const lewat=terurut.filter(d=>d.tanggal&&d.tanggal<todayKey);
   let editor=null;
   let dialogTugas=null;
+  let menuTugas=null;
   if(S.admin&&form){
     /* Bentuk formulir: groups = [{tugas, petugas:[nama, ...]}] */
     if(!Array.isArray(form.groups)||!form.groups.length)form.groups=[{tugas:'',petugas:['']}];
@@ -304,6 +303,26 @@ function vPiket(){
             h('button',{class:'btn s',onclick:tutup},'Batal'),
             h('button',{class:'btn',onclick:()=>hapusTugas(gi)},'Hapus tugas'))));
     }
+    /* Panel aksi GERIGI per tugas: dibuka dari tombol gerigi di kepala
+       blok tugas (S.piketTugasMenu = indeks tugasnya). Isinya tepat
+       dua aksi berlabel — Simpan tugas & Hapus tugas — dengan fungsi
+       yang sama persis seperti tombol kaki blok sebelumnya. Pola
+       aplikasi: tanpa tombol X, mengetuk bidang di luar kotak
+       menutupnya. Dibangun di sini karena simpanTugas/mintaHapusTugas
+       adalah penutup (closure) formulir ini. */
+    if(S.piketTugasMenu!=null&&form.groups[S.piketTugasMenu]){
+      const giMenu=S.piketTugasMenu;
+      const grupMenu=form.groups[giMenu];
+      const namaTugasMenu=(grupMenu.tugas||'').trim()||'Tugas '+(giMenu+1);
+      const tutupMenu=()=>{S.piketTugasMenu=null;render()};
+      menuTugas=h('div',{class:'confirm-overlay',onclick:tutupMenu},
+        h('div',{class:'card confirm-card aksi-menu-card',onclick:ev=>ev.stopPropagation()},
+          h('b',{class:'confirm-title'},'Pengaturan Tugas'),
+          h('p',{class:'confirm-text'},namaTugasMenu),
+          h('div',{class:'aksi-menu-list'},
+            h('button',{type:'button',class:'aksi-menu-item',onclick:()=>{S.piketTugasMenu=null;render();void simpanTugas(giMenu)}},icon('check',16),h('span',{},'Simpan tugas')),
+            h('button',{type:'button',class:'aksi-menu-item aksi-menu-item-danger',onclick:()=>{S.piketTugasMenu=null;mintaHapusTugas(giMenu);if(!S.dutyTaskConfirm)render()}},icon('trash',16),h('span',{},'Hapus tugas')))));
+    }
     const groupsEl=h('div',{class:'piket-form-groups'});
     const gambarGroups=()=>{
       groupsEl.replaceChildren(...form.groups.map((grup,gi)=>{
@@ -331,15 +350,18 @@ function vPiket(){
           h('div',{class:'piket-form-group-head'},
             h('span',{class:'piket-group-number'},String(gi+1)),
             h('b',{},'Tugas '+(gi+1)),
-            (grup.tugasAsli||'').trim()&&h('span',{class:'piket-group-saved-tag'},'Tersimpan')),
+            (grup.tugasAsli||'').trim()&&h('span',{class:'piket-group-saved-tag'},'Tersimpan'),
+            /* Simpan/Hapus per tugas kini lewat SATU tombol gerigi
+               kecil di kepala blok tugas ini (panel berlabel di
+               menuTugas pada vPiket) — fungsi simpan/hapus per
+               tugasnya tidak berubah. */
+            h('button',{type:'button',class:'aksi-gear-btn piket-group-gear',title:'Pengaturan tugas '+(gi+1),'aria-label':'Pengaturan tugas '+(gi+1),onclick:()=>{S.piketTugasMenu=gi;render()}},icon('gear',15))),
           h('label',{class:'lb'},'Nama tugas *',inputTugas),
           h('div',{class:'piket-form-petugas-head'},h('b',{},'Petugas *'),h('small',{},'Pilih dari daftar anggota atau ketik manual')),
           petugasEl,
           h('button',{class:'btn s piket-add-petugas',onclick:()=>{grup.petugas.push('');gambarPetugas()}},'+ Tambah petugas'),
-          h('div',{class:'piket-form-group-foot'},
-            h('button',{class:'btn s piket-group-save',title:'Simpan hanya tugas ini',onclick:()=>simpanTugas(gi)},icon('check',14),h('span',{},'Simpan tugas')),
-            h('button',{class:'btn s piket-group-del',title:'Hapus tugas ini dari jadwal',onclick:()=>mintaHapusTugas(gi)},icon('trash',14),h('span',{},'Hapus tugas')),
-            (S.dutyTaskNotice&&S.dutyTaskNotice.gi===gi)&&h('span',{class:'piket-task-saved'},icon('check',13),S.dutyTaskNotice.text)));
+          (S.dutyTaskNotice&&S.dutyTaskNotice.gi===gi)&&h('div',{class:'piket-form-group-foot'},
+            h('span',{class:'piket-task-saved'},icon('check',13),S.dutyTaskNotice.text)));
       }));
     };
     gambarGroups();
@@ -374,6 +396,9 @@ function vPiket(){
     S.admin&&!form&&h('button',{class:'btn duty-add',onclick:()=>{S.dutyForm={tanggal:todayKey,groups:[{tugas:'',petugas:['']}]};S.dutyTaskNotice=null;S.dutyTaskConfirm=null;render()}},'+ Tambah jadwal'),
     editor];
   if(dialogTugas)hasil.push(dialogTugas);
+  if(menuTugas)hasil.push(menuTugas);
+  const menuGerigiPiket=aksiMenuAktif();
+  if(menuGerigiPiket)hasil.push(menuGerigiPiket);
   if(mendatang.length)hasil.push(h('div',{class:'piket-list'},...mendatang.map(kartuJadwal)));
   else if(!editor)hasil.push(h('div',{class:'duty-empty'},icon('brush',24),h('b',{},'Belum ada jadwal piket mendatang'),h('p',{},S.admin?'Tambahkan jadwal pertama untuk mulai mengatur tugas piket.':'Jadwal piket yang akan datang akan tampil di sini.')));
   if(lewat.length){
@@ -385,16 +410,18 @@ function vPiket(){
 }
 function vForum(){
   const t=h('input',{placeholder:'Judul topik'}),b=h('textarea',{placeholder:'Isi diskusi',rows:3});
-  const list=S.topics.map(x=>h('div',{class:'card',style:'display:block'},h('b',{},x.judul),h('p',{class:'warn'},x.isi||''),
-    S.admin&&h('button',{class:'btn s btn-eh',onclick:async()=>{
-      if(!confirm('Hapus topik ini?'))return;
-      try{await S.db.collection('topics').doc(x.id).delete()}catch(error){console.error(error);alert('Gagal menghapus topik: '+(error.message||'periksa koneksi'))}
-    }},'Hapus')));
+  /* Hapus topik (khusus admin) kini lewat SATU tombol gerigi kecil di
+     kepala kartu topik — panel aksinya berlabel jelas (aksi-gerigi.js).
+     Tombol Kirim di formulir topik baru tidak berubah. */
+  const list=S.topics.map(x=>h('div',{class:'card',style:'display:block'},
+    h('div',{class:'forum-topic-head'},h('b',{},x.judul),S.admin&&aksiGearBtn('topik '+(x.judul||''),{jenis:'forum',id:x.id})),
+    h('p',{class:'warn'},x.isi||'')));
   return [h('h1',{},'Forum'),guard(),
     h('div',{class:'card',style:'display:block'},t,b,h('button',{class:'btn',onclick:async()=>{
       if(!t.value.trim()||!S.db){alert('Isi judul topik terlebih dahulu.');return}
       try{await S.db.collection('topics').add({judul:t.value.trim(),isi:b.value.trim(),by:S.uid,at:Date.now()});t.value='';b.value=''}
       catch(error){console.error(error);alert('Gagal mengirim topik: '+(error.message||'periksa koneksi'))}
     }},'Kirim')),
-    ...(list.length?list:[h('p',{class:'warn'},'Belum ada topik.')])];
+    ...(list.length?list:[h('p',{class:'warn'},'Belum ada topik.')]),
+    aksiMenuAktif()];
 }
