@@ -257,26 +257,64 @@ function pasangSeretMenu(el){
 /* ===== Riwayat halaman untuk tombol Back perangkat/peramban =====
    Aplikasi ini satu halaman (semua perpindahan lewat go()), jadi
    tanpa entri riwayat peramban tombol Back Android/peramban langsung
-   KELUAR aplikasi dari halaman mana pun. Supaya Back berarti
-   "kembali" di dalam aplikasi:
-   - pasangSentinelBack() mendorong SATU entri penanda (sentinel)
-     sesudah aplikasi benar-benar bisa dipakai (lihat
-     pulihkanViewTerakhir) — tanpa sentinel ini, tekanan Back pertama
-     tidak pernah sampai ke aplikasi.
-   - Setiap perpindahan halaman lewat go() mendorong entri baru dan
-     mencatat halaman sebelumnya di riwayatHalamanBack.
-   - Pendengar popstate (di bawah, sesudah aksiUsapKembali) menjawab
-     tiap tekanan Back dengan satu langkah kembali: tutup panel →
-     tutup sub-tampilan → halaman sebelumnya → Home; hanya di Home
-     tanpa riwayat tekanan berikutnya keluar seperti biasa.
+   KELUAR aplikasi dari halaman mana pun. Pola yang dipakai di sini
+   adalah SATU entri penanda (sentinel) yang SELALU dipasang ulang:
+   - Tumpukan peramban dijaga tetap pendek: [entri awal dokumen,
+     sentinel]. Riwayat halaman aplikasi sendiri TIDAK disimpan
+     sebagai entri peramban, melainkan sebagai daftar nama halaman
+     di riwayatHalamanBack (diisi go()).
+   - pasangSentinelBack() memasang sentinel sesudah aplikasi benar-
+     benar bisa dipakai (lihat pulihkanViewTerakhir). Tekanan Back
+     memindahkan peramban dari sentinel ke entri awal dan memicu
+     popstate; pendengar popstate (di bawah, sesudah aksiUsapKembali)
+     menjawabnya dengan SATU langkah kembali — tutup panel → tutup
+     sub-tampilan → halaman sebelumnya → Home — lalu MEMASANG
+     SENTINEL BARU, jadi tekanan berikutnya selalu punya entri untuk
+     dikonsumsi dan tidak pernah "kehabisan" di tengah jalan.
+     (Pola lama mendorong satu entri per perpindahan halaman dan
+     langkah halaman-ke-halaman tidak memasang entri pengganti:
+     sesudah satu-dua tekanan tumpukan bisa habis — apalagi sesudah
+     muat ulang/pemulihan sesi yang menggeser hitungan entri — dan
+     tekanan berikutnya langsung keluar aplikasi. Itulah yang
+     dilaporkan pengguna: "hanya kembali satu halaman, setelah itu
+     tetap keluar".)
+   - Di Home tanpa riwayat, tekanan Back pertama TIDAK memasang
+     sentinel baru: muncul petunjuk "Tekan sekali lagi untuk keluar"
+     dan siaga 2,5 detik. Tekanan kedua dalam tenggang itu tidak
+     memicu popstate sama sekali (tumpukan sudah di entri awal), jadi
+     peramban/TWA keluar dengan sendirinya — persis seperti aplikasi
+     Android biasa. Bila tenggang habis tanpa tekanan kedua, sentinel
+     dipasang lagi otomatis dan tekanan berikutnya mengulang siaga.
    idx pada state membedakan tombol Back dari tombol Maju peramban.
    Semua pemakaian history dibungkus try/catch: lingkungan yang
    memblokir history tidak menimbulkan error, tombol Back cukup
    kembali ke perilaku bawaan peramban. */
-let riwayatHalamanBack=[],navigasiDariBack=false,backSentinelAktif=false,backIdx=0;
-function dorongEntriBack(){backIdx++;try{history.pushState({shikokuBack:1,idx:backIdx,view:S.view},'')}catch(e){/* history terblokir: abaikan */}}
-function pasangSentinelBack(){if(backSentinelAktif)return;backSentinelAktif=true;dorongEntriBack()}
-function go(v){const viewSebelumBack=S.view;/* Halaman Pengaturan & Laporan Keamanan khusus ADMIN UTAMA: admin biasa yang somehow memanggilnya diarahkan ke Home, bukan sekadar menunya disembunyikan. */if((v==='pengaturan'||v==='keamanan')&&!S.mainAdmin)v='landing';/* Menu yang dimatikan admin utama tidak bisa dibuka pengguna lain: navigasi langsung ke halamannya terpental ke Home. */if(v!=='landing'&&!S.mainAdmin&&!menuAktifUntuk(v))v='landing';if(v==='peta'&&typeof petaResetKeBawaanAdmin==='function')petaResetKeBawaanAdmin();if(v==='kegiatan'){bawaanArsipKegiatan();/* Masuk halaman Kegiatan dari menu selalu menuju DAFTAR: detail kegiatan adalah sub-tampilan yang hanya dibuka dari kartu dan ditutup lewat tombol Kembali di dalamnya, jadi keadaan detail & absensi dibersihkan di sini (bukan saat kembali dari detail). */S.activityDetail=null;S.absensiEvent=null;S.absensiRegion=null;S.absensiDraft=null;try{sessionStorage.removeItem('shikoku-family:kegiatan-detail')}catch(e){/* storage terblokir: abaikan */}}if(v==='ringkasan')bawaanArsipRingkasan();S.view=v;simpanViewTerakhir(v);/* Catat halaman sebelumnya untuk tombol Back (lihat blok riwayat di atas go()); navigasi yang DIPICU tombol Back sendiri tidak mendorong entri baru. */if(backSentinelAktif&&!navigasiDariBack&&viewSebelumBack&&viewSebelumBack!==v){riwayatHalamanBack.push(viewSebelumBack);dorongEntriBack()}S.adminMenuOpen=false;S.chatDialog=null;S.inboxDialog=null;S.aksiMenu=null;S.piketTugasMenu=null;S.form=S.detail=S.dutyForm=null;S.financeForm=null;S.financePhoto=null;S.inventarisForm=null;S.inventarisPhoto=null;S.inventarisDetail=null;S.inventarisConfirm=null;S.inventarisPinjam=null;S.idPhoto=null;S.detailOrigin=null;S.detailReturnView=null;if(v==='pesan'){/* Masuk menu Pesan selalu menuju KOTAK MASUK (daftar percakapan pribadi pengguna yang masuk) untuk semua peran; percakapan hanya ditandai terbaca saat dibuka, bukan saat daftar ditampilkan. Direktori pengguna dimuat untuk nama/foto lawan bicara dan pemilih Pesan Baru. */S.openConversation=null;S.newChat=null;if(S.uid&&typeof loadUserDirectory==='function')loadUserDirectory().then(()=>{if(S.view==='pesan')renderDariData()})}document.body.classList.remove('open');syncAdminTheme();render()}
+let riwayatHalamanBack=[],navigasiDariBack=false,backTrapAktif=false,sentinelDiTumpukan=false,backIdx=0,backKeluarSiaga=0,backKeluarTimer=null,backHintEl=null,backHintTimer=null;
+function dorongEntriBack(){backIdx++;try{history.pushState({shikokuBack:1,idx:backIdx,view:S.view},'');sentinelDiTumpukan=true}catch(e){/* history terblokir: abaikan */}}
+function pasangSentinelBack(){backTrapAktif=true;if(!sentinelDiTumpukan)dorongEntriBack()}
+/* Petunjuk keluar di Home: pil kecil di bawah layar, gaya yang sama
+   seperti toast Musyawarah (lihat #back-exit-hint di style.css). */
+function tampilkanPetunjukKeluar(){
+  if(!backHintEl){
+    backHintEl=document.createElement('div');
+    backHintEl.id='back-exit-hint';
+    backHintEl.textContent='Tekan sekali lagi untuk keluar';
+    document.body.appendChild(backHintEl);
+  }
+  backHintEl.classList.add('s');
+  clearTimeout(backHintTimer);
+  backHintTimer=setTimeout(()=>{if(backHintEl)backHintEl.classList.remove('s')},2300);
+}
+function sembunyikanPetunjukKeluar(){clearTimeout(backHintTimer);if(backHintEl)backHintEl.classList.remove('s')}
+/* Batalkan siaga keluar (navigasi baru / langkah kembali lain):
+   penghitung tenggang berhenti dan petunjuk disembunyikan. Sentinel
+   TIDAK dipasang di sini — pemanggil yang memasangnya bila perlu. */
+function batalkanSiagaKeluar(){
+  if(backKeluarTimer){clearTimeout(backKeluarTimer);backKeluarTimer=null}
+  backKeluarSiaga=0;
+  sembunyikanPetunjukKeluar();
+}
+function go(v){const viewSebelumBack=S.view;/* Halaman Pengaturan & Laporan Keamanan khusus ADMIN UTAMA: admin biasa yang somehow memanggilnya diarahkan ke Home, bukan sekadar menunya disembunyikan. */if((v==='pengaturan'||v==='keamanan')&&!S.mainAdmin)v='landing';/* Menu yang dimatikan admin utama tidak bisa dibuka pengguna lain: navigasi langsung ke halamannya terpental ke Home. */if(v!=='landing'&&!S.mainAdmin&&!menuAktifUntuk(v))v='landing';if(v==='peta'&&typeof petaResetKeBawaanAdmin==='function')petaResetKeBawaanAdmin();if(v==='kegiatan'){bawaanArsipKegiatan();/* Masuk halaman Kegiatan dari menu selalu menuju DAFTAR: detail kegiatan adalah sub-tampilan yang hanya dibuka dari kartu dan ditutup lewat tombol Kembali di dalamnya, jadi keadaan detail & absensi dibersihkan di sini (bukan saat kembali dari detail). */S.activityDetail=null;S.absensiEvent=null;S.absensiRegion=null;S.absensiDraft=null;try{sessionStorage.removeItem('shikoku-family:kegiatan-detail')}catch(e){/* storage terblokir: abaikan */}}if(v==='ringkasan')bawaanArsipRingkasan();S.view=v;simpanViewTerakhir(v);/* Catat halaman sebelumnya untuk tombol Back (lihat blok riwayat di atas go()) dan pastikan sentinel terpasang — termasuk sesudah siaga keluar di Home, saat tumpukan sedang kosong. Navigasi yang DIPICU tombol Back sendiri tidak dicatat dan tidak memasang sentinel di sini; pendengar popstate yang memasangnya sesudah langkah selesai. */if(backTrapAktif&&!navigasiDariBack){batalkanSiagaKeluar();if(viewSebelumBack&&viewSebelumBack!==v)riwayatHalamanBack.push(viewSebelumBack);pasangSentinelBack()}S.adminMenuOpen=false;S.chatDialog=null;S.inboxDialog=null;S.aksiMenu=null;S.piketTugasMenu=null;S.form=S.detail=S.dutyForm=null;S.financeForm=null;S.financePhoto=null;S.inventarisForm=null;S.inventarisPhoto=null;S.inventarisDetail=null;S.inventarisConfirm=null;S.inventarisPinjam=null;S.idPhoto=null;S.detailOrigin=null;S.detailReturnView=null;if(v==='pesan'){/* Masuk menu Pesan selalu menuju KOTAK MASUK (daftar percakapan pribadi pengguna yang masuk) untuk semua peran; percakapan hanya ditandai terbaca saat dibuka, bukan saat daftar ditampilkan. Direktori pengguna dimuat untuk nama/foto lawan bicara dan pemilih Pesan Baru. */S.openConversation=null;S.newChat=null;if(S.uid&&typeof loadUserDirectory==='function')loadUserDirectory().then(()=>{if(S.view==='pesan')renderDariData()})}document.body.classList.remove('open');syncAdminTheme();render()}
 $('#mn').onclick=()=>document.body.classList.add('open');
 $('#mn').replaceChildren(icon('menu',21));
 $('#st').replaceChildren(icon('settings',19));
@@ -568,40 +606,71 @@ function aksiUsapKembali(){
    Urutan langkahnya sama seperti isyarat usap tepi: panel/modal yang
    terbuka ditutup dulu, lalu sub-tampilan di dalam halaman, lalu
    halaman sebelumnya dari riwayat navigasi, terakhir Home. Sesudah
-   langkah 1–2 (panel/sub-tampilan tertutup) entri riwayat didorong
-   lagi, karena tekanan Back ini sudah memakai satu entri — halaman
-   yang sama tetap punya entri untuk tekanan berikutnya. */
+   SETIAP langkah yang tertangani, sentinel dipasang lagi
+   (pasangSentinelBack) karena tekanan ini sudah memindahkan
+   peramban ke entri awal dokumen — halaman yang sama selalu punya
+   entri untuk tekanan berikutnya, berapa pun banyaknya langkah. */
 window.addEventListener('popstate',e=>{
   const st=e&&e.state;
   if(st&&st.shikokuBack&&typeof st.idx==='number'){
-    /* Tombol Maju peramban: bukan urusan tombol Back — cukup samakan
-       penanda posisi, tampilan tidak diubah. */
-    if(st.idx>backIdx){backIdx=st.idx;return}
+    /* Tombol Maju peramban mendarat DI entri sentinel: bukan urusan
+       tombol Back — cukup samakan penanda posisi, tampilan tidak
+       diubah, dan siaga keluar dibatalkan (sentinel utuh lagi). */
+    if(st.idx>backIdx){backIdx=st.idx;sentinelDiTumpukan=true;batalkanSiagaKeluar();return}
     backIdx=st.idx;
   }
-  /* Sentinel belum terpasang (aplikasi belum bisa dipakai) atau
-     sedang di gerbang masuk: kejadian ini bukan untuk diatur di
-     sini, biarkan perilaku bawaan peramban berjalan. */
-  if(!backSentinelAktif)return;
+  /* Tekanan Back ini memindahkan peramban DARI sentinel ke entri
+     awal dokumen (atau entri lama sederetanya): sentinel tidak lagi
+     di puncak tumpukan, apa pun langkah yang diambil sesudah ini. */
+  sentinelDiTumpukan=false;
+  /* Sentinel belum pernah dipasang (aplikasi belum bisa dipakai)
+     atau sedang di gerbang masuk: kejadian ini bukan untuk diatur
+     di sini, biarkan perilaku bawaan peramban berjalan. */
+  if(!backTrapAktif)return;
   if(document.body.classList.contains('auth-locked')||S.authLoading||!S.uid)return;
   /* 1) Panel/modal/drawer/pemindai QR terbuka: tutup dulu, halaman
         tidak berpindah. */
-  if(panelUsapTerbuka()){tutupPanelUsap();dorongEntriBack();return}
+  if(panelUsapTerbuka()){batalkanSiagaKeluar();tutupPanelUsap();pasangSentinelBack();return}
   /* 2) Sub-tampilan di dalam halaman: kembali satu langkah di dalam
         halaman yang sama. */
-  if(langkahKembaliDalamHalaman()){dorongEntriBack();return}
+  if(langkahKembaliDalamHalaman()){batalkanSiagaKeluar();pasangSentinelBack();return}
   /* 3) Halaman sebelumnya dalam riwayat navigasi aplikasi; tanpa
         riwayat (mis. halaman ini hasil pemulihan sesudah muat ulang)
         tujuannya Home. go() dijalankan dengan penanda
-        navigasiDariBack supaya tidak mendorong entri riwayat baru. */
+        navigasiDariBack supaya tidak mencatat riwayat baru; sentinel
+        dipasang di sini sesudah navigasinya selesai. */
   let tujuan=null;
   while(riwayatHalamanBack.length){const calon=riwayatHalamanBack.pop();if(calon&&calon!==S.view){tujuan=calon;break}}
   if(!tujuan&&S.view!=='landing')tujuan='landing';
-  if(tujuan){navigasiDariBack=true;try{go(tujuan)}finally{navigasiDariBack=false}}
-  /* 4) Sudah di Home dan tidak ada riwayat: diam saja. Entri sentinel
-        sudah terpakai oleh tekanan ini, jadi tekanan Back berikutnya
-        keluar aplikasi seperti biasa — pengguna memang sudah berada
-        di halaman paling awal. */
+  if(tujuan){batalkanSiagaKeluar();navigasiDariBack=true;try{go(tujuan)}finally{navigasiDariBack=false}pasangSentinelBack();return}
+  /* 4) Sudah di Home dan tidak ada riwayat: SIAGA KELUAR. Sentinel
+        sengaja TIDAK dipasang lagi pada tekanan pertama — cukup
+        tampilkan petunjuk dan beri tenggang 2,5 detik. Tekanan kedua
+        dalam tenggang tidak memicu popstate (tumpukan sudah di entri
+        awal), jadi peramban/TWA keluar dengan sendirinya, persis
+        seperti aplikasi Android biasa. Bila tenggang habis tanpa
+        tekanan kedua, sentinel dipasang lagi otomatis: tekanan
+        berikutnya mengulang siaga ini, bukan langsung keluar. */
+  if(backKeluarSiaga&&Date.now()<backKeluarSiaga){
+    /* Cadangan: normalnya tidak tercapai (lihat di atas), tetapi
+       bila peramban tetap mengirim popstate untuk tekanan kedua,
+       perlakukan sama — jangan pasang sentinel, supaya tekanan
+       berikutnya benar-benar keluar. */
+    batalkanSiagaKeluar();
+    return;
+  }
+  backKeluarSiaga=Date.now()+2500;
+  tampilkanPetunjukKeluar();
+  if(backKeluarTimer)clearTimeout(backKeluarTimer);
+  backKeluarTimer=setTimeout(()=>{
+    backKeluarTimer=null;
+    backKeluarSiaga=0;
+    sembunyikanPetunjukKeluar();
+    /* Tenggang habis dan pengguna masih di dalam aplikasi: pasang
+       sentinel lagi supaya tekanan Back berikutnya tidak langsung
+       keluar tanpa siaga. */
+    if(backTrapAktif&&!sentinelDiTumpukan&&S.uid&&!document.body.classList.contains('auth-locked'))pasangSentinelBack();
+  },2500);
 });
 (function(){
   const TEPI=28,JARAK=70;

@@ -2724,3 +2724,8 @@ input,textarea,select{padding:8px 11px}
 /* Kartu percakapan Pesan: bilah atas aplikasi kini lebih ramping,
    jadi ruang utas pesan boleh memakai sisa tingginya */
 .chat-card{height:clamp(280px,calc(100vh - 156px),720px);height:clamp(280px,calc(100dvh - 156px),720px)}
+/* Petunjuk "Tekan sekali lagi untuk keluar" (tombol Back di Home,
+   lihat shell.js): pil kecil di bawah layar, gaya sama seperti
+   toast Musyawarah; muncul hanya selama siaga keluar 2,5 detik. */
+#back-exit-hint{position:fixed;left:50%;bottom:calc(22px + env(safe-area-inset-bottom,0px));transform:translateX(-50%) translateY(8px);background:#24344a;color:#eef5f9;padding:9px 18px;border-radius:99px;font-size:13.5px;font-weight:500;opacity:0;transition:opacity .25s,transform .25s;pointer-events:none;z-index:1300;box-shadow:0 10px 24px rgba(20,35,50,.35);white-space:nowrap}
+#back-exit-hint.s{opacity:1;transform:translateX(-50%) translateY(0)}
