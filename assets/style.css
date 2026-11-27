@@ -2581,3 +2581,79 @@ body.lk-menyeret-body,body.lk-menyeret-body *{cursor:col-resize!important}
   .inv-filters select{flex:none;width:100%;min-width:0;margin:0;padding:8px 22px 8px 9px;font-size:12.5px;border-radius:12px;background-position:right 7px center;background-size:11px 8px}
   .inv-table-meta{display:none}
 }
+
+/* ===== Bagian atas halaman RINGKAS (semua halaman) =====
+   Permintaan pengguna: bagian atas tiap halaman jangan terlalu
+   banyak makan ruang. Blok penimpa terakhir ini merapatkan SEMUA
+   elemen atas yang polanya sama di seluruh aplikasi: bilah header
+   aplikasi, judul halaman (h1) & subjudul, kartu sambutan Home,
+   kartu statistik & pintasan Home, kartu formulir di kepala halaman
+   (Buat kegiatan dan sejenisnya), baris saringan di bawah judul,
+   kartu total Laporan Keuangan, hero halaman masuk, dan bilah atas
+   Musyawarah. Isi, fungsi, dan tata letak di luar jarak & ukuran
+   kepala ini tidak berubah; target ketuk tetap nyaman (tombol
+   utama ≥40px, tombol kecil ≥34px). */
+header{padding:7px 14px;gap:9px}
+header .logo{width:30px;height:30px;border-radius:11px}
+.ic{width:34px;height:34px;border-radius:11px}
+.header-action{width:35px;height:35px}
+.user-profile{padding:2px 10px 2px 2px}
+.user-avatar{width:28px;height:28px}
+main{padding:12px 16px 30px}
+h1{font-size:22px;margin:2px 0 6px}
+.sub{margin-bottom:10px}
+.section-title{font-size:18px;margin:16px 2px 10px}
+.duty-heading{margin-bottom:8px}
+.duty-heading h1{margin-top:2px}
+.duty-count{padding:6px 11px;font-size:12.5px}
+@media (max-width:560px){.duty-count{margin-top:6px}}
+.member-page-heading{margin:2px 0 10px}
+.member-toolbar{padding:11px}
+.member-filters{margin-top:6px;gap:6px}
+.member-results-count{margin:8px 4px}
+.inbox-head{margin-bottom:8px}
+/* Kartu & formulir: bantalan lebih ramping di semua halaman */
+.card{padding:13px;margin-bottom:10px}
+.auth-card{padding:20px}
+input,textarea,select{padding:9px 12px;margin:4px 0}
+select{padding-right:36px;background-position:right 12px center}
+.btn{min-height:40px;padding:8px 16px}
+.lb{margin-top:10px}
+/* Kepala Home: sambutan, statistik, pintasan, grafik */
+.home-welcome{padding:15px 16px;margin-bottom:12px}
+.home-welcome h1{font-size:21px;margin:3px 0}
+.home-welcome p{font-size:13.5px}
+.home-welcome-cta{margin-top:10px}
+.home-welcome-mascot{height:132px}
+@media (max-width:560px){.home-welcome-mascot{height:100px}}
+@media (max-width:430px){.home-welcome{padding:13px}.home-shortcut{min-height:68px}}
+.stats{gap:8px}
+.stats>div{padding:10px 8px 9px;border-radius:19px}
+.home-stats{margin-bottom:14px}
+.home-shortcuts{gap:8px}
+.home-shortcut{min-height:88px;padding:10px}
+.home-chart{margin-top:14px;padding:13px}
+/* Kepala Kegiatan: formulir buat + saringan tahun/bulan + judul daftar */
+.activity-create h2{font-size:18px;margin-bottom:8px}
+.activity-create input,.activity-create textarea{padding:8px 11px}
+.activity-create select{padding:8px 34px 8px 11px}
+.activity-create-grid{gap:6px 8px}
+.activity-create-grid3{gap:6px 8px;margin-top:6px}
+.activity-create>.btn{margin-top:8px}
+.activity-field{font-size:12.5px}
+.ringkasan-filters{gap:6px 12px;margin-bottom:8px}
+.kegiatan-bulan-judul{margin:0 2px 8px}
+/* Kepala Laporan Keuangan: dua kartu total lebih ramping */
+.fin-totals{gap:8px;margin-bottom:10px}
+.fin-total{padding:12px 14px}
+.fin-total b{font-size:19px}
+.fin-summary{margin-bottom:10px}
+/* Hero halaman masuk */
+.hero{padding:20px 18px;margin-bottom:12px}
+.hero h1{font-size:clamp(26px,7vw,38px);margin-bottom:8px}
+.hero p{font-size:15px;margin-bottom:14px}
+@media (max-width:560px){.hero{padding:16px 15px}}
+/* Bilah atas Musyawarah */
+.musy-root .musy-top{padding:8px 12px}
+.musy-root .musy-tabs{padding:8px 4px 0}
+.musy-root[data-style="fresh"] .musy-tabs{padding:8px 12px 4px}
