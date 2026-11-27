@@ -21,6 +21,192 @@ async function saveSambutanPesan(teks){
   await S.db.collection('pengaturan').doc('sambutan').set({pesan:teks,at:Date.now()});
   S.sambutan=teks;
 }
+/* ===== Penyimpanan & Berkas (kotak di halaman Pengaturan) =====
+   Semua angka DIHITUNG dari data sungguhan saat halaman dibuka atau
+   tombol Hitung Ulang ditekan — tidak ada angka tebakan:
+   1) Basis data: dokumen tiap koleksi dibaca dari tabel app_data
+      Supabase (atau lapisan data lokal bila Supabase tidak aktif),
+      ukurannya = besar JSON dokumen itu.
+   2) Berkas unggahan: isi bucket Supabase Storage didaftar rekursif
+      lewat klien yang sama; bila izin membaca daftar tidak ada,
+      bucket ditandai jujur tidak terbaca (tanpa angka karangan).
+   3) Perangkat ini: navigator.storage.estimate() + localStorage asal
+      situs ini di peramban yang sedang membuka — BUKAN total server.
+   Daftar koleksi mengikuti APP_DATA_COLLECTIONS di db.js persis. */
+const PENYIMPANAN_KOLEKSI=[
+  ['members','Data Anggota'],
+  ['events','Kegiatan'],
+  ['keuangan','Keuangan'],
+  ['inventaris','Inventari Benda'],
+  ['musyawarah','Musyawarah'],
+  ['topics','Forum'],
+  ['cleaning_duties','Jadwal Piket'],
+  ['pengaturan','Pengaturan & Pilihan'],
+  ['pin','Pin Peta'],
+  ['meeting','Rapat (arsip lama)']
+];
+const PENYIMPANAN_BUCKET=[
+  ['member-files','Foto & berkas anggota'],
+  ['message-attachments','Lampiran pesan']
+];
+function formatUkuranBerkas(bytes){
+  const n=Number(bytes);
+  if(!Number.isFinite(n)||n<0)return '—';
+  if(n<1024)return n+' B';
+  if(n<1024*1024)return (n/1024).toFixed(n<10*1024?1:0).replace('.',',')+' KB';
+  if(n<1024*1024*1024)return (n/(1024*1024)).toFixed(2).replace('.',',')+' MB';
+  return (n/(1024*1024*1024)).toFixed(2).replace('.',',')+' GB';
+}
+function ukuranJsonBytes(nilai){
+  try{return new TextEncoder().encode(JSON.stringify(nilai==null?{}:nilai)).length}
+  catch(e){try{return String(JSON.stringify(nilai==null?{}:nilai)).length}catch(e2){return 0}}
+}
+async function penyimpananAmbilKoleksi(nama){
+  if(S.supabase){
+    const {data,error}=await S.supabase.from('app_data').select('id,data').eq('collection',nama);
+    if(error)throw error;
+    return (data||[]).map(row=>({id:row.id,...(row.data&&typeof row.data==='object'?row.data:{value:row.data})}));
+  }
+  if(S.db){
+    return await new Promise((resolve,reject)=>{
+      let selesai=false,unsub=null;
+      const timer=setTimeout(()=>{if(!selesai){selesai=true;try{unsub&&unsub()}catch(e){}reject(new Error('Waktu membaca habis'))}},15000);
+      const gagal=err=>{if(selesai)return;selesai=true;clearTimeout(timer);reject(err||new Error('Gagal membaca koleksi'))};
+      try{
+        unsub=S.db.collection(nama).onSnapshot(snap=>{
+          if(selesai)return;selesai=true;clearTimeout(timer);try{unsub&&unsub()}catch(e){}
+          resolve((snap.docs||[]).map(d=>{try{return {id:d.id,...(typeof d.data==='function'?d.data():{})}}catch(e){return {id:d.id}}}));
+        },gagal);
+      }catch(e){gagal(e)}
+    });
+  }
+  const peta={members:S.members,events:S.events,topics:S.topics,cleaning_duties:S.cleaningDuties,pin:S.pins,musyawarah:S.musyawarah,pengaturan:S.pengaturan,keuangan:S.keuangan,inventaris:S.inventaris,meeting:[]};
+  return (peta[nama]||[]).map(d=>({...d}));
+}
+async function penyimpananHitungBucket(namaBucket){
+  if(!S.supabase)throw new Error('Mode online (Supabase) tidak aktif di perangkat ini');
+  const BATAS=1000,LIMIT=100;
+  let count=0,total=0,truncated=false;
+  const jenis={};
+  const antre=[''];
+  while(antre.length&&!truncated){
+    const prefix=antre.shift();
+    let offset=0;
+    while(true){
+      const {data,error}=await S.supabase.storage.from(namaBucket).list(prefix,{limit:LIMIT,offset,sortBy:{column:'name',order:'asc'}});
+      if(error)throw error;
+      const entries=data||[];
+      for(const entri of entries){
+        if(!entri.id){antre.push(prefix?prefix+'/'+entri.name:entri.name);continue}
+        if(count>=BATAS){truncated=true;break}
+        count++;
+        total+=(entri.metadata&&typeof entri.metadata.size==='number')?entri.metadata.size:0;
+        let tipe='';
+        const namaFile=String(entri.name||''),titik=namaFile.lastIndexOf('.');
+        if(titik>0&&titik<namaFile.length-1)tipe=namaFile.slice(titik+1).toLowerCase();
+        if(!tipe&&entri.metadata&&entri.metadata.mimetype)tipe=String(entri.metadata.mimetype).split('/').pop().toLowerCase();
+        if(!tipe)tipe='tanpa ekstensi';
+        jenis[tipe]=(jenis[tipe]||0)+1;
+        if(count>=BATAS)truncated=true;
+      }
+      if(truncated||entries.length<LIMIT)break;
+      offset+=LIMIT;
+    }
+  }
+  return {count,bytes:total,jenis,truncated};
+}
+async function penyimpananHitungPerangkat(){
+  const hasil={localBytes:0,localKeys:0,localError:'',usage:null,quota:null};
+  try{
+    const enc=new TextEncoder();
+    let total=0,keys=0;
+    for(let i=0;i<localStorage.length;i++){
+      const k=localStorage.key(i);
+      if(k==null)continue;
+      total+=enc.encode(k).length+enc.encode(localStorage.getItem(k)||'').length;
+      keys++;
+    }
+    hasil.localBytes=total;hasil.localKeys=keys;
+  }catch(e){hasil.localError='Tidak bisa dibaca di peramban ini'}
+  try{
+    if(navigator.storage&&typeof navigator.storage.estimate==='function'){
+      const est=await navigator.storage.estimate();
+      if(est&&typeof est.usage==='number')hasil.usage=est.usage;
+      if(est&&typeof est.quota==='number')hasil.quota=est.quota;
+    }
+  }catch(e){/* perkiraan tidak tersedia: dibiarkan kosong, ditandai di tampilan */}
+  return hasil;
+}
+async function hitungPenyimpanan(){
+  if(S.penyimpananLoading)return;
+  S.penyimpananLoading=true;
+  if(S.view==='pengaturan')render();
+  const koleksi=await Promise.all(PENYIMPANAN_KOLEKSI.map(async([key,label])=>{
+    try{
+      const docs=await penyimpananAmbilKoleksi(key);
+      return {key,label,count:docs.length,bytes:docs.reduce((s,d)=>s+ukuranJsonBytes(d),0),error:''};
+    }catch(e){
+      return {key,label,count:null,bytes:null,error:(e&&e.message)||'Gagal membaca'};
+    }
+  }));
+  const buckets=await Promise.all(PENYIMPANAN_BUCKET.map(async([name,label])=>{
+    try{
+      const r=await penyimpananHitungBucket(name);
+      return {name,label,...r,error:''};
+    }catch(e){
+      return {name,label,count:null,bytes:null,jenis:{},truncated:false,error:(e&&e.message)||'Gagal membaca'};
+    }
+  }));
+  const perangkat=await penyimpananHitungPerangkat();
+  S.penyimpanan={at:Date.now(),koleksi,buckets,perangkat};
+  S.penyimpananLoading=false;
+  if(S.view==='pengaturan')render();
+}
+let penyimpananAutoDiminta=false;
+function kotakPenyimpanan(){
+  if(!S.penyimpanan&&!S.penyimpananLoading&&!penyimpananAutoDiminta){
+    penyimpananAutoDiminta=true;
+    setTimeout(()=>{void hitungPenyimpanan()},60);
+  }
+  const data=S.penyimpanan,loading=S.penyimpananLoading;
+  const hostProyek=(()=>{try{return new URL((window.SUPABASE_CONFIG||{}).url||'').host}catch(e){return 'Supabase'}})();
+  const anak=[h('b',{},'Penyimpanan & Berkas'),
+    h('p',{class:'sub',style:'margin-top:8px'},'Di mana saja data aplikasi ini tersimpan, macam berkasnya, dan seberapa besar. Angka dihitung dari data yang benar-benar terbaca saat halaman dibuka — bagian yang tidak bisa dibaca ditandai apa adanya, bukan ditebak.')];
+  if(loading&&!data)anak.push(h('p',{class:'warn',style:'margin:10px 0 2px'},'Menghitung penyimpanan…'));
+  if(data){
+    /* --- 1) Basis data --- */
+    anak.push(h('p',{class:'penyimpanan-sub'},'Basis Data — Supabase'));
+    anak.push(h('p',{class:'warn',style:'margin:0 0 2px'},'Lokasi: tabel app_data · proyek '+hostProyek+'. Ukuran = besar data JSON tiap dokumen.'));
+    let totalDok=0,totalBytes=0,adaGagalKoleksi=false;
+    data.koleksi.forEach(k=>{
+      if(k.error){adaGagalKoleksi=true;anak.push(h('div',{class:'sec-row'},h('div',{class:'sec-row-main'},h('b',{},k.label),h('small',{style:'display:block'},'Koleksi ‘'+k.key+'’ · tidak bisa dibaca: '+k.error)),h('span',{class:'sec-badge sec-badge-bad'},'Tidak terbaca')));return}
+      totalDok+=k.count;totalBytes+=k.bytes;
+      anak.push(h('div',{class:'sec-row'},h('div',{class:'sec-row-main'},h('b',{},k.label),h('small',{style:'display:block'},'Koleksi ‘'+k.key+'’ · '+k.count+' dokumen')),h('span',{class:'penyimpanan-ukuran'},formatUkuranBerkas(k.bytes))));
+    });
+    anak.push(h('div',{class:'penyimpanan-total'},h('span',{},'Total basis data'+(adaGagalKoleksi?' (dari yang terbaca)':'')),h('span',{},totalDok+' dokumen · '+formatUkuranBerkas(totalBytes))));
+    /* --- 2) Berkas unggahan --- */
+    anak.push(h('p',{class:'penyimpanan-sub'},'Berkas Unggahan — Supabase Storage'));
+    anak.push(h('p',{class:'warn',style:'margin:0 0 2px'},'Lokasi: Supabase Storage, di dalam bucket di bawah ini. Didaftar lewat aplikasi, maksimal 1.000 berkas per bucket.'));
+    data.buckets.forEach(b=>{
+      if(b.error){
+        anak.push(h('div',{class:'sec-row'},h('div',{class:'sec-row-main'},h('b',{},b.label),h('small',{style:'display:block'},'Bucket ‘'+b.name+'’ · Tidak bisa dibaca dari aplikasi — lihat di panel Supabase.')),h('span',{class:'sec-badge sec-badge-mut'},'Tidak terbaca')));
+        return;
+      }
+      const jenisList=Object.entries(b.jenis||{}).sort((a,c)=>c[1]-a[1]);
+      const jenisTeks=b.count===0?'Belum ada berkas.':('Macam berkas: '+jenisList.map(([t,n])=>t+' · '+n).join('  ·  '));
+      anak.push(h('div',{class:'sec-row'},h('div',{class:'sec-row-main'},h('b',{},b.label),h('small',{style:'display:block'},'Bucket ‘'+b.name+'’ · '+b.count+' berkas'+(b.truncated?' (dibatasi 1.000 berkas pertama — total sebenarnya bisa lebih besar)':'')),h('small',{style:'display:block'},jenisTeks)),h('span',{class:'penyimpanan-ukuran'},formatUkuranBerkas(b.bytes))));
+    });
+    /* --- 3) Perangkat ini --- */
+    const per=data.perangkat||{};
+    anak.push(h('p',{class:'penyimpanan-sub'},'Penyimpanan di Perangkat Ini'));
+    anak.push(h('p',{class:'warn',style:'margin:0 0 2px'},'Khusus perangkat & peramban yang sedang Anda pakai saat ini — bukan total di server. Isinya berubah dari satu perangkat ke perangkat lain.'));
+    anak.push(h('div',{class:'sec-row'},h('div',{class:'sec-row-main'},h('b',{},'Perkiraan pemakaian situs ini'),h('small',{style:'display:block'},per.usage==null?'Peramban ini tidak menyediakan perkiraan pemakaian.':('Terpakai '+formatUkuranBerkas(per.usage)+(per.quota!=null?' dari kuota sekitar '+formatUkuranBerkas(per.quota):''))+' — termasuk cache aplikasi & berkas offline.')),h('span',{class:'penyimpanan-ukuran'},per.usage==null?'—':formatUkuranBerkas(per.usage))));
+    anak.push(h('div',{class:'sec-row'},h('div',{class:'sec-row-main'},h('b',{},'Penyimpanan lokal (localStorage)'),h('small',{style:'display:block'},per.localError?per.localError:(per.localKeys+' kunci tersimpan di asal situs ini.'))),h('span',{class:'penyimpanan-ukuran'},per.localError?'—':formatUkuranBerkas(per.localBytes))));
+    anak.push(h('p',{class:'warn',style:'margin:12px 0 2px'},'Terakhir dihitung: '+new Date(data.at).toLocaleString('id-ID')+'.'));
+  }
+  anak.push(h('div',{class:'fl'},h('button',loading?{class:'btn',disabled:''}:{class:'btn',onclick:()=>{void hitungPenyimpanan()}},loading?'Menghitung…':(data?'Hitung Ulang':'Hitung Penyimpanan'))));
+  return box(...anak);
+}
 /* Halaman Pengaturan: khusus ADMIN UTAMA saja (admin biasa tidak bisa membukanya) */
 function vPengaturan(){
   if(!S.mainAdmin)return [h('p',{class:'warn'},'Halaman ini hanya dapat diakses admin utama.')];
@@ -51,7 +237,8 @@ function vPengaturan(){
       h('div',{class:'fl'},h('button',{class:'btn',onclick:async()=>{
         try{await saveSumberPeta(gayaSel.value);alert('Sumber peta disimpan.');render()}
         catch(e){alert('Gagal menyimpan sumber peta: '+(e.message||'periksa koneksi'))}
-      }},'Simpan')))];
+      }},'Simpan'))),
+    kotakPenyimpanan()];
 }
 /* Maskot Home: VIDEO transparan pilihan pengguna — karakter dari
    video yang dipilihnya, latarnya sudah dipisahkan dengan AI menjadi

@@ -2490,6 +2490,14 @@ select.inv-in{-webkit-appearance:none;appearance:none;padding-right:14px;backgro
 .sec-badge-note{background:#f2e6c4;color:#5b4a12}
 .sec-badge-mut{background:#e3edf3;color:#22384c}
 
+/* ===== Kotak Penyimpanan & Berkas (halaman Pengaturan, home.js) =====
+   Subjudul kelompok di dalam kartu, baris total basis data, dan angka
+   ukuran rata kanan yang tidak menyusut — mengikuti pola .sec-row. */
+.penyimpanan-sub{font-weight:700;font-size:15px;margin:18px 0 4px}
+.penyimpanan-total{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:11px 0 2px;margin-top:2px;border-top:2px solid var(--line);font-weight:700}
+.penyimpanan-total span:last-child{white-space:nowrap;font-variant-numeric:tabular-nums}
+.penyimpanan-ukuran{flex:none;font-weight:700;white-space:nowrap;font-variant-numeric:tabular-nums;margin-top:1px}
+
 /* ===== Lebar kolom tabel diatur ADMIN UTAMA (lebar-kolom.js) =====
    Begitu sebuah tabel punya lebar tersimpan, ia mendapat kelas
    'lk-ada-lebar': tata letak fixed + colgroup nyata dari JS membuat
