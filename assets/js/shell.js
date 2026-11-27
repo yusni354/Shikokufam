@@ -257,41 +257,85 @@ function pasangSeretMenu(el){
 /* ===== Riwayat halaman untuk tombol Back perangkat/peramban =====
    Aplikasi ini satu halaman (semua perpindahan lewat go()), jadi
    tanpa entri riwayat peramban tombol Back Android/peramban langsung
-   KELUAR aplikasi dari halaman mana pun. Pola yang dipakai di sini
-   adalah SATU entri penanda (sentinel) yang SELALU dipasang ulang:
-   - Tumpukan peramban dijaga tetap pendek: [entri awal dokumen,
-     sentinel]. Riwayat halaman aplikasi sendiri TIDAK disimpan
-     sebagai entri peramban, melainkan sebagai daftar nama halaman
-     di riwayatHalamanBack (diisi go()).
-   - pasangSentinelBack() memasang sentinel sesudah aplikasi benar-
-     benar bisa dipakai (lihat pulihkanViewTerakhir). Tekanan Back
-     memindahkan peramban dari sentinel ke entri awal dan memicu
-     popstate; pendengar popstate (di bawah, sesudah aksiUsapKembali)
-     menjawabnya dengan SATU langkah kembali — tutup panel → tutup
-     sub-tampilan → halaman sebelumnya → Home — lalu MEMASANG
-     SENTINEL BARU, jadi tekanan berikutnya selalu punya entri untuk
-     dikonsumsi dan tidak pernah "kehabisan" di tengah jalan.
-     (Pola lama mendorong satu entri per perpindahan halaman dan
-     langkah halaman-ke-halaman tidak memasang entri pengganti:
-     sesudah satu-dua tekanan tumpukan bisa habis — apalagi sesudah
-     muat ulang/pemulihan sesi yang menggeser hitungan entri — dan
-     tekanan berikutnya langsung keluar aplikasi. Itulah yang
-     dilaporkan pengguna: "hanya kembali satu halaman, setelah itu
-     tetap keluar".)
-   - Di Home tanpa riwayat, tekanan Back pertama TIDAK memasang
-     sentinel baru: muncul petunjuk "Tekan sekali lagi untuk keluar"
-     dan siaga 2,5 detik. Tekanan kedua dalam tenggang itu tidak
-     memicu popstate sama sekali (tumpukan sudah di entri awal), jadi
-     peramban/TWA keluar dengan sendirinya — persis seperti aplikasi
-     Android biasa. Bila tenggang habis tanpa tekanan kedua, sentinel
-     dipasang lagi otomatis dan tekanan berikutnya mengulang siaga.
-   idx pada state membedakan tombol Back dari tombol Maju peramban.
+   KELUAR aplikasi dari halaman mana pun. Riwayat halaman aplikasi
+   sendiri TIDAK disimpan sebagai entri peramban, melainkan sebagai
+   daftar nama halaman di riwayatHalamanBack (diisi go()); tumpukan
+   peramban hanya memegang entri PENYANGGA (sentinel) di atas entri
+   awal dokumen, yang tugasnya menyerap tekanan Back menjadi
+   kejadian popstate.
+
+   Pola ini adalah PENYANGGA BANYAK entri (bukan satu sentinel):
+   - pasangSentinelBack() menjaga selalu ada BACK_BUFFER entri
+     penyangga di tumpukan. Sesudah SETIAP tekanan Back yang
+     tertangani, penyangga diisi ulang sampai penuh, jadi tekanan
+     berikutnya selalu punya entri untuk dikonsumsi — berapa pun
+     banyaknya langkah mundur, sampai Home.
+   - Daftar indeks entri penyangga yang diyakini ada di tumpukan
+     disimpan di tumpukanIdxBack dan DISINKRONKAN dari state entri
+     tujuan setiap popstate, jadi hitungan tidak pernah meleset:
+     mendarat di entri penyangga memangkas daftar sampai entri itu;
+     mendarat di entri awal/asing mengosongkannya.
+   - Alasan penyangga harus BANYAK: Chrome Android punya "intervensi
+     manipulasi riwayat" — entri pushState yang dibuat TANPA gestur
+     pengguna boleh DILOMPATI peramban saat Back ditekan beruntun
+     tanpa sentuhan di antaranya. Dengan satu sentinel, loncatan itu
+     menghabiskan tumpukan sekaligus dan tekanan berikutnya keluar
+     aplikasi (gejala yang dilaporkan pengguna dua kali: "hanya
+     kembali satu halaman, setelah itu tetap keluar"). Dengan
+     penyangga banyak, entri yang dilompati hanya mengurangi
+     penyangga; peramban tetap mendarat di entri penyangga lain atau
+     di entri awal — keduanya memicu popstate, langkah kembali tetap
+     berjalan satu langkah, dan penyangga diisi ulang. Peramban
+     tidak bisa melompati entri awal dokumen.
+   - Penguatan gestur: pendengar pointerdown (di bawah pendengar
+     popstate) mengisi ulang penyangga saat pengguna MENYENTUH
+     layar. Entri yang dibuat di tengah gestur sungguhan membawa
+     aktivasi pengguna, jadi TIDAK bisa dilompati intervensi itu.
+   - Di Home tanpa riwayat, tekanan Back pertama masuk SIAGA KELUAR:
+     petunjuk "Tekan sekali lagi untuk keluar" tampil, lalu sisa
+     tumpukan diloncatkan ke entri awal (history.go) supaya tekanan
+     kedua dalam tenggang 2,5 detik benar-benar keluar, seperti
+     aplikasi Android biasa. Popstate hasil loncatan itu ditandai
+     dan diabaikan. Bila tenggang habis tanpa tekanan kedua,
+     penyangga dipasang lagi otomatis dan tekanan berikutnya
+     mengulang siaga.
    Semua pemakaian history dibungkus try/catch: lingkungan yang
    memblokir history tidak menimbulkan error, tombol Back cukup
    kembali ke perilaku bawaan peramban. */
-let riwayatHalamanBack=[],navigasiDariBack=false,backTrapAktif=false,sentinelDiTumpukan=false,backIdx=0,backKeluarSiaga=0,backKeluarTimer=null,backHintEl=null,backHintTimer=null;
-function dorongEntriBack(){backIdx++;try{history.pushState({shikokuBack:1,idx:backIdx,view:S.view},'');sentinelDiTumpukan=true}catch(e){/* history terblokir: abaikan */}}
-function pasangSentinelBack(){backTrapAktif=true;if(!sentinelDiTumpukan)dorongEntriBack()}
+const BACK_BUFFER=3;
+let riwayatHalamanBack=[],navigasiDariBack=false,backTrapAktif=false,backIdx=0,tumpukanIdxBack=[],backKeluarSiaga=0,backKeluarTimer=null,backHintEl=null,backHintTimer=null,backAbaikanPopstate=false;
+/* Dorong SATU entri penyangga. Mengembalikan true bila berhasil;
+   gagal (history terblokir) menghentikan pengisian ulang supaya
+   tidak berputar tanpa akhir. */
+function dorongEntriBack(){
+  const idx=backIdx+1;
+  try{history.pushState({shikokuBack:1,idx:idx,view:S.view},'')}catch(e){return false}
+  backIdx=idx;
+  tumpukanIdxBack.push(idx);
+  return true;
+}
+/* Pasang/isi ulang penyangga sampai penuh (BACK_BUFFER entri). */
+function pasangSentinelBack(){
+  backTrapAktif=true;
+  while(tumpukanIdxBack.length<BACK_BUFFER){
+    if(!dorongEntriBack())break;
+  }
+}
+/* Loncatkan tumpukan ke entri awal dokumen: dipakai siaga keluar di
+   Home supaya tekanan Back berikutnya benar-benar keluar. Popstate
+   dari loncatan ini ditandai backAbaikanPopstate dan diabaikan
+   pendengar popstate. */
+function loncatKeEntriAwalBack(){
+  const n=tumpukanIdxBack.length;
+  tumpukanIdxBack=[];
+  if(!n)return;
+  backAbaikanPopstate=true;
+  try{history.go(-n)}catch(e){backAbaikanPopstate=false;return}
+  /* Jaga-jaga: bila traversal tidak menghasilkan popstate (tumpukan
+     ternyata sudah di entri awal), penanda abaikan tidak boleh
+     menelan tekanan Back berikutnya. */
+  setTimeout(()=>{backAbaikanPopstate=false},500);
+}
 /* Petunjuk keluar di Home: pil kecil di bawah layar, gaya yang sama
    seperti toast Musyawarah (lihat #back-exit-hint di style.css). */
 function tampilkanPetunjukKeluar(){
@@ -606,26 +650,48 @@ function aksiUsapKembali(){
    Urutan langkahnya sama seperti isyarat usap tepi: panel/modal yang
    terbuka ditutup dulu, lalu sub-tampilan di dalam halaman, lalu
    halaman sebelumnya dari riwayat navigasi, terakhir Home. Sesudah
-   SETIAP langkah yang tertangani, sentinel dipasang lagi
-   (pasangSentinelBack) karena tekanan ini sudah memindahkan
-   peramban ke entri awal dokumen — halaman yang sama selalu punya
-   entri untuk tekanan berikutnya, berapa pun banyaknya langkah. */
+   SETIAP langkah yang tertangani, penyangga diisi ulang sampai penuh
+   (pasangSentinelBack) — tekanan berikutnya selalu punya entri untuk
+   dikonsumsi, berapa pun banyaknya langkah. */
 window.addEventListener('popstate',e=>{
   const st=e&&e.state;
-  if(st&&st.shikokuBack&&typeof st.idx==='number'){
-    /* Tombol Maju peramban mendarat DI entri sentinel: bukan urusan
-       tombol Back — cukup samakan penanda posisi, tampilan tidak
-       diubah, dan siaga keluar dibatalkan (sentinel utuh lagi). */
-    if(st.idx>backIdx){backIdx=st.idx;sentinelDiTumpukan=true;batalkanSiagaKeluar();return}
-    backIdx=st.idx;
+  const idxTujuan=(st&&st.shikokuBack&&typeof st.idx==='number')?st.idx:null;
+  /* Sinkronkan daftar penyangga dengan posisi tumpukan yang
+     sebenarnya sesudah traversal ini, apa pun yang terjadi sesudah
+     ini (termasuk gerbang masuk): hitungan entri tidak boleh
+     meleset dari kenyataan. */
+  if(idxTujuan===null){
+    /* Mendarat di entri awal dokumen atau entri asing: semua entri
+       penyangga sudah terlewati. */
+    tumpukanIdxBack=[];
+  }else{
+    const pos=tumpukanIdxBack.indexOf(idxTujuan);
+    if(pos>=0){
+      /* Mendarat di entri penyangga yang dikenal: pangkas daftar
+         sampai entri itu (entri di atasnya sudah terkonsumsi). */
+      tumpukanIdxBack.length=pos+1;
+    }else if(!tumpukanIdxBack.length||idxTujuan>tumpukanIdxBack[tumpukanIdxBack.length-1]){
+      /* Tombol Maju peramban mendarat di entri penyangga yang tadi
+         terkonsumsi: entri itu ada lagi di posisi sekarang. Bukan
+         langkah Back — cukup catat, siaga keluar batal, selesai. */
+      tumpukanIdxBack.push(idxTujuan);
+      batalkanSiagaKeluar();
+      return;
+    }else{
+      /* Entri penyangga lama yang tidak lagi dikenal (mis. hitungan
+         sempat terputus): perlakukan sebagai satu-satunya penyangga
+         yang tersisa. */
+      tumpukanIdxBack=[idxTujuan];
+    }
   }
-  /* Tekanan Back ini memindahkan peramban DARI sentinel ke entri
-     awal dokumen (atau entri lama sederetanya): sentinel tidak lagi
-     di puncak tumpukan, apa pun langkah yang diambil sesudah ini. */
-  sentinelDiTumpukan=false;
-  /* Sentinel belum pernah dipasang (aplikasi belum bisa dipakai)
-     atau sedang di gerbang masuk: kejadian ini bukan untuk diatur
-     di sini, biarkan perilaku bawaan peramban berjalan. */
+  /* Popstate hasil loncatan siaga keluar sendiri: bukan tekanan
+     Back baru, abaikan (siaga tetap berjalan). */
+  if(backAbaikanPopstate){backAbaikanPopstate=false;return}
+  /* Penyangga belum pernah dipasang (aplikasi belum bisa dipakai)
+     atau sedang di gerbang masuk: bukan untuk diatur di sini,
+     biarkan perilaku bawaan peramban berjalan. Daftar penyangga
+     sudah disinkronkan di atas; pengisian ulang terjadi lewat go()
+     atau sentuhan berikutnya. */
   if(!backTrapAktif)return;
   if(document.body.classList.contains('auth-locked')||S.authLoading||!S.uid)return;
   /* 1) Panel/modal/drawer/pemindai QR terbuka: tutup dulu, halaman
@@ -637,41 +703,48 @@ window.addEventListener('popstate',e=>{
   /* 3) Halaman sebelumnya dalam riwayat navigasi aplikasi; tanpa
         riwayat (mis. halaman ini hasil pemulihan sesudah muat ulang)
         tujuannya Home. go() dijalankan dengan penanda
-        navigasiDariBack supaya tidak mencatat riwayat baru; sentinel
-        dipasang di sini sesudah navigasinya selesai. */
+        navigasiDariBack supaya tidak mencatat riwayat baru;
+        penyangga diisi ulang di sini sesudah navigasinya selesai. */
   let tujuan=null;
   while(riwayatHalamanBack.length){const calon=riwayatHalamanBack.pop();if(calon&&calon!==S.view){tujuan=calon;break}}
   if(!tujuan&&S.view!=='landing')tujuan='landing';
   if(tujuan){batalkanSiagaKeluar();navigasiDariBack=true;try{go(tujuan)}finally{navigasiDariBack=false}pasangSentinelBack();return}
-  /* 4) Sudah di Home dan tidak ada riwayat: SIAGA KELUAR. Sentinel
-        sengaja TIDAK dipasang lagi pada tekanan pertama — cukup
-        tampilkan petunjuk dan beri tenggang 2,5 detik. Tekanan kedua
-        dalam tenggang tidak memicu popstate (tumpukan sudah di entri
-        awal), jadi peramban/TWA keluar dengan sendirinya, persis
-        seperti aplikasi Android biasa. Bila tenggang habis tanpa
-        tekanan kedua, sentinel dipasang lagi otomatis: tekanan
-        berikutnya mengulang siaga ini, bukan langsung keluar. */
+  /* 4) Sudah di Home dan tidak ada riwayat: SIAGA KELUAR. */
   if(backKeluarSiaga&&Date.now()<backKeluarSiaga){
-    /* Cadangan: normalnya tidak tercapai (lihat di atas), tetapi
-       bila peramban tetap mengirim popstate untuk tekanan kedua,
-       perlakukan sama — jangan pasang sentinel, supaya tekanan
+    /* Tekanan kedua dalam tenggang yang tetap memicu popstate
+       (sisa penyangga belum terloncati): jangan pasang apa pun —
+       loncatkan sisa tumpukan ke entri awal supaya tekanan
        berikutnya benar-benar keluar. */
-    batalkanSiagaKeluar();
+    loncatKeEntriAwalBack();
     return;
   }
   backKeluarSiaga=Date.now()+2500;
   tampilkanPetunjukKeluar();
+  /* Tumpukan langsung diloncatkan ke entri awal: tekanan kedua
+     dalam tenggang tidak lagi memicu popstate, jadi peramban/TWA
+     keluar dengan sendirinya, persis aplikasi Android biasa. */
+  loncatKeEntriAwalBack();
   if(backKeluarTimer)clearTimeout(backKeluarTimer);
   backKeluarTimer=setTimeout(()=>{
     backKeluarTimer=null;
     backKeluarSiaga=0;
     sembunyikanPetunjukKeluar();
     /* Tenggang habis dan pengguna masih di dalam aplikasi: pasang
-       sentinel lagi supaya tekanan Back berikutnya tidak langsung
+       penyangga lagi supaya tekanan Back berikutnya tidak langsung
        keluar tanpa siaga. */
-    if(backTrapAktif&&!sentinelDiTumpukan&&S.uid&&!document.body.classList.contains('auth-locked'))pasangSentinelBack();
+    if(backTrapAktif&&S.uid&&!document.body.classList.contains('auth-locked'))pasangSentinelBack();
   },2500);
 });
+/* Penguatan gestur untuk penyangga Back: setiap sentuhan/klik
+   sungguhan mengisi ulang penyangga yang kurang. Entri yang dibuat
+   di tengah gestur membawa aktivasi pengguna, sehingga tidak bisa
+   dilompati oleh intervensi manipulasi riwayat Chrome (lihat blok
+   riwayat di atas). Selama siaga keluar di Home TIDAK diisi ulang —
+   tekanan kedua harus tetap bisa keluar. */
+document.addEventListener('pointerdown',()=>{
+  if(backTrapAktif&&!backKeluarSiaga&&tumpukanIdxBack.length<BACK_BUFFER)pasangSentinelBack();
+},true);
+
 (function(){
   const TEPI=28,JARAK=70;
   let usap=null;
