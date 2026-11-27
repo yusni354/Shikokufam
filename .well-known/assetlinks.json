@@ -1,1 +1,8 @@
-W3sKICAicmVsYXRpb24iOiBbImRlbGVnYXRlX3Blcm1pc3Npb24vY29tbW9uLmhhbmRsZV9hbGxfdXJscyJdLAogICJ0YXJnZXQiOiB7CiAgICAibmFtZXNwYWNlIjogImFuZHJvaWRfYXBwIiwKICAgICJwYWNrYWdlX25hbWUiOiAiYXBwLnNoaWtva3VmYW0iLAogICAgInNoYTI1Nl9jZXJ0X2ZpbmdlcnByaW50cyI6IFsiMDk6NzY6OTY6MTI6NzM6MjM6NDI6QTA6NUM6NUI6NjI6ODA6OTc6QTc6NzE6QTU6NDM6OUI6QjI6QzM6MEI6MzE6QkM6Qjg6Nzg6MDY6NEM6NTA6NjY6Nzc6OEM6NzMiXQogIH0KfV0K
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "app.shikokufam",
+    "sha256_cert_fingerprints": ["09:76:96:12:73:23:42:A0:5C:5B:62:80:97:A7:71:A5:43:9B:B2:C3:0B:31:BC:B8:78:06:4C:50:66:77:8C:73"]
+  }
+}]
