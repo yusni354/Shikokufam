@@ -254,7 +254,29 @@ function pasangSeretMenu(el){
     document.addEventListener('touchmove',cegahGulir,{passive:false});
   });
 }
-function go(v){/* Halaman Pengaturan & Laporan Keamanan khusus ADMIN UTAMA: admin biasa yang somehow memanggilnya diarahkan ke Home, bukan sekadar menunya disembunyikan. */if((v==='pengaturan'||v==='keamanan')&&!S.mainAdmin)v='landing';/* Menu yang dimatikan admin utama tidak bisa dibuka pengguna lain: navigasi langsung ke halamannya terpental ke Home. */if(v!=='landing'&&!S.mainAdmin&&!menuAktifUntuk(v))v='landing';if(v==='peta'&&typeof petaResetKeBawaanAdmin==='function')petaResetKeBawaanAdmin();if(v==='kegiatan'){bawaanArsipKegiatan();/* Masuk halaman Kegiatan dari menu selalu menuju DAFTAR: detail kegiatan adalah sub-tampilan yang hanya dibuka dari kartu dan ditutup lewat tombol Kembali di dalamnya, jadi keadaan detail & absensi dibersihkan di sini (bukan saat kembali dari detail). */S.activityDetail=null;S.absensiEvent=null;S.absensiRegion=null;S.absensiDraft=null;try{sessionStorage.removeItem('shikoku-family:kegiatan-detail')}catch(e){/* storage terblokir: abaikan */}}if(v==='ringkasan')bawaanArsipRingkasan();S.view=v;simpanViewTerakhir(v);S.adminMenuOpen=false;S.chatDialog=null;S.inboxDialog=null;S.aksiMenu=null;S.piketTugasMenu=null;S.form=S.detail=S.dutyForm=null;S.financeForm=null;S.financePhoto=null;S.inventarisForm=null;S.inventarisPhoto=null;S.inventarisDetail=null;S.inventarisConfirm=null;S.inventarisPinjam=null;S.idPhoto=null;S.detailOrigin=null;S.detailReturnView=null;if(v==='pesan'){/* Masuk menu Pesan selalu menuju KOTAK MASUK (daftar percakapan pribadi pengguna yang masuk) untuk semua peran; percakapan hanya ditandai terbaca saat dibuka, bukan saat daftar ditampilkan. Direktori pengguna dimuat untuk nama/foto lawan bicara dan pemilih Pesan Baru. */S.openConversation=null;S.newChat=null;if(S.uid&&typeof loadUserDirectory==='function')loadUserDirectory().then(()=>{if(S.view==='pesan')renderDariData()})}document.body.classList.remove('open');syncAdminTheme();render()}
+/* ===== Riwayat halaman untuk tombol Back perangkat/peramban =====
+   Aplikasi ini satu halaman (semua perpindahan lewat go()), jadi
+   tanpa entri riwayat peramban tombol Back Android/peramban langsung
+   KELUAR aplikasi dari halaman mana pun. Supaya Back berarti
+   "kembali" di dalam aplikasi:
+   - pasangSentinelBack() mendorong SATU entri penanda (sentinel)
+     sesudah aplikasi benar-benar bisa dipakai (lihat
+     pulihkanViewTerakhir) — tanpa sentinel ini, tekanan Back pertama
+     tidak pernah sampai ke aplikasi.
+   - Setiap perpindahan halaman lewat go() mendorong entri baru dan
+     mencatat halaman sebelumnya di riwayatHalamanBack.
+   - Pendengar popstate (di bawah, sesudah aksiUsapKembali) menjawab
+     tiap tekanan Back dengan satu langkah kembali: tutup panel →
+     tutup sub-tampilan → halaman sebelumnya → Home; hanya di Home
+     tanpa riwayat tekanan berikutnya keluar seperti biasa.
+   idx pada state membedakan tombol Back dari tombol Maju peramban.
+   Semua pemakaian history dibungkus try/catch: lingkungan yang
+   memblokir history tidak menimbulkan error, tombol Back cukup
+   kembali ke perilaku bawaan peramban. */
+let riwayatHalamanBack=[],navigasiDariBack=false,backSentinelAktif=false,backIdx=0;
+function dorongEntriBack(){backIdx++;try{history.pushState({shikokuBack:1,idx:backIdx,view:S.view},'')}catch(e){/* history terblokir: abaikan */}}
+function pasangSentinelBack(){if(backSentinelAktif)return;backSentinelAktif=true;dorongEntriBack()}
+function go(v){const viewSebelumBack=S.view;/* Halaman Pengaturan & Laporan Keamanan khusus ADMIN UTAMA: admin biasa yang somehow memanggilnya diarahkan ke Home, bukan sekadar menunya disembunyikan. */if((v==='pengaturan'||v==='keamanan')&&!S.mainAdmin)v='landing';/* Menu yang dimatikan admin utama tidak bisa dibuka pengguna lain: navigasi langsung ke halamannya terpental ke Home. */if(v!=='landing'&&!S.mainAdmin&&!menuAktifUntuk(v))v='landing';if(v==='peta'&&typeof petaResetKeBawaanAdmin==='function')petaResetKeBawaanAdmin();if(v==='kegiatan'){bawaanArsipKegiatan();/* Masuk halaman Kegiatan dari menu selalu menuju DAFTAR: detail kegiatan adalah sub-tampilan yang hanya dibuka dari kartu dan ditutup lewat tombol Kembali di dalamnya, jadi keadaan detail & absensi dibersihkan di sini (bukan saat kembali dari detail). */S.activityDetail=null;S.absensiEvent=null;S.absensiRegion=null;S.absensiDraft=null;try{sessionStorage.removeItem('shikoku-family:kegiatan-detail')}catch(e){/* storage terblokir: abaikan */}}if(v==='ringkasan')bawaanArsipRingkasan();S.view=v;simpanViewTerakhir(v);/* Catat halaman sebelumnya untuk tombol Back (lihat blok riwayat di atas go()); navigasi yang DIPICU tombol Back sendiri tidak mendorong entri baru. */if(backSentinelAktif&&!navigasiDariBack&&viewSebelumBack&&viewSebelumBack!==v){riwayatHalamanBack.push(viewSebelumBack);dorongEntriBack()}S.adminMenuOpen=false;S.chatDialog=null;S.inboxDialog=null;S.aksiMenu=null;S.piketTugasMenu=null;S.form=S.detail=S.dutyForm=null;S.financeForm=null;S.financePhoto=null;S.inventarisForm=null;S.inventarisPhoto=null;S.inventarisDetail=null;S.inventarisConfirm=null;S.inventarisPinjam=null;S.idPhoto=null;S.detailOrigin=null;S.detailReturnView=null;if(v==='pesan'){/* Masuk menu Pesan selalu menuju KOTAK MASUK (daftar percakapan pribadi pengguna yang masuk) untuk semua peran; percakapan hanya ditandai terbaca saat dibuka, bukan saat daftar ditampilkan. Direktori pengguna dimuat untuk nama/foto lawan bicara dan pemilih Pesan Baru. */S.openConversation=null;S.newChat=null;if(S.uid&&typeof loadUserDirectory==='function')loadUserDirectory().then(()=>{if(S.view==='pesan')renderDariData()})}document.body.classList.remove('open');syncAdminTheme();render()}
 $('#mn').onclick=()=>document.body.classList.add('open');
 $('#mn').replaceChildren(icon('menu',21));
 $('#st').replaceChildren(icon('settings',19));
@@ -291,6 +313,12 @@ let viewSudahDipulihkan=false;
 function pulihkanViewTerakhir(){
   if(viewSudahDipulihkan)return;
   viewSudahDipulihkan=true;
+  /* Sentinel tombol Back dipasang di sini: fungsi ini hanya berjalan
+     SATU KALI, dari render() sesudah sesi masuk terpulihkan &
+     disetujui — titik paling awal aplikasi benar-benar bisa dipakai,
+     jadi tombol Back sudah diatur sejak halaman pertama tampil,
+     termasuk halaman hasil pemulihan di bawah. */
+  pasangSentinelBack();
   const v=bacaViewTerakhir();
   if(!v||v===S.view)return;
   if(typeof V==='undefined'||!V[v])return;
@@ -483,39 +511,98 @@ function tutupPanelUsap(){
   if(S.susunanInline&&typeof tutupInlineSusunan==='function'){tutupInlineSusunan();return true}
   return false;
 }
+/* Satu langkah Kembali DI DALAM halaman yang sedang tampil: menutup
+   sub-tampilan/formulir yang sedang terbuka, persis seperti tombol
+   Kembali/Batal milik bagian itu sendiri. Dipakai bersama oleh
+   isyarat usap tepi (aksiUsapKembali) dan tombol Back perangkat
+   (pendengar popstate di bawah). Mengembalikan true bila ada langkah
+   yang dilakukan; false bila halaman sedang polos (tidak ada
+   sub-tampilan terbuka) sehingga pemanggil boleh berpindah halaman.
+   Panel/modal TIDAK termasuk di sini — itu urusan panelUsapTerbuka/
+   tutupPanelUsap, yang dicek pemanggil lebih dulu. */
+function langkahKembaliDalamHalaman(){
+  /* Panel pin peta di dalam formulir anggota: tutup panelnya saja,
+     formulirnya tetap terbuka (sama seperti tombol Batal panel itu
+     di members.js). Dari isyarat usap tepi cabang ini tidak terjangkau
+     (usap diam saat panel pin terbuka), tetapi tombol Back memang
+     harus menutup panel ini lebih dulu. */
+  if(S.formPinOpen){S.formPinOpen=false;S.formPinTemp=null;render();return true}
+  /* Detail anggota / Kartu ID / Profil: tombol Kembali-nya sendiri —
+     kembali ke halaman asal dengan keadaan halaman itu utuh. */
+  if(S.detail){if(typeof kembaliDariDetailAnggota==='function'){kembaliDariDetailAnggota();return true}return false}
+  /* Formulir tambah/edit anggota: sama seperti tombol Kembali-nya. */
+  if(S.form){S.form=null;S.formPinOpen=false;S.formPinTemp=null;S.formPinAlamatHasil='';render();return true}
+  if(S.view==='kegiatan'){
+    /* Fokus absensi kembali ke detail kegiatan yang sama; detail
+       kegiatan kembali ke daftar dengan arsip bulan/tahun yang sama. */
+    if(S.absensiEvent||S.absensiRegion){if(typeof leaveAbsensi==='function'){leaveAbsensi();return true}return false}
+    if(S.activityDetail){if(typeof leaveActivityDetail==='function'){leaveActivityDetail();return true}return false}
+  }
+  /* Utas percakapan → daftar percakapan: sama seperti tombol kembali
+     utas (isyarat usap di badan utas yang sudah ada tetap konsisten
+     — hasil akhirnya sama, keadaan tidak berubah dua kali). */
+  if(S.view==='pesan'&&S.openConversation){S.openConversation=null;S.newChat=null;render();return true}
+  /* Formulir Laporan Keuangan: sama seperti tombol Batalnya. */
+  if(S.view==='keuangan'&&S.financeForm){S.financeForm=null;S.financePhotoState=null;render();return true}
+  if(S.view==='inventaris'){
+    /* Formulir barang: sama seperti tombol Batalnya; rincian /
+       peminjaman yang sedang terbuka ditutup kembali ke daftar. */
+    if(S.inventarisForm){S.inventarisForm=null;S.inventarisPhotoState=null;render();return true}
+    if(S.inventarisDetail||S.inventarisPinjam){S.inventarisDetail=null;S.inventarisPinjam=null;render();return true}
+  }
+  /* Formulir Jadwal Piket: sama seperti tombol Batalnya. */
+  if(S.view==='piket'&&S.dutyForm){S.dutyForm=null;S.dutyTaskNotice=null;S.dutyTaskConfirm=null;render();return true}
+  return false;
+}
 /* Satu langkah Kembali mengikuti alur halaman yang sedang tampil —
    dipakai isyarat usap tepi dalam mode navigasi. */
 function aksiUsapKembali(){
   if(S.view==='peta')return;
   if(S.formPinOpen)return;
-  /* Detail anggota / Kartu ID / Profil: tombol Kembali-nya sendiri —
-     kembali ke halaman asal dengan keadaan halaman itu utuh. */
-  if(S.detail){if(typeof kembaliDariDetailAnggota==='function')kembaliDariDetailAnggota();return}
-  /* Formulir tambah/edit anggota: sama seperti tombol Kembali-nya. */
-  if(S.form){S.form=null;S.formPinOpen=false;S.formPinTemp=null;S.formPinAlamatHasil='';render();return}
-  if(S.view==='kegiatan'){
-    /* Fokus absensi kembali ke detail kegiatan yang sama; detail
-       kegiatan kembali ke daftar dengan arsip bulan/tahun yang sama. */
-    if(S.absensiEvent||S.absensiRegion){if(typeof leaveAbsensi==='function')leaveAbsensi();return}
-    if(S.activityDetail){if(typeof leaveActivityDetail==='function')leaveActivityDetail();return}
-  }
-  /* Utas percakapan → daftar percakapan: sama seperti tombol kembali
-     utas (isyarat usap di badan utas yang sudah ada tetap konsisten
-     — hasil akhirnya sama, keadaan tidak berubah dua kali). */
-  if(S.view==='pesan'&&S.openConversation){S.openConversation=null;S.newChat=null;render();return}
-  /* Formulir Laporan Keuangan: sama seperti tombol Batalnya. */
-  if(S.view==='keuangan'&&S.financeForm){S.financeForm=null;S.financePhotoState=null;render();return}
-  if(S.view==='inventaris'){
-    /* Formulir barang: sama seperti tombol Batalnya; rincian /
-       peminjaman yang sedang terbuka ditutup kembali ke daftar. */
-    if(S.inventarisForm){S.inventarisForm=null;S.inventarisPhotoState=null;render();return}
-    if(S.inventarisDetail||S.inventarisPinjam){S.inventarisDetail=null;S.inventarisPinjam=null;render();return}
-  }
-  /* Formulir Jadwal Piket: sama seperti tombol Batalnya. */
-  if(S.view==='piket'&&S.dutyForm){S.dutyForm=null;S.dutyTaskNotice=null;S.dutyTaskConfirm=null;render();return}
+  if(langkahKembaliDalamHalaman())return;
   /* Halaman tanpa alur kembali khusus → Home. Di Home diam saja. */
   if(S.view!=='landing')go('landing');
 }
+/* ===== Tombol Back perangkat/peramban: satu tekanan = satu langkah
+   Kembali di dalam aplikasi (lihat blok riwayat di atas go()) =====
+   Urutan langkahnya sama seperti isyarat usap tepi: panel/modal yang
+   terbuka ditutup dulu, lalu sub-tampilan di dalam halaman, lalu
+   halaman sebelumnya dari riwayat navigasi, terakhir Home. Sesudah
+   langkah 1–2 (panel/sub-tampilan tertutup) entri riwayat didorong
+   lagi, karena tekanan Back ini sudah memakai satu entri — halaman
+   yang sama tetap punya entri untuk tekanan berikutnya. */
+window.addEventListener('popstate',e=>{
+  const st=e&&e.state;
+  if(st&&st.shikokuBack&&typeof st.idx==='number'){
+    /* Tombol Maju peramban: bukan urusan tombol Back — cukup samakan
+       penanda posisi, tampilan tidak diubah. */
+    if(st.idx>backIdx){backIdx=st.idx;return}
+    backIdx=st.idx;
+  }
+  /* Sentinel belum terpasang (aplikasi belum bisa dipakai) atau
+     sedang di gerbang masuk: kejadian ini bukan untuk diatur di
+     sini, biarkan perilaku bawaan peramban berjalan. */
+  if(!backSentinelAktif)return;
+  if(document.body.classList.contains('auth-locked')||S.authLoading||!S.uid)return;
+  /* 1) Panel/modal/drawer/pemindai QR terbuka: tutup dulu, halaman
+        tidak berpindah. */
+  if(panelUsapTerbuka()){tutupPanelUsap();dorongEntriBack();return}
+  /* 2) Sub-tampilan di dalam halaman: kembali satu langkah di dalam
+        halaman yang sama. */
+  if(langkahKembaliDalamHalaman()){dorongEntriBack();return}
+  /* 3) Halaman sebelumnya dalam riwayat navigasi aplikasi; tanpa
+        riwayat (mis. halaman ini hasil pemulihan sesudah muat ulang)
+        tujuannya Home. go() dijalankan dengan penanda
+        navigasiDariBack supaya tidak mendorong entri riwayat baru. */
+  let tujuan=null;
+  while(riwayatHalamanBack.length){const calon=riwayatHalamanBack.pop();if(calon&&calon!==S.view){tujuan=calon;break}}
+  if(!tujuan&&S.view!=='landing')tujuan='landing';
+  if(tujuan){navigasiDariBack=true;try{go(tujuan)}finally{navigasiDariBack=false}}
+  /* 4) Sudah di Home dan tidak ada riwayat: diam saja. Entri sentinel
+        sudah terpakai oleh tekanan ini, jadi tekanan Back berikutnya
+        keluar aplikasi seperti biasa — pengguna memang sudah berada
+        di halaman paling awal. */
+});
 (function(){
   const TEPI=28,JARAK=70;
   let usap=null;
