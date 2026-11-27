@@ -2544,3 +2544,32 @@ body.lk-menyeret-body,body.lk-menyeret-body *{cursor:col-resize!important}
 /* Kepala kartu topik Forum: judul lentur + gerigi di kanan */
 .forum-topic-head{display:flex;align-items:flex-start;gap:10px}
 .forum-topic-head>b{flex:1;min-width:0}
+
+/* ===== Inventari: bagian atas RINGKAS khusus HP =====
+   Di bawah breakpoint desktop (1024px) area sebelum tabel diringkas
+   besar-besaran supaya tabel cepat terlihat tanpa menggulir:
+   judul & lencana sedikit lebih ramping, empat kartu ringkasan
+   menjadi SATU strip ramping berisi keempat angka berjajar
+   mendatar, baris Cari + Tambah Barang lebih ramping, tiga dropdown
+   saringan menjadi SATU baris 3 kolom sama lebar, dan baris meta
+   tabel ("Menampilkan X dari Y barang" + petunjuk ketuk baris)
+   disembunyikan — jumlahnya sudah terbaca di lencana judul & strip.
+   Isi, angka, dan fungsi (cari/tambah/saring) tidak berubah.
+   Desktop (>=1024px) tidak tersentuh blok ini sama sekali. */
+@media (max-width:1023px){
+  .inv-heading{margin-bottom:8px;align-items:center}
+  .inv-heading h1{font-size:21px;margin:2px 0 4px;line-height:1.2}
+  .inv-heading .duty-count{margin-top:0;padding:5px 10px;font-size:12px}
+  .inv-stats{display:grid;grid-template-columns:.8fr .8fr 1.3fr 1.1fr;gap:0;margin-bottom:8px;padding:7px 2px;background:linear-gradient(115deg,#f8fbfc,#e9f4f1);border:1px solid #cfe0da;border-radius:15px;box-shadow:4px 5px 12px rgba(70,95,115,.09)}
+  .inv-stat{padding:1px 3px;background:none;border:0;border-radius:0;box-shadow:none;text-align:center;min-width:0}
+  .inv-stat+.inv-stat{border-left:1px solid #d7e5de}
+  .inv-stat small{font-size:9.5px;line-height:1.25;margin-bottom:2px;overflow-wrap:normal;word-break:normal}
+  .inv-stat b{font-size:15px;line-height:1.2;white-space:nowrap}
+  .inv-toolbar{gap:8px;margin-bottom:8px}
+  .inv-search{padding:0 11px}
+  .inv-search input{padding:8px 0;font-size:14px}
+  .inv-toolbar>.btn{padding:8px 12px;font-size:13.5px;white-space:nowrap}
+  .inv-filters{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;flex-wrap:nowrap;margin-bottom:8px}
+  .inv-filters select{flex:none;width:100%;min-width:0;margin:0;padding:8px 22px 8px 9px;font-size:12.5px;border-radius:12px;background-position:right 7px center;background-size:11px 8px}
+  .inv-table-meta{display:none}
+}

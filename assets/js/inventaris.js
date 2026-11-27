@@ -467,7 +467,7 @@ function vInventaris(){
   selStatus.onchange=()=>{S.inventarisFilterStatus=selStatus.value;render()};
   gambarDaftar();
   const hasil=[
-    h('div',{class:'duty-heading'},h('div',{},h('h1',{},'Inventari Benda SB')),h('span',{class:'duty-count'},all.length+' jenis barang')),
+    h('div',{class:'duty-heading inv-heading'},h('div',{},h('h1',{},'Inventari Benda SB')),h('span',{class:'duty-count'},all.length+' jenis barang')),
     guard(),
     h('div',{class:'inv-stats'},
       h('div',{class:'inv-stat'},h('small',{},'Jenis Barang'),h('b',{},String(all.length))),
