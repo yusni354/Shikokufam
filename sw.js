@@ -3,14 +3,14 @@
    Catatan penempatan: berkas ini ada di assets/. Di situs produksi,
    salin berkas ini ke folder utama situs (di samping index.html)
    dengan nama sw.js supaya cakupannya meliputi seluruh aplikasi. */
-const CACHE = 'shikoku-family-v34';
+const CACHE = 'shikoku-family-v35';
 const CORE = [
   './',
   '../',
   '../index.html',
   './style.css',
   './manifest.webmanifest',
-  './icons/icon-192.png',
+  './icons/icon-192-v2.png',
   './icons/icon-512.png',
   './icons/apple-touch-icon.png',
   './mascot.webp',
