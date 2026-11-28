@@ -730,6 +730,60 @@ revoke execute on function public.is_main_admin() from anon;
 --   drop function if exists public.record_site_visit(text, text, text, text, double precision, double precision, text, text);
 
 -- ---------------------------------------------------------------------
+-- NOTIFIKASI PUSH (Web Push / VAPID)
+-- Langganan push milik Admin Utama & Pengurus: satu baris per
+-- endpoint perangkat. Aplikasi menyimpan langganannya sendiri lewat
+-- pushManager.subscribe() (assets/js/push.js) memakai sesi pengguna
+-- itu sendiri — kebijakan di bawah membatasi setiap pengguna hanya
+-- bisa membaca/menulis baris MILIKNYA. Pengiriman push dilakukan
+-- Supabase Edge Function dengan kunci layanan (service role) yang
+-- melewati RLS, dipicu perubahan pada tabel messages/message_replies
+-- (pesan grup baru) dan profiles (pendaftar baru menunggu).
+-- ---------------------------------------------------------------------
+create table if not exists public.push_subscriptions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  endpoint text not null unique,
+  p256dh text not null,
+  auth text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists push_subscriptions_user_id_idx
+  on public.push_subscriptions (user_id);
+
+alter table public.push_subscriptions enable row level security;
+
+drop policy if exists "Users can read their own push subscriptions" on public.push_subscriptions;
+create policy "Users can read their own push subscriptions"
+  on public.push_subscriptions for select
+  to authenticated
+  using (user_id = (select auth.uid()));
+
+drop policy if exists "Users can save their own push subscriptions" on public.push_subscriptions;
+create policy "Users can save their own push subscriptions"
+  on public.push_subscriptions for insert
+  to authenticated
+  with check (user_id = (select auth.uid()));
+
+drop policy if exists "Users can update their own push subscriptions" on public.push_subscriptions;
+create policy "Users can update their own push subscriptions"
+  on public.push_subscriptions for update
+  to authenticated
+  using (user_id = (select auth.uid()))
+  with check (user_id = (select auth.uid()));
+
+drop policy if exists "Users can delete their own push subscriptions" on public.push_subscriptions;
+create policy "Users can delete their own push subscriptions"
+  on public.push_subscriptions for delete
+  to authenticated
+  using (user_id = (select auth.uid()));
+
+grant select, insert, update, delete on public.push_subscriptions to authenticated;
+revoke select, insert, update, delete on public.push_subscriptions from anon;
+
+-- ---------------------------------------------------------------------
 -- LANGKAH MANUAL SETELAH SKEMA (sekali saja):
 -- 1) Authentication > Users: buat/pilih akun admin, salin UUID-nya.
 -- 2) Jalankan (ganti UUID dan nama):

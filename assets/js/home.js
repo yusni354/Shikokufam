@@ -224,6 +224,10 @@ function vPengaturan(){
   }));
   gayaSel.value=PETA_STYLES[tersimpanPeta.gaya]?tersimpanPeta.gaya:'jalan';
   return [h('h1',{},'Pengaturan'),
+    /* Baris Notifikasi Push juga ada di sini (halaman yang sama
+       seperti di Profil/akun): hanya Admin Utama & Pengurus;
+       fungsi barisNotifikasiPush di push.js yang menjaganya. */
+    ...(typeof barisNotifikasiPush==='function'?[barisNotifikasiPush()].filter(Boolean):[]),
     box(h('b',{},'Pesan sambutan di Home'),
       inp,
       h('div',{class:'fl'},h('button',{class:'btn',onclick:async()=>{
@@ -527,6 +531,10 @@ function vDash(){
   return [h('h1',{},'Selamat datang'+(S.name?', '+S.name.split(' ')[0]:'')+'!'),
     h('p',{class:'sub'},new Date().toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'})),
     h('div',{class:'card',style:'display:block'},h('small',{class:'warn'},'User ID'),h('br'),h('b',{},S.email||S.uid||'-')),
+    /* Baris Notifikasi Push di halaman Profil/akun ini: hanya untuk
+       Admin Utama & Pengurus; untuk Anggota tidak tampil apa-apa
+       (barisNotifikasiPush di push.js mengembalikan null). */
+    ...(typeof barisNotifikasiPush==='function'?[barisNotifikasiPush()].filter(Boolean):[]),
     h('div',{class:'stats'},...[['Anggota',S.members.length],['Kegiatan',S.events.length],['Wilayah',Object.keys(wilayah()).length]].map(x=>h('div',{},h('small',{},x[0]),h('b',{},String(x[1]))))),
     c('users','Daftar Anggota',S.members.length+' anggota','members'),
     c('calendar','Kegiatan',S.events.length+' kegiatan','kegiatan'),

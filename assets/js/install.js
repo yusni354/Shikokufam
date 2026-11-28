@@ -54,6 +54,49 @@ function unduhAndroid(){
 /* Download iOS: iOS tidak menyediakan perintah pasang terprogram,
    jadi selalu tampilkan petunjuk Bagikan -> Layar Utama. */
 function unduhIOS(){panelPetunjukPasang('ios')}
+/* ===== Navigasi dari notifikasi push =====
+   Ketukan notifikasi (lihat handler 'notificationclick' di sw.js)
+   mengirim postMessage 'shikoku-push-navigate' ke jendela aplikasi
+   yang sudah terbuka, atau membuka jendela baru dengan parameter
+   '?push=<view>'. Keduanya diterima di sini dan dijalankan lewat
+   go() — yang sudah menjaga halamannya sendiri (Pesan Grup &
+   Persetujuan hanya untuk admin/pengurus; pengguna lain terpental
+   ke Home). Bila sesi belum siap saat pesan tiba (aplikasi baru
+   dimuat), tujuannya ditahan dan diterapkan begitu sesi masuk
+   terpulihkan, paling lama ±2 menit. */
+let pushNavTertunda=null,pushNavPercobaan=0;
+function pushTerapkanNavigasi(view){
+  if(view!=='pesan'&&view!=='approvals')return;
+  if(typeof S!=='undefined'&&S.uid&&!S.authLoading&&S.admin&&typeof go==='function'){go(view);return}
+  pushNavTertunda=view;pushNavPercobaan=0;
+}
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.addEventListener('message',event=>{
+    const d=event&&event.data;
+    if(d&&d.type==='shikoku-push-navigate'&&d.view)pushTerapkanNavigasi(d.view);
+  });
+}
+try{
+  const paramPush=new URLSearchParams(window.location.search).get('push');
+  if(paramPush){
+    pushTerapkanNavigasi(paramPush);
+    /* Bersihkan parameternya dari alamat supaya muat ulang tidak
+       menavigasi lagi; replaceState tidak menambah entri riwayat. */
+    try{history.replaceState(history.state,'',window.location.pathname+window.location.hash)}catch(e){}
+  }
+}catch(e){/* alamat tidak bisa dibaca: abaikan */}
+setInterval(()=>{
+  if(!pushNavTertunda)return;
+  pushNavPercobaan++;
+  if(pushNavPercobaan>120){pushNavTertunda=null;return}
+  if(typeof S==='undefined'||S.authLoading||!S.uid)return;
+  const tujuan=pushNavTertunda;
+  pushNavTertunda=null;
+  /* Kedua halaman tujuan khusus admin & pengurus; selain itu
+     navigasinya gugur (go() pun akan memantulkannya ke Home). */
+  if(!S.admin)return;
+  if(typeof go==='function')go(tujuan);
+},1000);
 /* Daftarkan service worker bila memungkinkan. Di situs produksi sw.js
    diletakkan di folder utama; di pratinjau ini dicoba dari assets/. */
 (function registerServiceWorker() {

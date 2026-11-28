@@ -24,5 +24,9 @@ writeFileSync('assets/config.js',
   url: ${JSON.stringify(url)},
   anonKey: ${JSON.stringify(anonKey)}
 });
+/* Kunci PUBLIK VAPID untuk langganan notifikasi push (Web Push).
+   Kunci publik aman dibagikan ke peramban — pasangan privatnya hanya
+   ada di server pengirim (Supabase Edge Function). */
+window.VAPID_PUBLIC_KEY = 'BB9PO1Le5I0jrPwmj8HKWZoTYwWUa9Vr2gsjx75s1GqoRowXEeGP458urTA1ExeLvAzM0v6o-FgQIiHSeRkSCn8';
 `);
 console.log('assets/config.js berhasil dibuat.');

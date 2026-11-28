@@ -139,6 +139,11 @@ render();
              lewat kejadian realtime / pemuatan berikutnya. */
           await denganBatasWaktu(loadMessages(), 8000);
           await denganBatasWaktu(subscribeToMessages(), 5000);
+          /* Langganan notifikasi push (admin & pengurus): bila izin
+             SUDAH pernah diberikan, langganannya diperbarui otomatis
+             di latar — tidak ditunggu dan tidak pernah meminta izin,
+             jadi tidak bisa menahan pemeriksaan sesi. */
+          if (typeof pushPerbaruiLanggananOtomatis === 'function') void pushPerbaruiLanggananOtomatis();
         }
         await denganBatasWaktu(loadPendingUsers(), 8000);
         if (session?.user && (S.approvalStatus === 'approved' || S.admin)) startDataSubscriptions();
