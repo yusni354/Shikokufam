@@ -1,6 +1,33 @@
 /* Titik awal aplikasi: siapkan Supabase, baca sesi login, lalu gambar halaman */
+/* Batas waktu untuk langkah jaringan saat aplikasi dibuka: janji yang
+   dibungkus fungsi ini TIDAK PERNAH menggantung selamanya — bila dalam
+   ms milidetik belum selesai (atau gagal), hasilnya dianggap kosong
+   (null) dan pemanggil melanjutkan dengan keadaan cadangannya. Tanpa
+   batas ini, satu permintaan yang macet — mis. penyegaran token sesi
+   lewat koneksi HP yang setengah terbuka sesudah aplikasi ditutup —
+   membuat layar 'Memeriksa sesi login...' bertahan selamanya, karena
+   S.authLoading tidak pernah dicabut. */
+function denganBatasWaktu(janji, ms) {
+  let timer = null;
+  const batas = new Promise(resolve => { timer = setTimeout(() => resolve(null), ms); });
+  return Promise.race([Promise.resolve(janji).catch(() => null), batas])
+    .then(hasil => { clearTimeout(timer); return hasil; });
+}
 render();
 (async () => {
+  /* Pengawas terakhir muatan awal: apa pun yang terjadi pada langkah
+     pemeriksaan sesi di bawah, layar 'Memeriksa sesi login...' tidak
+     boleh bertahan lebih dari 20 detik. Bila batas ini tercapai,
+     halaman digambar dengan keadaan sesi yang sudah sempat terbaca
+     (masuk -> Home, belum -> formulir masuk); langkah yang masih
+     berjalan di latar tetap menyelesaikan gambarannya sendiri lewat
+     render() di akhir applySession. */
+  setTimeout(() => {
+    if (!S.authLoading) return;
+    console.error('Pemeriksaan sesi login melewati batas 20 detik; halaman ditampilkan dengan keadaan sesi yang sudah ada.');
+    S.authLoading = false;
+    render();
+  }, 20000);
   // ID sementara bila belum login (dipakai mode lokal saja)
   try {
     S.uid = localStorage.getItem('uid');
@@ -66,7 +93,10 @@ render();
     const applySession = async session => {
       try {
         if (!session?.user && S.messageChannel) {
-          await S.supabase.removeChannel(S.messageChannel);
+          /* Penutupan kanal realtime diberi batas waktu: soket yang
+             sedang bermasalah bisa membuat removeChannel tidak pernah
+             selesai, dan itu tidak boleh menahan pemeriksaan sesi. */
+          await denganBatasWaktu(S.supabase.removeChannel(S.messageChannel), 3000);
           S.messageChannel = null;
         }
         stopDataSubscriptions();
@@ -89,8 +119,12 @@ render();
              layar menunggu hanya karena satu permintaan gagal. */
           let profile = null, profileError = null;
           for (let attempt = 0; attempt < 2; attempt++) {
-            const res = await S.supabase.from('profiles').select('name,role,is_main_admin,approval_status').eq('id', session.user.id).maybeSingle();
-            profile = res.data; profileError = res.error;
+            /* Tiap percobaan dibatasi 6 detik: permintaan profil yang
+               macet dihitung sebagai bacaan gagal (lalu dicoba sekali
+               lagi), bukan menggantungkan pemeriksaan sesi selamanya. */
+            const res = await denganBatasWaktu(S.supabase.from('profiles').select('name,role,is_main_admin,approval_status').eq('id', session.user.id).maybeSingle(), 6000);
+            if (res) { profile = res.data; profileError = res.error; }
+            else { profile = null; profileError = { message: 'Batas waktu membaca profil tercapai' }; }
             if (!profileError) break;
             console.error('Profil tidak dapat dibaca:', profileError);
             await new Promise(r => setTimeout(r, 700));
@@ -99,10 +133,14 @@ render();
           S.name = profile?.name || session.user.email || '';
           S.mainAdmin = S.admin && profile?.is_main_admin === true;
           S.approvalStatus = profile?.approval_status || 'pending';
-          await loadMessages();
-          await subscribeToMessages();
+          /* Pesan & langganan realtime BUKAN syarat masuk: keduanya
+             diberi batas waktu supaya muatan pesan yang macet tidak
+             menahan dibukanya aplikasi; pesan tetap tiba belakangan
+             lewat kejadian realtime / pemuatan berikutnya. */
+          await denganBatasWaktu(loadMessages(), 8000);
+          await denganBatasWaktu(subscribeToMessages(), 5000);
         }
-        await loadPendingUsers();
+        await denganBatasWaktu(loadPendingUsers(), 8000);
         if (session?.user && (S.approvalStatus === 'approved' || S.admin)) startDataSubscriptions();
       } catch (error) {
         console.error('Gagal menyiapkan sesi login:', error);
@@ -138,7 +176,17 @@ render();
          pembacaan awal di bawah. */
       if (appliedUid === undefined) applySession(null);
     });
-    const { data: { session } } = await S.supabase.auth.getSession();
+    /* getSession() diberi batas waktu 6 detik: bila token tersimpan
+       harus disegarkan dan permintaan penyegarannya macet di jaringan
+       (kejadian khas saat aplikasi dibuka lagi di HP), getSession
+       tidak pernah selesai — dahulu inilah yang membuat aplikasi
+       berhenti di 'Memeriksa sesi login...' setiap dibuka lagi. Bila
+       batas tercapai, sesi dianggap belum terbaca dan sumber
+       pemulihan kedua (INITIAL_SESSION) yang memutuskan; bila sesi
+       akhirnya tiba belakangan, pendengar sesi di atas tetap
+       menerapkannya (jalur TOKEN_REFRESHED / SIGNED_IN). */
+    const hasilSesi = await denganBatasWaktu(S.supabase.auth.getSession(), 6000);
+    const session = hasilSesi?.data?.session || null;
     /* Ambil sesi pertama yang tidak kosong dari kedua sumber pemulihan
        (getSession + INITIAL_SESSION). Hanya bila keduanya kosong pengguna
        benar-benar belum masuk. Batas tunggu 6 detik hanya berjalan bila
