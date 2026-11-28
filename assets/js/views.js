@@ -40,6 +40,9 @@ function updateApprovalBadges(){
     if(count>0&&!badge){badge=h('span',{id:'ab',class:'icon-badge'},value);st.append(badge)}
     if(badge){badge.textContent=value;badge.style.display=count>0?'inline-grid':'none'}
   }
+  /* Total menunggu (persetujuan + pesan) juga ditampilkan pada ikon
+     aplikasi terinstal */
+  if(typeof updateAppIconBadge==='function')updateAppIconBadge();
 }
 function renderDrawer(){
   const d=$('#dr');

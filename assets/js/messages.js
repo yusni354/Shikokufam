@@ -59,6 +59,8 @@ function updateMessageBadges(){
     if(badge){badge.textContent=value;badge.style.display=S.unreadMessages>0?'':'none'}
   };
   syncBadge(document.querySelector('[data-message-nav]'),'nav-badge');
+  /* Angka yang sama juga ditampilkan pada ikon aplikasi terinstal */
+  if(typeof updateAppIconBadge==='function')updateAppIconBadge();
 }
 function userMessageSeen(){
   try{return JSON.parse(localStorage.getItem('shikoku-family:message-seen:'+S.uid)||'{}')}catch(e){return {}}
