@@ -822,41 +822,15 @@ function attachmentPicker(){
   /* Menu '+' berisi TEPAT tiga pilihan: 'Gambar' (pilih gambar dari
      galeri, input gambar tanpa capture), 'Kamera' (ambil foto lewat
      kamera, input gambar dengan capture), dan 'File' (pilih berkas,
-     input berkas umum yang sudah ada). Pilihan 'Rekam' TIDAK ada di
-     menu ini — rekam suara kini tombol ikon mic di dalam field tulis
-     (lihat recordButton). */
+     input berkas umum yang sudah ada). */
   return {files,label,buttons:h('div',{class:'attachment-tools'},
     h('button',{class:'btn s',onclick:()=>gallery.click()},icon('image',16),h('span',{},'Gambar')),
     h('button',{class:'btn s',onclick:()=>camera.click()},icon('camera',16),h('span',{},'Kamera')),
     h('button',{class:'btn s',onclick:()=>file.click()},icon('attachment',16),h('span',{},'File')))};
 }
-/* Tombol REKAM pesan suara: kini IKON MIC SAJA (tanpa tulisan) di
-   DALAM field tulis, sisi kanan dalam (.composer-mic pada
-   .composer-field). Alur rekamnya sama seperti sebelumnya: ketuk
-   mulai merekam (ikon berubah jadi ikon berhenti dengan kelas
-   'recording'), ketuk lagi berhenti — hasil rekaman masuk daftar
-   lampiran pemilih yang sama (label berubah 'Voice note siap
-   dikirim') dan terkirim bersama pesan saat tombol Kirim ditekan. */
-function recordButton(picker){
-  const btn=h('button',{class:'composer-mic',type:'button',title:'Rekam pesan suara','aria-label':'Rekam pesan suara'},icon('mic',18));
-  let recorder,recorded=[];
-  btn.onclick=async()=>{
-    if(recorder){recorder.stop();return}
-    if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder){alert('Perekaman suara tidak didukung browser ini.');return}
-    let stream;
-    try{stream=await navigator.mediaDevices.getUserMedia({audio:true})}catch(error){alert('Mikrofon tidak dapat dibuka: '+(error.message||'periksa izin mikrofon'));return}
-    recorded=[];
-    recorder=new MediaRecorder(stream);
-    recorder.ondataavailable=e=>{if(e.data.size)recorded.push(e.data)};
-    recorder.onstop=()=>{stream.getTracks().forEach(track=>track.stop());picker.files.push(new File(recorded,'voice-note.webm',{type:'audio/webm'}));picker.label.textContent='Voice note siap dikirim';recorder=null;btn.classList.remove('recording');btn.replaceChildren(icon('mic',18))};
-    recorder.start();btn.classList.add('recording');btn.replaceChildren(icon('stop',16));
-  };
-  return btn;
-}
 function replyBox(messageId){
   const input=h('textarea',{rows:2,placeholder:'Tulis balasan...'});
   const picker=attachmentPicker();
-  const mic=recordButton(picker);
   const menu=h('div',{class:'attachment-menu'},picker.buttons);
   const plus=h('button',{class:'composer-plus',type:'button',title:'Lampiran',onclick:()=>menu.classList.toggle('open')},'+');
   const send=h('button',{class:'btn',onclick:async e=>{
@@ -869,10 +843,9 @@ function replyBox(messageId){
     }catch(error){e.currentTarget.disabled=false;alert('Gagal mengirim balasan: '+error.message)}
   }},'Kirim');
   /* Tombol '+' berada DI DALAM field tulis (pembungkus .composer-field,
-     sisi kiri dalam) dan ikon mic rekam suara di dalam field sisi
-     kanan dalam; Kirim tetap di luar field di kanan. Menu '+' hanya
-     berisi Gambar/Kamera/File — rekam tidak lagi di menu itu. */
-  return h('div',{class:'reply-box'},menu,h('div',{class:'composer-row'},h('div',{class:'composer-field'},input,plus,mic),send),picker.label);
+     sisi kiri dalam); Kirim tetap di luar field di kanan. Menu '+'
+     berisi Gambar/Kamera/File. */
+  return h('div',{class:'reply-box'},menu,h('div',{class:'composer-row'},h('div',{class:'composer-field'},input,plus),send),picker.label);
 }
 
 /* Direktori penerima: daftar akun yang SUDAH DISETUJUI (id, nama,
@@ -944,7 +917,6 @@ function openNewMessagePicker(){
 function firstMessageBox(partner){
   const input=h('textarea',{rows:2,placeholder:'Tulis pesan...'});
   const picker=attachmentPicker();
-  const mic=recordButton(picker);
   const menu=h('div',{class:'attachment-menu'},picker.buttons);
   const plus=h('button',{class:'composer-plus',type:'button',title:'Lampiran',onclick:()=>menu.classList.toggle('open')},'+');
   const send=h('button',{class:'btn',onclick:async e=>{
@@ -958,19 +930,18 @@ function firstMessageBox(partner){
       render();
     }catch(error){e.currentTarget.disabled=false;alert('Gagal mengirim pesan: '+error.message)}
   }},'Kirim');
-  /* Sama seperti kolom balasan utas: '+' di dalam field kiri, ikon
-     mic di dalam field kanan, Kirim di luar field. */
-  return h('div',{class:'reply-box'},menu,h('div',{class:'composer-row'},h('div',{class:'composer-field'},input,plus,mic),send),picker.label);
+  /* Sama seperti kolom balasan utas: '+' di dalam field kiri,
+     Kirim di luar field. */
+  return h('div',{class:'reply-box'},menu,h('div',{class:'composer-row'},h('div',{class:'composer-field'},input,plus),send),picker.label);
 }
 /* Kolom tulis PESAN GRUP: mengirimnya membuat pesan pokok baru tanpa
    penerima dengan pengirim saya (admin/pengurus) — pesan grup yang
    dibaca semua admin & pengurus. Tata letak kolomnya sama seperti
-   kolom balasan utas: '+' lampiran di dalam field kiri, ikon mic di
-   dalam field kanan, Kirim di luar field. */
+   kolom balasan utas: '+' lampiran di dalam field kiri, Kirim di
+   luar field. */
 function groupMessageBox(){
   const input=h('textarea',{rows:2,placeholder:'Tulis pesan untuk grup...'});
   const picker=attachmentPicker();
-  const mic=recordButton(picker);
   const menu=h('div',{class:'attachment-menu'},picker.buttons);
   const plus=h('button',{class:'composer-plus',type:'button',title:'Lampiran',onclick:()=>menu.classList.toggle('open')},'+');
   const send=h('button',{class:'btn',onclick:async e=>{
@@ -983,7 +954,7 @@ function groupMessageBox(){
       render();
     }catch(error){e.currentTarget.disabled=false;alert('Gagal mengirim pesan: '+error.message)}
   }},'Kirim');
-  return h('div',{class:'reply-box'},menu,h('div',{class:'composer-row'},h('div',{class:'composer-field'},input,plus,mic),send),picker.label);
+  return h('div',{class:'reply-box'},menu,h('div',{class:'composer-row'},h('div',{class:'composer-field'},input,plus),send),picker.label);
 }
 function vPesan(){
   if(!S.uid)return [h('h1',{},'Pesan Grup'),accountForm()];

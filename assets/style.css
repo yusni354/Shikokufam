@@ -397,17 +397,8 @@ body.open #dr{transform:none}body.open #ov{display:block}
    banyak baris, tombol tetap diam di kiri-bawah sejajar baris
    terakhir dan tidak menutupi teks (teks mulai di kanan tombol). */
 .composer-field{position:relative;flex:1;min-width:0}
-.composer-field textarea{display:block;width:100%;margin:0;padding-left:52px;padding-right:52px}
+.composer-field textarea{display:block;width:100%;margin:0;padding-left:52px;padding-right:14px}
 .composer-field .composer-plus{position:absolute;left:7px;bottom:7px;width:34px;height:34px;font-size:24px;z-index:1}
-/* Ikon mic rekam suara DI DALAM field tulis, sisi kanan dalam:
-   cukup ikon saja tanpa tulisan, bulat mengikuti gaya tombol '+',
-   diam di kanan-bawah bidang; area ketik sudah diberi ruang kanan
-   (padding-right pada textarea) sehingga teks tidak tertutup mic
-   dan tombol Kirim di luar field tidak bergeser. Saat merekam,
-   tombol beralih kelas 'recording' (merah) dengan ikon berhenti. */
-.composer-field .composer-mic{position:absolute;right:7px;bottom:7px;width:34px;height:34px;border:0;border-radius:50%;background:var(--line);color:var(--acc);display:grid;place-items:center;flex:none;z-index:1;cursor:pointer;padding:0}
-.composer-field .composer-mic:hover{background:#d7edf7}
-.composer-field .composer-mic.recording{background:#d9455f;color:#fff}
 .attachment-menu{display:none;gap:6px;align-items:center;padding:8px;background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:0 8px 22px rgba(23,50,77,.16)}
 .attachment-menu.open{display:flex}
 .reply-box>.attachment-menu{position:absolute;left:0;bottom:calc(100% + 8px);z-index:3;flex-wrap:wrap}
@@ -2009,8 +2000,8 @@ header .logo{border-radius:13px}
 .chat-bubble{line-height:1.5;font-size:14.5px;box-shadow:0 2px 6px rgba(50,75,95,.07)}
 .chat-card .reply-box{padding-top:9px}
 .composer-field textarea{border-radius:20px}
-.composer-field .composer-plus,.composer-field .composer-mic{transition:background .15s ease,transform .15s ease}
-.composer-field .composer-plus:active,.composer-field .composer-mic:active{transform:scale(.92)}
+.composer-field .composer-plus{transition:background .15s ease,transform .15s ease}
+.composer-field .composer-plus:active{transform:scale(.92)}
 .attachment-menu{border-radius:15px;box-shadow:0 10px 26px rgba(23,50,77,.18)}
 .chat-dialog-preview{border-radius:11px}
 
