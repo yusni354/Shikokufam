@@ -187,7 +187,7 @@ function render(){
   $('#sw').style.display=S.mainAdmin?'flex':'none';
   updateApprovalBadges();
   const current=ALL.find(x=>x[0]===S.view);
-  if(!V[S.view]||(S.view==='approvals'&&!S.admin)||(S.view==='pengaturan'&&!S.mainAdmin)||(S.view==='keamanan'&&!S.mainAdmin)||(!S.mainAdmin&&!menuAktifUntuk(S.view)))S.view='landing';
+  if(!V[S.view]||(S.view==='approvals'&&!S.admin)||(S.view==='pesan'&&!S.admin)||(S.view==='pengaturan'&&!S.mainAdmin)||(S.view==='keamanan'&&!S.mainAdmin)||(!S.mainAdmin&&!menuAktifUntuk(S.view)))S.view='landing';
   /* Halaman Peta = SATU JENDELA tanpa gulir halaman: kelas 'peta-view'
      pada body mengunci tinggi halaman setinggi layar (lihat CSS
      .peta-fit di style.css); halaman lain tidak terpengaruh. Dipasang

@@ -430,8 +430,8 @@ function vHome(){
   const summaryRows=[
     {glyph:'wallet',judul:'Keuangan · '+today.toLocaleDateString('id-ID',{month:'long',year:'numeric'}),isi:formatYen(finTotalBulanIni)+' dari '+finBulanIni.length+' catatan belanja',view:'keuangan'},
     {glyph:'box',judul:'Inventari Benda SB',isi:(S.inventaris||[]).length+' benda tercatat'+(invDipinjam?' · '+invDipinjam+' sedang dipinjam':' · semua tersedia'),view:'inventaris'},
-    {glyph:'inbox',judul:'Pesan Masuk',isi:S.unreadMessages>0?S.unreadMessages+' pesan belum dibaca':'Tidak ada pesan yang belum dibaca',view:'pesan',badge:S.unreadMessages>0?String(S.unreadMessages):''}
-  ].filter(row=>S.mainAdmin||menuAktifUntuk(row.view));
+    {glyph:'messages',judul:'Pesan Grup',isi:S.unreadMessages>0?S.unreadMessages+' pesan grup belum dibaca':'Tidak ada pesan grup yang belum dibaca',view:'pesan',badge:S.unreadMessages>0?String(S.unreadMessages):''}
+  ].filter(row=>(S.mainAdmin||menuAktifUntuk(row.view))&&(row.view!=='pesan'||S.admin));
   if(S.admin&&(S.pendingUsers||[]).length>0)summaryRows.push({glyph:'users',judul:'Persetujuan Akun',isi:(S.pendingUsers||[]).length+' akun menunggu persetujuan',view:'approvals',badge:String((S.pendingUsers||[]).length)});
   return [
     approvedBanner,
@@ -459,8 +459,7 @@ function vHome(){
       h('span',{class:'home-summary-main'},h('b',{},row.judul),h('small',{},row.isi)),
       row.badge?h('span',{class:'nav-badge'},row.badge):null,
       h('span',{class:'home-summary-arrow'},'›')))),
-    homeAttendanceChart(),
-    h('button',{class:'home-admin-link',onclick:askForm},icon('messages',17),' Butuh bantuan? Hubungi Admin')
+    homeAttendanceChart()
   ];
 }
 /* Grafik kehadiran: batang SVG + donat, dihitung murni dari daftar hadir
@@ -533,7 +532,7 @@ function vDash(){
     c('calendar','Kegiatan',S.events.length+' kegiatan','kegiatan'),
     c('brush','Jadwal Piket',S.cleaningDuties.length+' jadwal','piket'),
     c('messages','Forum',S.topics.length+' topik','forum'),
-    c('inbox','Pesan Masuk',S.admin?((S.tanya?.length||0)+' pesan'):'Pesan saya','pesan'),
+    ...(S.admin?[c('messages','Pesan Grup',String(S.unreadMessages||0)+' pesan grup belum dibaca','pesan')]:[]),
     c('map','Peta & Wilayah',Object.keys(wilayah()).length+' wilayah','peta'),
     h('button',{class:'card',onclick:()=>signOut()},h('span',{class:'e'},icon('logout',22)),h('span',{style:'flex:1'},h('b',{},'Keluar')),'›')];
 }

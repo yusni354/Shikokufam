@@ -1,4 +1,14 @@
-/* Pesan ke admin: muat, kirim, balas, lampiran, tampilan percakapan */
+/* Pesan Grup admin & pengurus: muat, kirim, balas, lampiran, tampilan utas grup.
+   Perpesanan di drawer kini SATU pesan grup bersama yang hanya bisa
+   dibuka admin dan pengurus (S.admin); untuk anggota tidak ada menu
+   Pesan sama sekali (menu disembunyikan di drawer, navigasinya dijaga
+   di go()/render()). Pesan grup disimpan sebagai pesan pokok TANPA
+   penerima (recipient_id kosong) yang pengirimnya admin/pengurus —
+   bentuk yang sama seperti pesan Tanya Admin lama, jadi admin &
+   pengurus memang sudah memuatnya di loadMessages; yang membedakan
+   pesan grup dari pertanyaan anggota adalah PERAN pengirimnya
+   (isGroupSender). Balasan menempel pada pesan pokok grup seperti
+   sebelumnya. */
 /* hidden_for: daftar uid yang MENYEMBUNYIKAN baris ini dari tampilannya
    sendiri (penghapusan "untuk saya saja" pada pesan kiriman lawan
    bicara). Bentuknya larik uid di kolom jsonb hidden_for pada tabel
@@ -54,6 +64,15 @@ function userMessageSeen(){
   try{return JSON.parse(localStorage.getItem('shikoku-family:message-seen:'+S.uid)||'{}')}catch(e){return {}}
 }
 function incomingMessageItems(){
+  /* Untuk ADMIN & PENGURUS, "pesan masuk" = isi PESAN GRUP saja:
+     pesan pokok grup dari pengirim lain + balasan orang lain pada
+     pesan pokok grup. Lencana menu Pesan Grup mengikuti angka ini. */
+  if(S.admin){
+    const roots=groupMessages().filter(message=>message.sender_id!==S.uid&&!pesanTersembunyiUntukSaya(message));
+    const rootIds=new Set(groupMessages().map(message=>String(message.id)));
+    const replies=(S.replies||[]).filter(reply=>rootIds.has(String(reply.message_id))&&reply.by!==S.uid&&!pesanTersembunyiUntukSaya(reply));
+    return [...roots,...replies];
+  }
   /* Pesan masuk bagi saya = pesan pokok yang TIDAK saya kirim (pesan
      langsung yang ditujukan ke saya, atau pesan Tanya Admin bila saya
      admin) + balasan dari orang lain. loadMessages hanya memuat pesan
@@ -81,6 +100,50 @@ function memberForUser(user){
   if(!user||!user.email)return null;
   const email=String(user.email).toLowerCase();
   return (S.members||[]).find(member=>String(member.email||'').toLowerCase()===email)||null;
+}
+/* ===== Pesan Grup (admin & pengurus) =====
+   Pengirim pesan grup = akun berperan admin/pengurus menurut
+   direktori pengguna (role 'admin' atau admin utama); akun saya
+   sendiri mengikuti peran sesi saya. Pesan tanpa penerima dari
+   ANGGOTA (pertanyaan Tanya Admin) BUKAN pesan grup dan tidak tampil
+   di utas grup. */
+function isGroupSender(id){
+  if(!id)return false;
+  if(String(id)===String(S.uid))return !!S.admin;
+  const user=directoryUser(id);
+  return !!user&&(user.role==='admin'||user.is_main_admin===true);
+}
+function groupMessages(){
+  return (S.tanya||[]).filter(message=>!message.recipient_id&&isGroupSender(message.sender_id));
+}
+/* Seluruh entri utas grup (pesan pokok grup + balasannya) berurutan
+   waktu, dengan pengirim tiap entri untuk label nama di utas. Entri
+   yang saya sembunyikan (hapus untuk saya saja) tidak ikut tampil. */
+function groupEntries(){
+  const entries=[];
+  groupMessages().forEach(message=>{
+    if(!pesanTersembunyiUntukSaya(message))entries.push({id:message.id,kind:'root',message_id:message.id,at:message.at||0,mine:message.sender_id===S.uid,sender_id:message.sender_id,nama:message.nama||'',teks:message.teks||'',attachments:message.attachments||[]});
+    (S.replies||[]).filter(reply=>reply.message_id===message.id&&!pesanTersembunyiUntukSaya(reply)).forEach(reply=>{
+      entries.push({id:reply.id,kind:'reply',message_id:message.id,at:reply.at||0,mine:reply.by===S.uid,sender_id:reply.by,nama:'',teks:reply.teks||'',attachments:reply.attachments||[]});
+    });
+  });
+  entries.sort((a,b)=>a.at-b.at);
+  return entries;
+}
+function groupSenderName(entry){
+  if(entry.mine)return 'Anda';
+  if(entry.nama)return entry.nama;
+  const user=directoryUser(entry.sender_id);
+  if(user&&user.name)return user.name;
+  return 'Pengurus';
+}
+function groupSenderAvatar(entry){
+  const user=directoryUser(entry.sender_id);
+  const member=user?memberForUser(user):null;
+  const name=groupSenderName(entry);
+  if(member&&member.foto)return h('img',{class:'chat-avatar chat-avatar-sm',...memberMediaAttributes(member.foto,'src'),alt:'Foto '+name});
+  if(user&&user.avatar_url)return h('img',{class:'chat-avatar chat-avatar-sm',src:user.avatar_url,alt:'Foto '+name});
+  return h('div',{class:'chat-avatar chat-avatar-sm'},(name||'?').trim().charAt(0).toUpperCase()||'?');
 }
 function conversationGroups(){
   const groups=[],byKey=new Map();
@@ -196,6 +259,19 @@ async function subscribeToMessages(){
     if(status==='CHANNEL_ERROR'||status==='TIMED_OUT')console.error('Realtime pesan tidak tersedia:',status);
   });
 }
+/* Lencana & nama pengirim Pesan Grup ditentukan dari peran akun di
+   direktori pengguna; admin/pengurus memuat direktori itu sekali
+   sesudah pesan dimuat supaya lencana grup benar sejak awal, bukan
+   hanya sesudah halaman Pesan Grup dibuka. */
+function muatDirektoriUntukGrup(){
+  if(!S.admin||S.directoryLoaded||S.directoryLoading)return;
+  loadUserDirectory().then(()=>{
+    const seen=userMessageSeen();
+    S.unreadMessages=incomingMessageItems().filter(item=>!seen[item.id]).length;
+    updateMessageBadges();
+    if(S.view==='pesan')renderDariData();
+  });
+}
 async function loadMessages(){
   if(!S.uid)return;
   if(!S.supabase){
@@ -219,6 +295,7 @@ async function loadMessages(){
     S.unreadMessages=incomingMessageItems().filter(item=>!seen[item.id]).length;
     updateMessageBadges();
     if(changed&&S.view==='pesan')renderDariData();
+    muatDirektoriUntukGrup();
     return;
   }
   /* Saringan di lapisan data mengikuti akun yang masuk: hanya pesan
@@ -249,6 +326,7 @@ async function loadMessages(){
   S.unreadMessages=incomingMessageItems().filter(item=>!seen[item.id]).length;
   updateMessageBadges();
   if(changed&&S.view==='pesan')renderDariData();
+  muatDirektoriUntukGrup();
 }
 async function submitMessage(data){
   if(!S.uid)throw new Error('Silakan login terlebih dahulu');
@@ -882,109 +960,70 @@ function firstMessageBox(partner){
      mic di dalam field kanan, Kirim di luar field. */
   return h('div',{class:'reply-box'},menu,h('div',{class:'composer-row'},h('div',{class:'composer-field'},input,plus,mic),send),picker.label);
 }
+/* Kolom tulis PESAN GRUP: mengirimnya membuat pesan pokok baru tanpa
+   penerima dengan pengirim saya (admin/pengurus) — pesan grup yang
+   dibaca semua admin & pengurus. Tata letak kolomnya sama seperti
+   kolom balasan utas: '+' lampiran di dalam field kiri, ikon mic di
+   dalam field kanan, Kirim di luar field. */
+function groupMessageBox(){
+  const input=h('textarea',{rows:2,placeholder:'Tulis pesan untuk grup...'});
+  const picker=attachmentPicker();
+  const mic=recordButton(picker);
+  const menu=h('div',{class:'attachment-menu'},picker.buttons);
+  const plus=h('button',{class:'composer-plus',type:'button',title:'Lampiran',onclick:()=>menu.classList.toggle('open')},'+');
+  const send=h('button',{class:'btn',onclick:async e=>{
+    if(!input.value.trim()&&!picker.files.length)return;
+    try{
+      e.currentTarget.disabled=true;
+      const attachments=await uploadMessageFiles(picker.files);
+      await submitMessage({nama:S.name||S.email||'Pengurus',teks:input.value.trim(),attachments});
+      await loadMessages();
+      render();
+    }catch(error){e.currentTarget.disabled=false;alert('Gagal mengirim pesan: '+error.message)}
+  }},'Kirim');
+  return h('div',{class:'reply-box'},menu,h('div',{class:'composer-row'},h('div',{class:'composer-field'},input,plus,mic),send),picker.label);
+}
 function vPesan(){
-  if(!S.uid)return [h('h1',{},'Pesan Masuk'),accountForm()];
+  if(!S.uid)return [h('h1',{},'Pesan Grup'),accountForm()];
+  /* Penjaga terakhir: halaman ini khusus admin & pengurus. Navigasi
+     sudah dijaga di go()/render(); baris ini memastikan tidak ada
+     jalur lain yang menggambar utas grup untuk anggota. */
+  if(!S.admin)return [h('h1',{},'Pesan Grup'),h('p',{class:'warn'},'Pesan grup hanya untuk admin dan pengurus.')];
   if(!S.directoryLoaded&&!S.directoryLoading)loadUserDirectory().then(()=>{if(S.view==='pesan')renderDariData()});
-  const groups=conversationGroups();
-  const backToInbox=()=>{S.openConversation=null;S.newChat=null;render()};
-  /* Percakapan baru (belum ada pesan sama sekali): utas kosong sopan
-     + kolom pesan pertama di bawahnya. */
-  if(S.openConversation==='__new__'&&S.newChat){
-    const partner=S.newChat;
-    const user=directoryUser(partner.id);
-    const group={key:partner.id,name:partner.name,photoMember:null,photoUrl:user?user.avatar_url||'':'',messages:[]};
-    if(user){const member=memberForUser(user);if(member&&member.foto)group.photoMember=member}
-    return [
-      h('div',{class:'conversation-toolbar'},
-        conversationBackAvatar(group),
-        h('b',{},group.name)),
-      h('section',{class:'chat-card'},
-        h('div',{class:'chat-body'},h('p',{class:'warn chat-empty'},'Belum ada pesan. Tulis pesan pertama Anda di bawah.')),
-        firstMessageBox(partner))
-    ];
+  const roots=groupMessages();
+  const entries=groupEntries();
+  /* Membuka grup = membacanya: tandai pesan grup sebagai terbaca
+     (ditunda keluar dari gambar ulang yang sedang berjalan, dan hanya
+     bila memang ada yang belum dibaca). */
+  if(S.unreadMessages>0){
+    const grupUntukDibaca={messages:roots};
+    setTimeout(()=>{if(S.view==='pesan'&&S.admin)markMessagesRead(grupUntukDibaca)},0);
   }
-  if(S.openConversation){
-    const group=groups.find(item=>item.key===S.openConversation);
-    if(group){
-      const entries=conversationEntries(group);
-      /* Setiap gelembung bisa DITEKAN LAMA untuk membuka pilihan Hapus
-         (lihat pasangTekanLamaPesan). Utas yang semua pesannya
-         tersembunyi untuk saya tampil kosong dengan sopan, kolom
-         balasannya tetap hidup pada pesan pokok terakhir grup ini. */
-      const chatBody=h('div',{class:'chat-body'},...(entries.length?entries.map(entry=>{
-        const bubble=h('div',{class:'chat-bubble'},entry.teks,...entry.attachments.map(attachmentView).filter(Boolean));
-        pasangTekanLamaPesan(bubble,entry);
-        return h('div',{class:'chat-line '+(entry.mine?'outgoing':'incoming')},bubble);
-      }):[h('p',{class:'warn chat-empty'},'Belum ada pesan yang terlihat di percakapan ini.')]));
-      let swipeStartX=0,swipeStartY=0;
-      chatBody.ontouchstart=e=>{swipeStartX=e.changedTouches[0].clientX;swipeStartY=e.changedTouches[0].clientY};
-      chatBody.ontouchend=e=>{
-        const dx=e.changedTouches[0].clientX-swipeStartX,dy=e.changedTouches[0].clientY-swipeStartY;
-        if(dx>80&&Math.abs(dx)>Math.abs(dy)){
-          chatBody.classList.add('swipe-back');
-          setTimeout(()=>{S.openConversation=null;S.newChat=null;render()},220);
-        }
-      };
-      /* Penempatan LANGSUNG di pesan terbaru (paling bawah): tanpa
-         animasi gulir sama sekali. CSS .chat-body tidak lagi memakai
-         scroll-behavior smooth dan di sini perilaku gulir wadah
-         ditegaskan 'auto', lalu posisi diatur seketika pada frame
-         pertama (requestAnimationFrame berjalan sebelum frame itu
-         dilukis), jadi utas terbuka sudah diam di pesan terbaru —
-         tidak ada gerakan berjalan dari atas ke bawah. Jalur gambar
-         yang sama dipakai sesudah mengirim pesan sendiri (data dimuat
-         ulang lalu utas digambar ulang), jadi pesan yang baru dikirim
-         pun langsung tampil di posisi terbawah tanpa efek gulir.
-         Gulir manual pengguna di dalam utas tidak berubah. */
-      chatBody.style.scrollBehavior='auto';
-      requestAnimationFrame(()=>{chatBody.scrollTop=chatBody.scrollHeight});
-      return [
-        h('div',{class:'conversation-toolbar'},
-          conversationBackAvatar(group),
-          h('b',{},group.name)),
-        h('section',{class:'chat-card'},
-          chatBody,
-          replyBox(group.messages[group.messages.length-1].id)),
-        dialogPesan()
-      ];
-    }
-    /* Percakapan yang terbuka sudah tidak ada (data berubah): kembali
-       ke daftar kotak masuk di bawah. */
-    S.openConversation=null;
-  }
-  /* Kotak masuk: daftar percakapan milik pengguna yang masuk saja,
-     aktivitas terbaru di atas. Hanya percakapan yang masih punya
-     entri TERLIHAT untuk saya yang digambar: percakapan yang sudah
-     dihapus dari daftar (semua pesannya tersembunyi untuk saya lewat
-     hidden_for) tidak tampil dan tidak terhitung lencananya, dan akan
-     tampil lagi sendiri begitu ada pesan baru yang terlihat. */
-  const visibleGroups=groups.filter(group=>group.last);
-  const cards=visibleGroups.length?visibleGroups.map(group=>{
-    const unread=conversationUnread(group);
-    const last=group.last;
-    const snippet=last?((last.mine?'Anda: ':'')+(last.teks||(last.attachments&&last.attachments.length?'Lampiran':''))):'Belum ada pesan yang terlihat';
-    /* Setiap baris bisa DITEKAN LAMA untuk membuka pilihan Hapus
-       percakapan (lihat pasangTekanLamaPercakapan). Ketukan biasa
-       membuka percakapan; klik sisa sesudah tekan lama yang matang
-       ditelan oleh penjaga cap waktu di onclick ini. */
-    const row=h('button',{class:'conversation-row inbox-row',onclick:()=>{
-        if(Date.now()-tekanLamaPercakapanPada<700)return;
-        S.newChat=null;S.openConversation=group.key;markMessagesRead(group);
-      }},
-      conversationAvatar(group),
-      h('div',{class:'conversation-main'},
-        h('div',{class:'conversation-top'},h('b',{},group.name),last?h('span',{class:'conversation-time'},formatChatTime(last.at)):null),
-        h('small',{},snippet)),
-      unread>0&&h('span',{class:'conversation-badge'},String(unread)));
-    pasangTekanLamaPercakapan(row,group);
-    return row;
-  }):[h('p',{class:'warn'},'Belum ada percakapan. Ketuk "Pesan Baru" untuk memulai percakapan dengan pengguna lain.')];
+  /* Setiap gelembung bisa DITEKAN LAMA untuk membuka pilihan Hapus
+     (lihat pasangTekanLamaPesan). Pesan dari pengirim lain tampil
+     dengan avatar + nama pengirimnya, seperti obrolan grup. */
+  const chatBody=h('div',{class:'chat-body'},...(entries.length?entries.map(entry=>{
+    const bubble=h('div',{class:'chat-bubble'},entry.teks,...entry.attachments.map(attachmentView).filter(Boolean));
+    pasangTekanLamaPesan(bubble,entry);
+    const isi=[bubble,h('small',{class:'chat-time'},formatChatTime(entry.at))];
+    if(entry.mine)return h('div',{class:'chat-line outgoing'},h('div',{class:'chat-entry'},...isi));
+    return h('div',{class:'chat-line incoming'},
+      groupSenderAvatar(entry),
+      h('div',{class:'chat-entry'},h('small',{class:'chat-sender'},groupSenderName(entry)),...isi));
+  }):[h('p',{class:'warn chat-empty'},'Belum ada pesan di grup. Tulis pesan pertama untuk admin dan pengurus lain di bawah.')]));
+  /* Penempatan LANGSUNG di pesan terbaru (paling bawah), tanpa animasi
+     gulir — pola yang sama seperti utas percakapan sebelumnya. */
+  chatBody.style.scrollBehavior='auto';
+  requestAnimationFrame(()=>{chatBody.scrollTop=chatBody.scrollHeight});
   return [
-    h('div',{class:'inbox-head'},
-      h('h1',{},'Pesan Masuk'),
-      h('button',{class:'btn s',onclick:()=>openNewMessagePicker()},icon('edit',16),h('span',{},'Pesan Baru'))),
-    ...cards,
-    dialogPercakapan()
+    h('div',{class:'inbox-head'},h('h1',{},'Pesan Grup')),
+    h('section',{class:'chat-card'},
+      h('div',{class:'chat-head'},
+        h('div',{class:'chat-avatar'},icon('team',20)),
+        h('div',{},h('b',{},'Admin & Pengurus'),h('small',{},'Grup khusus admin dan pengurus'))),
+      chatBody,
+      groupMessageBox()),
+    dialogPesan()
   ];
 }
 /* ===== maskot: gambar diam, bisa digeser, ketuk untuk tanya admin ===== */
