@@ -1,11 +1,12 @@
 /* PWA: pendaftaran service worker + tombol unduh di drawer.
    Halaman/menu "Pasang Aplikasi" terpisah TIDAK dibuat; pemasangan
    ditawarkan lewat dua tombol di bawah tombol Keluar pada drawer:
-   'Download Android' langsung mengunduh berkas APK resmi aplikasi
-   (ShikokuFamily.apk di situs ini) lalu menampilkan petunjuk
-   memasangnya, sedangkan 'Download iOS' menampilkan panel petunjuk
-   memasang lewat menu Safari. Berkas manifest dan service worker
-   tetap dipertahankan apa adanya. */
+   'Download Android' adalah tautan unduh langsung ke berkas APK resmi
+   aplikasi (ShikokuFamily.apk di situs ini) — sekali ketuk, unduhan
+   bawaan peramban langsung mulai, tanpa cek atau panel apa pun —
+   sedangkan 'Download iOS' menampilkan panel petunjuk memasang lewat
+   menu Safari. Berkas manifest dan service worker tetap
+   dipertahankan apa adanya. */
 const ALAMAT_APK='https://shikokufam.vercel.app/ShikokuFamily.apk';
 let pwaDeferredPrompt=null;
 window.addEventListener('beforeinstallprompt',event=>{
@@ -39,54 +40,16 @@ function panelPetunjukPasang(platform){
       h('div',{class:'fl confirm-actions'},h('button',{class:'btn',onclick:()=>tutupPanelPasang()},'Selesai'))));
   document.body.append(overlay);
 }
-/* Panel sesudah unduhan APK dimulai: petunjuk membuka berkas hasil
-   unduhan untuk memasang, termasuk izin instal dari peramban bila
-   Android memintanya. Pola dialog yang sama seperti panel pasang. */
-function panelUnduhanApkMulai(){
-  tutupPanelPasang();
-  const overlay=h('div',{class:'confirm-overlay install-overlay',onclick:()=>tutupPanelPasang()},
-    h('div',{class:'card confirm-card install-card',onclick:ev=>ev.stopPropagation()},
-      h('b',{class:'confirm-title'},'Unduhan dimulai'),
-      h('ol',{class:'install-steps'},
-        h('li',{},'Tunggu sampai berkas ShikokuFamily.apk selesai diunduh.'),
-        h('li',{},'Buka berkas itu dari pemberitahuan unduhan, atau dari folder Unduhan/Downloads di HP.'),
-        h('li',{},'Ketuk "Instal". Bila HP meminta izin memasang dari peramban ini, pilih "Izinkan".')),
-      h('div',{class:'fl confirm-actions'},h('button',{class:'btn',onclick:()=>tutupPanelPasang()},'Selesai'))));
-  document.body.append(overlay);
-}
-/* Panel gagal: berkas APK tidak terjangkau (mis. tidak ada koneksi).
-   Ditampilkan sebagai pesan jujur, bukan klik yang diam saja. */
-function panelUnduhanApkGagal(){
-  tutupPanelPasang();
-  const overlay=h('div',{class:'confirm-overlay install-overlay',onclick:()=>tutupPanelPasang()},
-    h('div',{class:'card confirm-card install-card',onclick:ev=>ev.stopPropagation()},
-      h('b',{class:'confirm-title'},'Unduhan gagal'),
-      h('p',{class:'confirm-text'},'Berkas aplikasi belum bisa diunduh saat ini. Periksa koneksi internet HP, lalu coba lagi.'),
-      h('div',{class:'fl confirm-actions'},h('button',{class:'btn',onclick:()=>tutupPanelPasang()},'Selesai'))));
-  document.body.append(overlay);
-}
-/* Download Android: sekali klik langsung mengunduh berkas APK resmi.
-   Keterjangkauan berkas dicek dulu (HEAD); bila tidak terjangkau,
-   tampilkan pesan gagal. Unduhan dipicu lewat tautan dengan atribut
-   download supaya peramban mengunduh, bukan membuka halaman baru. */
-async function unduhAndroid(){
-  let terjangkau=false;
-  try{
-    const r=await fetch(ALAMAT_APK,{method:'HEAD'});
-    terjangkau=r.ok;
-  }catch(e){
-    /* Beda asal (mis. pratinjau) bisa menolak baca respons walau berkas
-       ada; coba mode no-cors: selesai tanpa galat berarti server menjawab. */
-    try{await fetch(ALAMAT_APK,{method:'HEAD',mode:'no-cors'});terjangkau=true}catch(e2){terjangkau=false}
-  }
-  if(!terjangkau){panelUnduhanApkGagal();return}
+/* Download Android: tautan unduh langsung biasa — sekali ketuk,
+   unduhan bawaan peramban langsung mulai saat itu juga, tanpa cek
+   keterjangkauan dan tanpa panel pemberitahuan apa pun. */
+function unduhAndroid(){
   const tautan=document.createElement('a');
   tautan.href=ALAMAT_APK;
   tautan.download='ShikokuFamily.apk';
   document.body.append(tautan);
   tautan.click();
   tautan.remove();
-  panelUnduhanApkMulai();
 }
 /* Download iOS: iOS tidak menyediakan perintah pasang terprogram,
    jadi selalu tampilkan petunjuk Bagikan -> Layar Utama. */
