@@ -828,12 +828,39 @@ function attachmentPicker(){
     h('button',{class:'btn s',onclick:()=>camera.click()},icon('camera',16),h('span',{},'Kamera')),
     h('button',{class:'btn s',onclick:()=>file.click()},icon('attachment',16),h('span',{},'File')))};
 }
+/* Pembangun kolom tulis pesan BERSAMA — dipakai balasan utas, pesan
+   pertama, dan pesan grup, supaya ketiganya selalu tampil dan berperilaku
+   sama: menu lampiran di atas; field tulis dengan tombol '+' lampiran
+   DI DALAM sisi kiri-bawah field; tombol kirim BULAT berikon pesawat
+   kertas saja (tanpa teks) di luar field sebelah kanan.
+   - Teks di field rata kiri mulai dari atas; jarak kiri 52px memberi
+     ruang bagi tombol '+' dan berlaku untuk semua baris (lihat CSS
+     .composer-field textarea).
+   - Field MELAR otomatis mengikuti isi: tiap ketikan tingginya disetel
+     dari scrollHeight sampai batas 168px, sesudah itu teks bergulir di
+     dalam field saja; teks dihapus → field menyusut lagi. Tombol '+'
+     menempel di kiri-bawah field, jadi tetap enak diketuk saat melar.
+   - Tombol kirim redup selama field kosong dan belum ada lampiran, dan
+     menyala penuh (kelas 'siap') begitu ada isi — perubahan lampiran
+     terbaca lewat label nama berkas milik pemilih lampiran. */
+function kolomPesan(input,picker,kirim){
+  const menu=h('div',{class:'attachment-menu'},picker.buttons);
+  const plus=h('button',{class:'composer-plus',type:'button',title:'Lampiran',onclick:()=>menu.classList.toggle('open')},'+');
+  const send=h('button',{class:'composer-send',type:'button',title:'Kirim pesan','aria-label':'Kirim pesan',onclick:kirim},icon('send',20));
+  const segarkan=()=>{
+    send.classList.toggle('siap',!!input.value.trim()||picker.files.length>0);
+    input.style.height='auto';
+    input.style.height=Math.min(input.scrollHeight,168)+'px';
+  };
+  input.addEventListener('input',segarkan);
+  new MutationObserver(segarkan).observe(picker.label,{childList:true,characterData:true,subtree:true});
+  segarkan();
+  return h('div',{class:'reply-box'},menu,h('div',{class:'composer-row'},h('div',{class:'composer-field'},input,plus),send),picker.label);
+}
 function replyBox(messageId){
   const input=h('textarea',{rows:2,placeholder:'Tulis balasan...'});
   const picker=attachmentPicker();
-  const menu=h('div',{class:'attachment-menu'},picker.buttons);
-  const plus=h('button',{class:'composer-plus',type:'button',title:'Lampiran',onclick:()=>menu.classList.toggle('open')},'+');
-  const send=h('button',{class:'btn',onclick:async e=>{
+  return kolomPesan(input,picker,async e=>{
     if(!input.value.trim()&&!picker.files.length)return;
     try{
       e.currentTarget.disabled=true;
@@ -841,11 +868,7 @@ function replyBox(messageId){
       await submitReply(messageId,input.value.trim(),attachments);
       await loadMessages();
     }catch(error){e.currentTarget.disabled=false;alert('Gagal mengirim balasan: '+error.message)}
-  }},'Kirim');
-  /* Tombol '+' berada DI DALAM field tulis (pembungkus .composer-field,
-     sisi kiri dalam); Kirim tetap di luar field di kanan. Menu '+'
-     berisi Gambar/Kamera/File. */
-  return h('div',{class:'reply-box'},menu,h('div',{class:'composer-row'},h('div',{class:'composer-field'},input,plus),send),picker.label);
+  });
 }
 
 /* Direktori penerima: daftar akun yang SUDAH DISETUJUI (id, nama,
@@ -917,9 +940,9 @@ function openNewMessagePicker(){
 function firstMessageBox(partner){
   const input=h('textarea',{rows:2,placeholder:'Tulis pesan...'});
   const picker=attachmentPicker();
-  const menu=h('div',{class:'attachment-menu'},picker.buttons);
-  const plus=h('button',{class:'composer-plus',type:'button',title:'Lampiran',onclick:()=>menu.classList.toggle('open')},'+');
-  const send=h('button',{class:'btn',onclick:async e=>{
+  /* Kolom bersama kolomPesan(): '+' di dalam field kiri, tombol kirim
+     pesawat kertas di luar field kanan. */
+  return kolomPesan(input,picker,async e=>{
     if(!input.value.trim()&&!picker.files.length)return;
     try{
       e.currentTarget.disabled=true;
@@ -929,10 +952,7 @@ function firstMessageBox(partner){
       S.newChat=null;S.openConversation=partner.id;
       render();
     }catch(error){e.currentTarget.disabled=false;alert('Gagal mengirim pesan: '+error.message)}
-  }},'Kirim');
-  /* Sama seperti kolom balasan utas: '+' di dalam field kiri,
-     Kirim di luar field. */
-  return h('div',{class:'reply-box'},menu,h('div',{class:'composer-row'},h('div',{class:'composer-field'},input,plus),send),picker.label);
+  });
 }
 /* Kolom tulis PESAN GRUP: mengirimnya membuat pesan pokok baru tanpa
    penerima dengan pengirim saya (admin/pengurus) — pesan grup yang
@@ -942,9 +962,7 @@ function firstMessageBox(partner){
 function groupMessageBox(){
   const input=h('textarea',{rows:2,placeholder:'Tulis pesan untuk grup...'});
   const picker=attachmentPicker();
-  const menu=h('div',{class:'attachment-menu'},picker.buttons);
-  const plus=h('button',{class:'composer-plus',type:'button',title:'Lampiran',onclick:()=>menu.classList.toggle('open')},'+');
-  const send=h('button',{class:'btn',onclick:async e=>{
+  return kolomPesan(input,picker,async e=>{
     if(!input.value.trim()&&!picker.files.length)return;
     try{
       e.currentTarget.disabled=true;
@@ -953,8 +971,7 @@ function groupMessageBox(){
       await loadMessages();
       render();
     }catch(error){e.currentTarget.disabled=false;alert('Gagal mengirim pesan: '+error.message)}
-  }},'Kirim');
-  return h('div',{class:'reply-box'},menu,h('div',{class:'composer-row'},h('div',{class:'composer-field'},input,plus),send),picker.label);
+  });
 }
 function vPesan(){
   if(!S.uid)return [h('h1',{},'Pesan Grup'),accountForm()];
